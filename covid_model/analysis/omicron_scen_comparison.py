@@ -27,64 +27,81 @@ def omicron_re(model):
     return infect_duration * new_infections / infected
 
 
+def plot(model, ax, label=None, min_date=dt.date(2021, 7, 1), max_date=dt.date(2022, 3, 31), max_hosps=4000):
+    modeled_hosps = model.solution_sum('seir')['Ih']
+
+    if max_hosps and modeled_hosps.max() > max_hosps:
+        index_where_passes_max = modeled_hosps[modeled_hosps > max_hosps].index.tolist()[0]
+        modeled_hosps = modeled_hosps.loc[:index_where_passes_max]
+    ax.plot(model.daterange[:len(modeled_hosps)], modeled_hosps, label=label)
+    ax.set_xlim((min_date, max_date))
+    ax.set_ylim((0, max_hosps))
+
+    format_date_axis(ax)
+    ax.grid(color='lightgray')
+
+
 if __name__ == '__main__':
     engine = db_engine()
 
     model = CovidModelWithVariants(end_date=dt.date(2022, 12, 31))
-    cms = CovidModelSpecifications.from_db(engine, 386, new_end_date=model.end_date)
-    cms.set_model_params('input/params.json')
+    # cms = CovidModelSpecifications.from_db(engine, 414, new_end_date=model.end_date)
+    # cms.set_model_params('input/params.json')
 
-    model.prep(specs=cms)
-
-    fig, axs = plt.subplots(2, 3)
-    axs = axs.transpose()
+    fig, axs = plt.subplots(2, 2)
     print('Prepping model...')
-    print(timeit('model.prep()', number=1, globals=globals()), 'seconds to prep model.')
+    print(timeit("model.prep(specs=417, engine=engine)", number=1, globals=globals()), 'seconds to prep model.')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
     for ax in axs.flatten():
-        modeled(model, 'Ih', ax=ax, label='No Omicron')
+        plot(model, ax=ax, label='No Omicron')
+        # modeled(model, 'Ih', ax=ax, label='No Omicron')
         # ax.plot(model.daterange, omicron_re(model), label='No Omicron')
         # plt.plot(model.daterange, omicron_prevalence_share(model), label='No Omicron')
 
     scenarios = {
-        # 'Low Vacc Escape': {'omicron_transm_mult': 2, 'omicron_acq_immune_escape': 0.5, 'omicron_vacc_eff_k': 1.6},
-        # 'High Vacc Escape': {'omicron_transm_mult': 2, 'omicron_acq_immune_escape': 0.5, 'omicron_vacc_eff_k': 2.6},
-        'Low Infectiousness, High Immune-Escape (vs. Acq. Immunity Only)': {'omicron_transm_mult': 1, 'omicron_acq_immune_escape': 0.89, 'omicron_vacc_immune_escape': 0},
-        'Low Infectiousness, High Immune-Escape (Including vs. Vacc.)': {'omicron_transm_mult': 1, 'omicron_acq_immune_escape': 0.89, 'omicron_vacc_immune_escape': 0.89},
-        'Med. Infectiousness, Med. Immune-Escape (vs. Acq. Immunity Only)': {'omicron_transm_mult': 1.5, 'omicron_acq_immune_escape': 0.55, 'omicron_vacc_immune_escape': 0},
-        'Med. Infectiousness, Med. Immune-Escape (Including vs. Vacc.)': {'omicron_transm_mult': 1.5, 'omicron_acq_immune_escape': 0.55, 'omicron_vacc_immune_escape': 0.55},
-        'High Infectiousness, Low Immune-Escape (vs. Acq. Immunity Only)': {'omicron_transm_mult': 2, 'omicron_acq_immune_escape': 0.22, 'omicron_vacc_immune_escape': 0},
-        'High Infectiousness, Low Immune-Escape (Including vs. Vacc.)': {'omicron_transm_mult': 2, 'omicron_acq_immune_escape': 0.22, 'omicron_vacc_immune_escape': 0.22},
+        # 'Low Infectiousness, Low Immune-Escape': {'omicron_transm_mult': 1.5*5/3, 'omicron_lp': 1.5, 'omicron_ip': 3, 'omicron_acq_immune_escape': 0.33, 'omicron_vacc_eff_k': 2.65},
+        # 'Low Infectiousness, High Immune-Escape': {'omicron_transm_mult': 1.5*5/3, 'omicron_lp': 1.5, 'omicron_ip': 3, 'omicron_acq_immune_escape': 0.89, 'omicron_vacc_eff_k': 7},
+        # 'High Infectiousness, Low Immune-Escape': {'omicron_transm_mult': 2.5*5/3, 'omicron_lp': 1.5, 'omicron_ip': 3, 'omicron_acq_immune_escape': 0.33, 'omicron_vacc_eff_k': 2.65},
+        'High Infectiousness, High Immune-Escape': {'omicron_transm_mult': 2.5*5/3, 'omicron_lp': 1.5, 'omicron_ip': 3, 'omicron_acq_immune_escape': 0.89, 'omicron_vacc_eff_k': 7}
     }
 
     virulence = {
-        'Same Virulence': 1.0,
-        # '25% Reduced Virulence': 0.75,
-        # '50% Reduced Virulence': 0.5
+        # '30% Reduced Virulence': 0.70,
+        # '60% Reduced Virulence': 0.40,
+        '90% Reduced Virulence': 0.10,
+        # '97% Reduced Virulence': 0.03,
     }
 
-    for om_imports_start in [1]:
-        om_imports_total = 2000
-        om_imports_by_day = np.round(om_imports_start * np.power(2, np.arange(999) / 14))
+    for om_imports_start in [0.5]:
+        om_imports_total = 1000
+        om_imports_by_day = om_imports_start * np.power(2, np.arange(999) / 14)
         om_imports_by_day = om_imports_by_day[om_imports_by_day.cumsum() <= om_imports_total]
         om_imports_by_day[-1] += om_imports_total - om_imports_by_day.sum()
         print(f'Omicron imports by day (over {len(om_imports_by_day)} days): {om_imports_by_day}')
         for t, n in zip(668 + np.arange(len(om_imports_by_day)), om_imports_by_day):
             model.set_param('om_seed', n, trange=[t])
+        base_params = model.params.copy()
         for ax, (scen_label, scen_params) in zip(axs.flatten(), scenarios.items()):
             ax.title.set_text(scen_label)
             for param, val in scen_params.items():
                 if param == 'omicron_vacc_eff_k':
                     model.specifications.model_params[param] = val
                     print(timeit('model.apply_omicron_vacc_eff()', number=1, globals=globals()), f'seconds to reapply specifications with {param} = {val}.')
+                elif param == 'omicron_lp':
+                    model.set_param('alpha', val, attrs={'variant': 'omicron'})
+                elif param == 'omicron_ip':
+                    model.set_param('gamm', 1/val, attrs={'variant': 'omicron'})
                 else:
                     model.set_param(param, val)
+
             for virulence_label, hosp_mult in virulence.items():
                 model.set_param('hosp', mult=hosp_mult, attrs={'variant': 'omicron'})
                 model.set_param('dnh', mult=hosp_mult, attrs={'variant': 'omicron'})
+                print(model.params[680])
                 model.build_ode()
                 print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
-                modeled(model, 'Ih', ax=ax, label=virulence_label)
+                plot(model, ax=ax, label=virulence_label)
+                # modeled(model, 'Ih', ax=ax, label=virulence_label)
                 # ax.plot(model.daterange, omicron_re(model), label=virulence_label)
                 model.set_param('hosp', mult=1/hosp_mult, attrs={'variant': 'omicron'})
                 model.set_param('dnh', mult=1/hosp_mult, attrs={'variant': 'omicron'})
@@ -114,7 +131,7 @@ if __name__ == '__main__':
     # ax.legend(loc='upper left')
     for ax in axs.flatten():
         format_date_axis(ax)
-        # ax.set_xlim((dt.date(2021, 1, 1), dt.date(2023, 1, 1)))
+        # ax.set_xlim((dt.date(2021, 7, 1), dt.date(2023, 1, 1)))
         # ax.set_ylim((0, 5))
 
     fig.tight_layout()

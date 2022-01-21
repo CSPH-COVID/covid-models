@@ -15,7 +15,8 @@ class CovidModelWithVariants(CovidModel):
 
     # add set a different vacc efficacy for Omicron
     def apply_omicron_vacc_eff(self):
-        self.set_param('omicron_vacc_eff', 0)
+        self.set_param('omicron_vacc_eff', 0, {'vacc': 'unvacc'})
+        self.set_param('omicron_vacc_eff', 0, {'vacc': 'vacc_fail'})
         vacc_mean_efficacy_vs_omicron_dict = self.specifications.get_vacc_mean_efficacy(k='omicron_vacc_eff_k').to_dict()
         for age in self.attr['age']:
             for t in self.trange:
@@ -66,8 +67,8 @@ class CovidModelWithVariants(CovidModel):
                                 s in ['I', 'A']]
             infectious_cmpt_coefs = [' * '.join([
                 'lamb' if seir == 'I' else '1',
-                'omicron_transm_mult' if variant == 'omicron' else '1',
-                'unvacc_relative_transm' if vacc == 'unvacc' else '1',
+                # 'omicron_transm_mult' if variant == 'omicron' else '1',
+                # 'unvacc_relative_transm' if vacc == 'unvacc' else '1',
             ]) for seir, age, vacc, variant in
                 infectious_cmpts]
             for age in self.attributes['age']:
@@ -104,6 +105,6 @@ class CovidModelWithVariants(CovidModel):
         y0d[('S', '40-64', 'unvacc', 'none')] -= 2.2
         return y0d
 
-    # don't try to write to db, since the table format doesn't match
-    def write_to_db(self, engine=None, new_spec=False):
-        pass
+    # # don't try to write to db, since the table format doesn't match
+    # def write_to_db(self, engine=None, new_spec=False):
+    #     pass

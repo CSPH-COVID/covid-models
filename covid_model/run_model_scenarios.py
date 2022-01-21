@@ -114,6 +114,7 @@ def main():
         if vacc_scen == primary_vacc_scen:
             model.specifications.tags.update({'run_type': 'Current', 'vacc_cap': vacc_scen})
             run_model(model, engine, legacy_output_dict=legacy_outputs)
+            build_legacy_output_df(model).to_csv('output/out2.csv')
 
         base_tslices, base_tc = (model.specifications.tslices, model.specifications.tc)
         for tcs in tc_shifts:
