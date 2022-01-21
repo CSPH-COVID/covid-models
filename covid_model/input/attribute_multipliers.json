@@ -1,0 +1,40 @@
+[
+
+  {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 2},
+  {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 1},
+  {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 1},
+  {"attrs": {"variant": "omicron"}, "param": "dh", "mult": 1},
+  {"attrs": {"variant": "omicron"}, "param": "dnh", "mult": 1},
+
+  {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 2},
+  {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 1},
+  {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 1},
+  {"attrs": {"variant": "omicron"}, "param": "dh", "mult": 1},
+  {"attrs": {"variant": "omicron"}, "param": "dnh", "mult": 1},
+
+  {
+  "b117": {
+    "hosp": 1.40,
+    "dh": 1.15,
+    "dnh": 1.60,
+    "betta": 1.50,
+    "pS": 1.0
+  },
+  "cali": {
+    "betta": 1.20
+  },
+  "delta": {
+    "nondelta_prevalence": 0,
+    "vacc_eff": 0.97,
+    "hosp": 2.38,
+    "dh": 1.3225,
+    "dnh": 3.28,
+    "betta": 2.25
+  },
+  "treatment_mab": {
+    "hosp": 0.21,
+    "hlos": 0.72
+  }
+}
+
+]
