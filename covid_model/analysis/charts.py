@@ -71,13 +71,26 @@ def total_hosps(model, group=None, **plot_params):
     plt.plot(model.daterange, hosps, **{'c': 'blue', 'label': 'Modeled Hosps.', **plot_params})
 
 
-def modeled(model, compartments, ax=None, transform=lambda x: x, **plot_params):
+def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], share_of_total=False, **plot_params):
     if type(compartments) == str:
         compartments = [compartments]
-    if ax is not None:
-        ax.plot(model.daterange, transform(model.solution_sum('seir')[compartments].sum(axis=1)), **{**plot_params})
+    if groupby:
+        if type(groupby) == str:
+            groupby = [groupby]
+        df = transform(model.solution_sum(['seir', *groupby])[compartments].groupby(groupby, axis=1).sum())
+        if share_of_total:
+            total = df.sum(axis=1)
+            df = df.apply(lambda s: s / total)
     else:
-        plt.plot(model.daterange, transform(model.solution_sum('seir')[compartments].sum(axis=1)), **{**plot_params})
+        df = transform(model.solution_sum('seir'))
+        if share_of_total:
+            total = df.sum(axis=1)
+            df = df.apply(lambda s: s / total)
+        df = df[compartments].sum(axis=1)
+    if ax is not None:
+        ax.plot(model.daterange, df, **{**plot_params})
+    else:
+        plt.plot(model.daterange, df, **{**plot_params})
 
 
 def modeled_re(model, ax=None, **plot_params):

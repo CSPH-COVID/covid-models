@@ -31,6 +31,7 @@ class CovidModelSpecifications:
         self.vacc_immun_params = None
         self.vacc_proj_params = None
         self.timeseries_effects = {}
+        self.attr_mults = None
 
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df, including proj, is saved to avoid unnecessary processing
@@ -102,7 +103,7 @@ class CovidModelSpecifications:
             model_params=self.model_params,
             vacc_actual={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()},
             vacc_proj_params=self.vacc_proj_params,
-            vacc_proj={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()},
+            vacc_proj={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None,
             vacc_immun_params=self.vacc_immun_params,
             timeseries_effects=self.timeseries_effects,
         )
@@ -142,6 +143,9 @@ class CovidModelSpecifications:
 
     def set_vacc_immun(self, vacc_immun_params):
         self.vacc_immun_params = vacc_immun_params if isinstance(vacc_immun_params, dict) else json.load(open(vacc_immun_params))
+
+    def set_attr_mults(self, attr_mults):
+        self.attr_mults = attr_mults if isinstance(attr_mults, dict) else json.load(open(attr_mults))
 
     def add_timeseries_effect(self, effect_type_name, prevalence_data, param_multipliers, fill_forward=False):
         # build prevalence and multiplier dataframes from inputs
@@ -211,10 +215,9 @@ class CovidModelSpecifications:
         shots = list(self.actual_vacc_df.columns)
 
         # add projections
-        # proj_from_date = self.actual_vacc_df.index.get_level_values('measure_date').max() + dt.timedelta(days=1)
         proj_from_t = self.actual_vacc_df.index.get_level_values('t').max() + 1
         proj_to_t = (self.end_date - self.start_date).days
-        if proj_to_t >= proj_from_t:
+        if proj_to_t > proj_from_t:
             proj_trange = range(proj_from_t, proj_to_t)
             # project rates based on the last {proj_lookback} days of data
             projected_rates = self.actual_vacc_df.loc[(proj_from_t - proj_lookback):].groupby('age').sum() / float(proj_lookback)
@@ -272,6 +275,10 @@ class CovidModelSpecifications:
         fail_cumu = (fail_increase - fail_reduction).groupby('age').cumsum()
         return (fail_reduction / fail_cumu).fillna(0)
 
+    @classmethod
+    def vacc_eff_decay_mult(cls, days_ago, delay, k):
+        return min(1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540), 1) ** k
+
     def get_vacc_mean_efficacy(self, delay=7, k=1):
         if isinstance(k, str):
             k = self.model_params[k]
@@ -283,14 +290,13 @@ class CovidModelSpecifications:
         vacc_effs = {k: v['eff'] for k, v in self.vacc_immun_params.items()}
 
         terminal_cumu_eff = pd.DataFrame(index=rate.index, columns=shots, data=0)
-        vacc_eff_decay_mult = lambda days_ago: (1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540)) ** k
         for shot, next_shot in zip(shots, shots[1:] + [None]):
             nonzero_ts = rate[shot][rate[shot] > 0].index.get_level_values('t')
             if len(nonzero_ts) > 0:
                 days_ago_range = range(nonzero_ts.max() - nonzero_ts.min() + 1)
                 for days_ago in days_ago_range:
                     terminal_rate = np.minimum(rate[shot], (cumu[shot] - cumu.groupby('age').shift(-days_ago)[next_shot]).clip(lower=0)) if next_shot is not None else rate[shot]
-                    terminal_cumu_eff[shot] += vacc_effs[shot] * vacc_eff_decay_mult(days_ago) * terminal_rate.groupby(['age']).shift(days_ago).fillna(0)
+                    terminal_cumu_eff[shot] += vacc_effs[shot] * self.vacc_eff_decay_mult(days_ago, delay, k) * terminal_rate.groupby(['age']).shift(days_ago).fillna(0)
 
         return (terminal_cumu_eff.sum(axis=1) / cumu[shots[0]]).fillna(0)
 
