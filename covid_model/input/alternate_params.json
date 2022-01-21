@@ -1,0 +1,10 @@
+{
+    "90% eff. vs. Delta": {"delta_vacc_escape": 0.0},
+    "81% eff. vs. Delta": {"delta_vacc_escape": 0.1},
+    "72% eff. vs. Delta": {"delta_vacc_escape": 0.2},
+    "63% eff. vs. Delta": {"delta_vacc_escape": 0.3},
+    "54% eff. vs. Delta": {"delta_vacc_escape": 0.4},
+    "45% eff. vs. Delta": {"delta_vacc_escape": 0.5},
+    "36% eff. vs. Delta": {"delta_vacc_escape": 0.6},
+    "27% eff. vs. Delta": {"delta_vacc_escape": 0.7}
+}
