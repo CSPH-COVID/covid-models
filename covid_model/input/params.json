@@ -8,7 +8,7 @@
   },
   "betta": 0.8308,
   "lamb": 1.395,
-  "gamm": 0.2  ,
+  "gamm": 0.2,
   "alpha": 2.5,
   "pS": {
     "0-19": 0.110023,
@@ -59,12 +59,8 @@
   "immune_decay_days_1": 400,
   "immune_decay_days_2": 400,
   "nondelta_prevalence": 1,
-  "delta_max_efficacy_reduction": 0.6,
-  "unvacc_relative_transm": 1,
-  "om_seed": 0,
-  "omicron_transm_mult": 1,
-  "omicron_acq_immune_escape": 0.0,
-  "omicron_vacc_immune_escape": 0.0,
+  "om_seed": {"tslices": [662, 687], "value": [0, 1, 0]},
+  "omicron_acq_immune_escape": 0.5,
   "delta_vacc_eff_k": 1.6,
-  "omicron_vacc_eff_k": 1.6
+  "omicron_vacc_eff_k": 4.5
 }

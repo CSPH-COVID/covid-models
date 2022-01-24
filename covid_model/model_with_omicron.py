@@ -81,20 +81,22 @@ class CovidModelWithVariants(CovidModel):
                               scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
                 # transmission to recovered (a.k.a. acquired-immune escape)
                 if variant == 'omicron':
-                    self.add_flow(('R', age, 'unvacc', 'none'), ('E', age, 'unvacc', variant),
-                                  f'omicron_acq_immune_escape * {base_transm_omicron}',
-                                  scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
-                    self.add_flow(('R', age, 'vacc', 'none'), ('E', age, 'vacc', variant),
-                                  f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
-                                  scale_by_cmpts_coef=infectious_cmpt_coefs)
-                    self.add_flow(('R', age, 'vacc_fail', 'none' ), ('E', age, 'vacc_fail', variant),
-                                  f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
-                                  scale_by_cmpts_coef=infectious_cmpt_coefs)
+                    for recovered_cmpt in ('R', 'R2'):
+                        self.add_flow((recovered_cmpt, age, 'unvacc', 'none'), ('E', age, 'unvacc', variant),
+                                      f'omicron_acq_immune_escape * {base_transm_omicron}',
+                                      scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+                        self.add_flow((recovered_cmpt, age, 'vacc', 'none'), ('E', age, 'vacc', variant),
+                                      f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
+                                      scale_by_cmpts_coef=infectious_cmpt_coefs)
+                        self.add_flow((recovered_cmpt, age, 'vacc_fail', 'none' ), ('E', age, 'vacc_fail', variant),
+                                      f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
+                                      scale_by_cmpts_coef=infectious_cmpt_coefs)
 
     # reset terms that depend on TC; this takes about 0.08 sec, while rebuilding the whole ODE takes ~0.90 sec
     def rebuild_ode_with_new_tc(self):
         self.reset_terms({'seir': 'S'}, {'seir': 'E'})
         self.reset_terms({'seir': 'R'}, {'seir': 'E'})
+        self.reset_terms({'seir': 'R2'}, {'seir': 'E'})
         self.build_SR_to_E_ode()
 
     # define initial state y0
