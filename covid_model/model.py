@@ -7,11 +7,11 @@ import pyswarms as ps
 from sqlalchemy import MetaData
 from datetime import datetime
 import itertools
-from data_imports import ExternalHosps, ExternalVaccWithProjections
-from model_specs import CovidModelSpecifications
-from utils import *
 from collections import OrderedDict
-from ode_builder import *
+from covid_model.data_imports import ExternalHosps, ExternalVaccWithProjections
+from covid_model.model_specs import CovidModelSpecifications
+from covid_model.utils import *
+from covid_model.ode_builder import *
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
@@ -281,19 +281,21 @@ class CovidModel(ODEBuilder):
         return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.specifications.model_params['alpha']
 
     # immunity
-    def immunity(self, variant='omicron'):
+    def immunity(self, variant='omicron', vacc_only=False):
         susc_by_t = {t: 0 for t in self.trange}
-        for from_cmpt in self.filter_cmpts_by_attrs({'seir': 'S'}) + self.filter_cmpts_by_attrs({'seir': 'R'}):
+        for from_cmpt in self.compartments:
             n = self.solution_ydf[from_cmpt]
             for to_cmpt in self.filter_cmpts_by_attrs({'seir': 'E', 'variant': variant}):
-                terms = self.get_terms_by_cmpt(from_cmpt, to_cmpt)
-                for term in terms:
-                    if term.coef_by_t is not None:  # if the term is a constant, coef_by_t will be None
-                        for t in self.trange:
-                            susc_rate = term.coef_by_t[t] * self.params[t][to_cmpt[1:]]['total_pop'] / self.params[t][to_cmpt[1:]]['betta'] / (1 - self.params[t][to_cmpt[1:]]['ef'])
-                            if t == 250:
-                                print(f'{from_cmpt}\t{to_cmpt}\t{round(n[t])}\t{round(susc_rate)}')
-                            susc_by_t[t] += n[t] * susc_rate
+                # we only want actual flows into E, not movement within E
+                if from_cmpt[0] != 'E' or (to_cmpt[2] == from_cmpt[2] and vacc_only):
+                    terms = self.get_terms_by_cmpt(('S', ) + from_cmpt[1:3] + ('none', ) if vacc_only else from_cmpt, to_cmpt)
+                    for term in terms:
+                        if term.coef_by_t is not None:  # if the term is a constant, coef_by_t will be None
+                            for t in self.trange:
+                                susc_rate = term.coef_by_t[t] * self.params[t][to_cmpt[1:]]['total_pop'] / self.params[t][to_cmpt[1:]]['betta'] / (1 - self.params[t][to_cmpt[1:]]['ef'])
+                                # if t == 700:
+                                #     print(f'{from_cmpt}\t{to_cmpt}\t{round(n[t])}\t{round(susc_rate, 2)}')
+                                susc_by_t[t] += n[t] * susc_rate
 
         return pd.Series({t: 1 - susc / self.specifications.model_params['total_pop'] for t, susc in susc_by_t.items()})
 

@@ -6,9 +6,9 @@ import json
 import scipy.stats as sps
 from sqlalchemy import MetaData
 
-from db import db_engine
-from data_imports import ExternalVaccWithProjections, ExternalVacc
-from utils import get_params
+from covid_model.db import db_engine
+from covid_model.data_imports import ExternalVaccWithProjections, ExternalVacc
+from covid_model.utils import get_params
 
 
 class CovidModelSpecifications:
@@ -277,7 +277,7 @@ class CovidModelSpecifications:
 
     @classmethod
     def vacc_eff_decay_mult(cls, days_ago, delay, k):
-        return min(1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540), 1) ** k
+        return (1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540)) ** k
 
     def get_vacc_mean_efficacy(self, delay=7, k=1):
         if isinstance(k, str):

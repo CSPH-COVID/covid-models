@@ -159,7 +159,7 @@ class ODEBuilder:
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
-    def set_param(self, name, val=None, attrs=None, trange=None, mult=None):
+    def set_param(self, param, val=None, attrs=None, trange=None, mult=None):
         if val is not None:
             def apply(t, cmpt, param):
                 self.params[t][cmpt][param] = val
@@ -174,7 +174,7 @@ class ODEBuilder:
             actual_trange = set(self.trange).intersection(trange)
         for cmpt in self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments:
             for t in actual_trange:
-                apply(t, cmpt, name)
+                apply(t, cmpt, param)
                 # if val is not None:
                 #     self.params[t][cmpt][name] = val
                 # else:
@@ -211,13 +211,22 @@ class ODEBuilder:
     def reset_ode(self):
         self.terms = []
 
-    def reset_terms(self, from_attrs, to_attrs):
-        to_delete = []
-        for i, term in enumerate(self.terms):
-            if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs):
-                to_delete.append(i)
+    def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
+        return [term for term in self.terms if term.from_cmpt_idx == self.cmpt_idx_lookup[from_cmpt] and term.to_cmpt_idx == self.cmpt_idx_lookup[to_cmpt]]
 
-        for i in sorted(to_delete, reverse=True):
+    def get_term_indices_by_attr(self, from_attrs, to_attrs):
+        return [i for i, term in enumerate(self.terms) if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs)]
+
+    def get_terms_by_attr(self, from_attrs, to_attrs):
+        return [self.terms[i] for i in self.get_term_indices_by_attr(from_attrs, to_attrs)]
+
+    def reset_terms(self, from_attrs, to_attrs):
+        # to_delete = []
+        # for i, term in enumerate(self.terms):
+        #     if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs):
+        #         to_delete.append(i)
+
+        for i in sorted(self.get_term_indices_by_attr(from_attrs, to_attrs), reverse=True):
             del self.terms[i]
 
     def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):

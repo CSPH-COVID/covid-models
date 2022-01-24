@@ -20,13 +20,13 @@ if __name__ == '__main__':
     model = CovidModelWithVariants()
 
     print('Prepping model...')
-    model.prep(536, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
 
     print('Running model...')
     model.solve_seir()
 
     print('Producing charts...')
-    fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+    fig, axs = plt.subplots(2, 2, figsize=(17, 8))
 
     axs = axs.flatten()
 
@@ -35,10 +35,10 @@ if __name__ == '__main__':
     axs[0].set_ylabel('SARS-CoV-2 Prevalence')
     axs[0].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
-    # hosps
-    modeled(model, 'Ih', ax=axs[1])
-    actual_hosps(engine, ax=axs[1], color='black')
-    axs[1].set_ylabel('Hospitalized with COVID-19')
+    # # hosps
+    # modeled(model, 'Ih', ax=axs[1])
+    # actual_hosps(engine, ax=axs[1], color='black')
+    # axs[1].set_ylabel('Hospitalized with COVID-19')
 
     # variants
     modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=axs[2])
@@ -47,19 +47,26 @@ if __name__ == '__main__':
     axs[2].lines.pop(0)
 
     # tc shift scenarios
-    # for tc_shift in [0, -0.05, -0.1, -0.15, -0.2]:
-    #     future_tc = model.specifications.tc[-1] + tc_shift
-    #     model.apply_tc(tc=model.specifications.tc + [future_tc], tslices=model.specifications.tslices + [738])
-    #     model.solve_seir()
-    #     modeled(model, 'Ih', ax=axs[3], label=f'{round(100*-tc_shift)}% drop in TC on February 1' if tc_shift < 0 else f'Hold TC constant at {round(100*-tc_shift)}%')
-    #
-    # actual_hosps(engine, ax=axs[3], color='black')
-    # axs[3].set_ylabel('Hospitalized with COVID-19')
-    # axs[3].legend(loc='best')
+    base_tslices = model.specifications.tslices.copy()
+    base_tc = model.specifications.tc.copy()
+    for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
+        start_t = 724
+        # future_tslices = list(range(start_t, max(round(start_t + tc_shift / (-.01)), 20)))
+        future_tslices = list(range(start_t, start_t + tc_shift_days))
+        future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
+        model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
+        model.solve_seir()
+        modeled(model, 'Ih', ax=axs[1], label=f'{round(100*-tc_shift)}% drop in TC over {len(future_tslices)} days' if tc_shift < 0 else f'Hold TC constant at {round(100*base_tc[-1])}%')
+
+    actual_hosps(engine, ax=axs[1], color='black')
+    axs[1].set_ylabel('Hospitalized with COVID-19')
+    axs[1].legend(loc='best')
 
     # immunity
-    axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron')
-    axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron')
+    axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron', color='cyan')
+    axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
+    axs[3].plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
+    axs[3].plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
     axs[3].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     axs[3].set_ylim(0, 1)
     axs[3].set_ylabel('Percent Immune')
@@ -68,7 +75,8 @@ if __name__ == '__main__':
     # formatting
     for ax in axs:
         format_date_axis(ax)
-        ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 3, 31))
+        ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 2, 28))
+        ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
 
     axs[3].set_xlim(dt.date(2020, 4, 1), dt.date(2022, 3, 31))

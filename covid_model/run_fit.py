@@ -12,6 +12,44 @@ from time import perf_counter
 import argparse
 
 
+# def apply_omicron_params(model, omicron_params, base_params=None):
+#     if base_params is not None:
+#         model.params = copy.deepcopy(base_params)
+#
+#     for param, val in omicron_params.items():
+#         if param == 'omicron_vacc_eff_k':
+#             model.specifications.model_params[param] = val
+#             print(timeit('model.apply_omicron_vacc_eff()', number=1, globals=globals()),
+#                   f'seconds to reapply specifications with {param} = {val}.')
+#         elif param == 'seed_t':
+#             apply_omicron_seed(model, start_t=val, start_rate=0.25, total=100)
+#         elif param[:14] == 'vacc_succ_hosp':
+#             model.set_param('hosp', val, attrs={'variant': 'omicron', 'vacc': 'vacc', 'age': param[15:]})
+#         elif re.match(r'\w+_mult_\d{8}_\d{8}', param):
+#             str_parts = param.split('_')
+#             from_date = dt.datetime.strptime(str_parts[-2], '%Y%m%d').date()
+#             to_date = dt.datetime.strptime(str_parts[-1], '%Y%m%d').date()
+#             param = param[:-23]
+#             model.set_param(param, mult=val, trange=range((from_date - model.start_date).days, (to_date - model.start_date).days))
+#         elif param[-5:] == '_mult':
+#             model.set_param(param[:-5], mult=val, attrs={'variant': 'omicron'})
+#         else:
+#             model.set_param(param, val, attrs={'variant': 'omicron'})
+#
+#     model.build_ode()
+#
+#
+# def apply_omicron_seed(model, start_t=668, start_rate=0.5, total=1000, doubling_time=14):
+#     om_imports_by_day = start_rate * np.power(2, np.arange(999) / doubling_time)
+#     om_imports_by_day = om_imports_by_day[om_imports_by_day.cumsum() <= total]
+#     om_imports_by_day[-1] += total - om_imports_by_day.sum()
+#     print(f'Omicron imports by day (over {len(om_imports_by_day)} days): {[round(x) for x in om_imports_by_day]}')
+#     for t, n in zip(start_t + np.arange(len(om_imports_by_day)), om_imports_by_day):
+#         model.set_param('om_seed', n, trange=[t])
+#
+#     model.build_ode()
+
+
 def run():
     # get fit params
     parser = argparse.ArgumentParser()
@@ -58,7 +96,8 @@ def run():
                             param_multipliers='input/param_multipliers.json',
                             variant_prevalence='input/variant_prevalence.csv',
                             mab_prevalence='input/mab_prevalence.csv',
-                            model_class=CovidModelWithVariants if fit_params.model_with_omicron else CovidModel)
+                            model_class=CovidModelWithVariants if fit_params.model_with_omicron else CovidModel,
+                            attribute_multipliers='input/attribute_multipliers.json' if fit_params.model_with_omicron else None)
 
     # fit.fitted_specs.write_to_db(engine)
     print(fit.fitted_model.specifications.tslices)
@@ -68,7 +107,8 @@ def run():
     if fit_params.model_with_omicron:
         fit.fitted_model.specifications.tags['model_type'] = 'with omicron'
 
-    fit.fitted_model.write_to_db(engine)
+    fit.fitted_model.specifications.write_to_db(engine)
+    # fit.fitted_model.write_to_db(engine)
 
     actual_hosps(engine)
     modeled(fit.fitted_model, 'Ih')
