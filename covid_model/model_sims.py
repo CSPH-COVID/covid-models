@@ -145,7 +145,7 @@ class CovidModelSimulation:
             self.results.append(self.model.solution_ydf.stack(level=self.model.param_attr_names))
             self.results_hosps.append(self.model.solution_sum('seir')['Ih'])
             t1 = perf_counter()
-            self.model.write_to_db(self.engine, sim_id=self.sim_id, sim_result_id=i)
+            self.model.write_to_db(self.engine, sim_id=self.sim_id, sim_result_id=i, cmpts_json_attrs=tuple())
             t2 = perf_counter()
             print(f'Simulation {i+1}/{len(simulated_tcs)} completed in {round(t2-t0, 4)} sec, including {round(t2-t1, 4)} sec to write to database.')
 

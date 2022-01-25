@@ -106,7 +106,3 @@ class CovidModelWithVariants(CovidModel):
         y0d[('I', '40-64', 'unvacc', 'none')] = 2.2
         y0d[('S', '40-64', 'unvacc', 'none')] -= 2.2
         return y0d
-
-    # # don't try to write to db, since the table format doesn't match
-    # def write_to_db(self, engine=None, new_spec=False):
-    #     pass
