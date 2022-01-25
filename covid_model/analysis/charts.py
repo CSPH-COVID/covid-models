@@ -74,6 +74,7 @@ def total_hosps(model, group=None, **plot_params):
 def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], share_of_total=False, **plot_params):
     if type(compartments) == str:
         compartments = [compartments]
+
     if groupby:
         if type(groupby) == str:
             groupby = [groupby]
@@ -87,10 +88,9 @@ def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], sha
             total = df.sum(axis=1)
             df = df.apply(lambda s: s / total)
         df = df[compartments].sum(axis=1)
-    if ax is not None:
-        ax.plot(model.daterange, df, **{**plot_params})
-    else:
-        plt.plot(model.daterange, df, **{**plot_params})
+
+    df.index = model.daterange
+    df.plot(ax=ax, **plot_params)
 
 
 def modeled_re(model, ax=None, **plot_params):

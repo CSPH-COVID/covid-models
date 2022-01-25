@@ -46,7 +46,7 @@ class CovidModel(ODEBuilder):
     def set_specifications(self, specs=None, engine=None,
                            tslices=None, tc=None, params=None,
                            refresh_actual_vacc=False, vacc_proj_params=None, vacc_immun_params=None,
-                           param_multipliers=None, variant_prevalence=None, mab_prevalence=None,
+                           timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
                            attribute_multipliers=None):
 
         if specs is not None:
@@ -72,10 +72,10 @@ class CovidModel(ODEBuilder):
         # TODO: make add_timeseries_effect use existing prevalence and existing multipliers if new prevalence or mults are not provided
         # if variant_prevalence or param_multipliers:
         if variant_prevalence:
-            self.specifications.add_timeseries_effect('variant', prevalence_data=variant_prevalence, param_multipliers=param_multipliers, fill_forward=True)
+            self.specifications.add_timeseries_effect('variant', prevalence_data=variant_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
         # if mab_prevalence or param_multipliers:
         if mab_prevalence:
-            self.specifications.add_timeseries_effect('mab', prevalence_data=mab_prevalence, param_multipliers=param_multipliers, fill_forward=True)
+            self.specifications.add_timeseries_effect('mab', prevalence_data=mab_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
 
         if attribute_multipliers:
             self.specifications.set_attr_mults(attribute_multipliers)
@@ -249,16 +249,6 @@ class CovidModel(ODEBuilder):
         self.reset_terms({'seir': 'S'}, {'seir': 'E'})
         self.build_SR_to_E_ode()
 
-        # for age in self.attributes['age']:
-        #     for vacc in self.attributes['vacc']:
-        #         vacc_eff_w_delta = 'vacc_eff * (1 - (1 - nondelta_prevalence) * delta_max_efficacy_reduction * (1 - vacc_eff))'
-        #         self.add_flow(('S', age, vacc), ('E', age, vacc),
-        #                       f'lamb * betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop',
-        #                       scale_by_cmpts=[('I', a, v) for a in self.attributes['age'] for v in self.attributes['vacc']])
-        #         self.add_flow(('S', age, vacc), ('E', age, vacc),
-        #                       f'betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop',
-        #                       scale_by_cmpts=[('A', a, v) for a in self.attributes['age'] for v in self.attributes['vacc']])
-
     # define initial state y0
     @property
     def y0_dict(self):
@@ -307,49 +297,40 @@ class CovidModel(ODEBuilder):
             self.specifications.write_to_db(engine)
 
         # build data frame with index of (t, age, vacc) and one column per seir cmpt
-        # df = self.solution_ydf.stack(level=self.param_attr_names).join(ef_series).join(oef_series)
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
 
         # Merge R and R2 into one column
         solution_sum_df['R'] += solution_sum_df['R2']
         del solution_sum_df['R2']
 
+        # build unique parameters dataframe
+        params_df = self.params_as_df
+        grouped = params_df.groupby(['t'] + list(cmpts_json_attrs))
+        unique_params = [param for param, is_unique in (grouped.nunique() == 1).all().iteritems() if is_unique]
+        unique_params_df = grouped.max()[unique_params]
+
+        # build export dataframe
         df = pd.DataFrame(index=solution_sum_df.index)
-
-        # add params
-        if set(cmpts_json_attrs) == set(self.param_attr_names):
-            params_df = pd.DataFrame.from_dict(self.params, orient='index').stack(level=list(range(len(self.param_attr_names)))).map(lambda d: json.dumps(d, ensure_ascii=False))
-            df = df.join(params_df.rename_axis(index=('t', ) + tuple(self.param_attr_names)).rename('params'), how='left')
-        else:
-            df['params'] = None
-
-        # build cmpt and vals
         df['t'] = solution_sum_df.index.get_level_values('t')
-        df['cmpt'] = solution_sum_df.index.droplevel('t').to_frame().to_dict(orient='records')
+        df['cmpt'] = solution_sum_df.index.droplevel('t').to_frame().to_dict(orient='records') if solution_sum_df.index.nlevels > 1 else None
         df['vals'] = solution_sum_df.to_dict(orient='records')
         for col in ['cmpt', 'vals']:
             df[col] = df[col].map(lambda d: json.dumps(d, ensure_ascii=False))
-        df = df.reset_index(drop=True)
 
-        # created_at date
-        df['created_at'] = dt.datetime.now()
-
-        # if a sim_id is provided, insert it as a simulation result
+        # if a sim_id is provided, insert it as a simulation result; some fields are different
         if sim_id is None:
             table = 'results_v2'
             df['spec_id'] = self.specifications.spec_id
+            df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
+            df['created_at'] = dt.datetime.now()
+            df['params'] = unique_params_df.apply(lambda x: json.dumps(x.to_dict(), ensure_ascii=False), axis=1)
         else:
-            table = 'simulation_results'
-            del df['params']
-            del df['created_at']
-            df = np.round(df.groupby('t').sum(), 1)
+            table = 'simulation_results_v2'
             df['sim_id'] = sim_id
             df['sim_result_id'] = sim_result_id
+            df['tc'] = unique_params_df['ef']
 
         # write to database
-        result_id = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
-        df['result_id'] = result_id
-
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
                   , index=False, if_exists='append', method='multi', chunksize=1000000)
