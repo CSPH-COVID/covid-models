@@ -112,8 +112,11 @@ def transmission_control(model, **plot_params):
     plt.plot(model.fixed_tslices[:-1], model.tc, **plot_params)
 
 
-def re_estimates(model, **plot_params):
-    plt.plot(model.daterange[90:], model.re_estimates[90:], **plot_params)
+def re_estimates(model, ax=None, **plot_params):
+    if ax is not None:
+        ax.plot(model.daterange[90:], model.re_estimates[90:], **plot_params)
+    else:
+        plt.plot(model.daterange[90:], model.re_estimates[90:], **plot_params)
 
 
 def new_deaths_by_group(model, axs, **plot_params):

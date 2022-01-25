@@ -13,6 +13,7 @@ from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.model_with_omicron import CovidModelWithVariants
 from covid_model.model_specs import CovidModelSpecifications
+from covid_model.run_model_scenarios import build_legacy_output_df
 
 if __name__ == '__main__':
     engine = db_engine()
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     axs = axs.flatten()
 
     # prevalence
-    modeled(model, ['I', 'A'], share_of_total=True, ax=axs[0])
+    # modeled(model, ['I', 'A'], share_of_total=True, ax=axs[0])
     axs[0].set_ylabel('SARS-CoV-2 Prevalence')
     axs[0].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
@@ -41,26 +42,11 @@ if __name__ == '__main__':
     # axs[1].set_ylabel('Hospitalized with COVID-19')
 
     # variants
-    modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=axs[2])
-    axs[2].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    # modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=axs[2])
+    # axs[2].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    re_estimates(model, ax=axs[2])
     axs[2].set_ylabel('Variant Share of Infections')
-    axs[2].lines.pop(0)
-
-    # tc shift scenarios
-    base_tslices = model.specifications.tslices.copy()
-    base_tc = model.specifications.tc.copy()
-    for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
-        start_t = 724
-        # future_tslices = list(range(start_t, max(round(start_t + tc_shift / (-.01)), 20)))
-        future_tslices = list(range(start_t, start_t + tc_shift_days))
-        future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
-        model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
-        model.solve_seir()
-        modeled(model, 'Ih', ax=axs[1], label=f'{round(100*-tc_shift)}% drop in TC over {len(future_tslices)} days' if tc_shift < 0 else f'Hold TC constant at {round(100*base_tc[-1])}%')
-
-    actual_hosps(engine, ax=axs[1], color='black')
-    axs[1].set_ylabel('Hospitalized with COVID-19')
-    axs[1].legend(loc='best')
+    # axs[2].lines.pop(0)
 
     # immunity
     axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron', color='cyan')
@@ -71,6 +57,28 @@ if __name__ == '__main__':
     axs[3].set_ylim(0, 1)
     axs[3].set_ylabel('Percent Immune')
     axs[3].legend(loc='best')
+
+    # tc shift scenarios
+    base_tslices = model.specifications.tslices.copy()
+    base_tc = model.specifications.tc.copy()
+    for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
+        start_t = 725
+        # future_tslices = list(range(start_t, max(round(start_t + tc_shift / (-.01)), 20)))
+        future_tslices = list(range(start_t, start_t + tc_shift_days))
+        future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
+        model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
+        model.solve_seir()
+        modeled(model, 'Ih', ax=axs[1], label=f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Hold TC constant at {round(100*base_tc[-1])}%')
+        modeled(model, ['I', 'A'], share_of_total=True, ax=axs[0], label=f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Hold TC constant at {round(100*base_tc[-1])}%')
+
+    actual_hosps(engine, ax=axs[1], color='black')
+    axs[1].set_ylabel('Hospitalized with COVID-19')
+    axs[1].legend(loc='best')
+
+    axs[0].legend(loc='best')
+
+    # export
+    build_legacy_output_df(model).to_csv('output/out2.csv')
 
     # formatting
     for ax in axs:
