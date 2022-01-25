@@ -1,7 +1,7 @@
 from covid_model.analysis.charts import actual_hosps, modeled
 from covid_model.model_specs import CovidModelSpecifications
-from model import CovidModel
-from db import db_engine
+from covid_model.model import CovidModel
+from covid_model.db import db_engine
 import datetime as dt
 import dateutil.relativedelta as durel
 import pandas as pd
@@ -23,17 +23,18 @@ def build_legacy_output_df(model: CovidModel):
 
     totals = model.solution_sum('seir')
     by_age = model.solution_sum(['seir', 'age'])
+    by_age_by_vacc = model.solution_sum(['seir', 'age', 'vacc'])
     df['Iht'] = totals['Ih']
     df['Dt'] = totals['D']
     df['Rt'] = totals['R']
     df['Itotal'] = totals['I'] + totals['A']
     df['Etotal'] = totals['E']
     df['Einc'] = df['Etotal'] / model.specifications.model_params['alpha']
-    for i, age in enumerate(model.attr['age']):
-        df[f'Vt{i+1}'] = (model.solution_ydf[('S', age, 'vacc')] + model.solution_ydf[('R', age, 'vacc')]) * params_df.xs((age, 'vacc'), level=('age', 'vacc'))['vacc_eff']
-        df[f'immune{i+1}'] = by_age[('R', age)] + model.solution_ydf[('S', age, 'vacc')] * params_df.xs((age, 'vacc'), level=('age', 'vacc'))['vacc_eff']
-    df['Vt'] = sum(df[f'Vt{i+1}'] for i in range(4))
-    df['immune'] = sum(df[f'immune{i+1}'] for i in range(4))
+    # for i, age in enumerate(model.attr['age']):
+    #     df[f'Vt{i+1}'] = (model.solution_ydf[('S', age, 'vacc')] + model.solution_ydf[('R', age, 'vacc')]) * params_df.xs((age, 'vacc'), level=('age', 'vacc'))['vacc_eff']
+    #     df[f'immune{i+1}'] = by_age[('R', age)] + by_age_by_vacc[('S', age, 'vacc')] * params_df.xs((age, 'vacc'), level=('age', 'vacc'))['vacc_eff']
+    df['Vt'] = model.immunity(variant='omicron', vacc_only=True)
+    df['immune'] = model.immunity(variant='omicron')
     df['date'] = model.daterange
     df['Ilag'] = totals['I'].shift(3)
     df['Re'] = model.re_estimates
