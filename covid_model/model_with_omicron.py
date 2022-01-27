@@ -65,12 +65,7 @@ class CovidModelWithVariants(CovidModel):
         for variant in self.attributes['variant']:
             infectious_cmpts = [(s, a, v, variant) for a in self.attributes['age'] for v in self.attributes['vacc'] for
                                 s in ['I', 'A']]
-            infectious_cmpt_coefs = [' * '.join([
-                'lamb' if seir == 'I' else '1',
-                # 'omicron_transm_mult' if variant == 'omicron' else '1',
-                # 'unvacc_relative_transm' if vacc == 'unvacc' else '1',
-            ]) for seir, age, vacc, variant in
-                infectious_cmpts]
+            infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1']) for seir, age, vacc, variant in infectious_cmpts]
             for age in self.attributes['age']:
                 # transmission to susceptibles
                 self.add_flow(('S', age, 'unvacc', 'none'), ('E', age, 'unvacc', variant), base_transm_omicron if variant == 'omicron' else base_transm,

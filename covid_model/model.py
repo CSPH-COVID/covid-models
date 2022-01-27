@@ -174,16 +174,6 @@ class CovidModel(ODEBuilder):
         infected = (self.solution_sum('seir')['I'].shift(3) + self.solution_sum('seir')['A'].shift(3))
         return infect_duration * self.new_infections.groupby('t').sum() / infected
 
-    # calc the observed TC by applying the variant multiplier to the base TC
-    # @property
-    # def obs_ef_by_t(self):
-    #     return {t: sum(1 - (1 - self.ef_by_t[t]) * self.params[t][pcmpt]['betta'] / self.specifications.model_params['betta'] for pcmpt in self.param_compartments) / len(self.param_compartments) for t in self.trange}
-
-    # @property
-    # def obs_ef_by_slice(self):
-    #     oef_by_t = self.obs_ef_by_t
-    #     return [np.array([oef_by_t[t] for t in range(self.specifications.tslices[i], self.specifications.tslices[i + 1])]).mean() for i in range(len(self.specifications.tslices) - 1)]
-
     def set_param_using_age_dict(self, name, val, trange=None):
         if not isinstance(val, dict):
             self.set_param(name, val, trange=trange)
