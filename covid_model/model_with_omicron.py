@@ -15,7 +15,8 @@ class CovidModelWithVariants(CovidModel):
 
     # add set a different vacc efficacy for Omicron
     def apply_omicron_vacc_eff(self):
-        self.set_param('omicron_vacc_eff', 0)
+        self.set_param('omicron_vacc_eff', 0, {'vacc': 'unvacc'})
+        self.set_param('omicron_vacc_eff', 0, {'vacc': 'vacc_fail'})
         vacc_mean_efficacy_vs_omicron_dict = self.specifications.get_vacc_mean_efficacy(k='omicron_vacc_eff_k').to_dict()
         for age in self.attr['age']:
             for t in self.trange:
@@ -64,12 +65,7 @@ class CovidModelWithVariants(CovidModel):
         for variant in self.attributes['variant']:
             infectious_cmpts = [(s, a, v, variant) for a in self.attributes['age'] for v in self.attributes['vacc'] for
                                 s in ['I', 'A']]
-            infectious_cmpt_coefs = [' * '.join([
-                'lamb' if seir == 'I' else '1',
-                'omicron_transm_mult' if variant == 'omicron' else '1',
-                'unvacc_relative_transm' if vacc == 'unvacc' else '1',
-            ]) for seir, age, vacc, variant in
-                infectious_cmpts]
+            infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1']) for seir, age, vacc, variant in infectious_cmpts]
             for age in self.attributes['age']:
                 # transmission to susceptibles
                 self.add_flow(('S', age, 'unvacc', 'none'), ('E', age, 'unvacc', variant), base_transm_omicron if variant == 'omicron' else base_transm,
@@ -80,20 +76,22 @@ class CovidModelWithVariants(CovidModel):
                               scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
                 # transmission to recovered (a.k.a. acquired-immune escape)
                 if variant == 'omicron':
-                    self.add_flow(('R', age, 'unvacc', 'none'), ('E', age, 'unvacc', variant),
-                                  f'omicron_acq_immune_escape * {base_transm_omicron}',
-                                  scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
-                    self.add_flow(('R', age, 'vacc', 'none'), ('E', age, 'vacc', variant),
-                                  f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
-                                  scale_by_cmpts_coef=infectious_cmpt_coefs)
-                    self.add_flow(('R', age, 'vacc_fail', 'none' ), ('E', age, 'vacc_fail', variant),
-                                  f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
-                                  scale_by_cmpts_coef=infectious_cmpt_coefs)
+                    for recovered_cmpt in ('R', 'R2'):
+                        self.add_flow((recovered_cmpt, age, 'unvacc', 'none'), ('E', age, 'unvacc', variant),
+                                      f'omicron_acq_immune_escape * {base_transm_omicron}',
+                                      scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+                        self.add_flow((recovered_cmpt, age, 'vacc', 'none'), ('E', age, 'vacc', variant),
+                                      f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
+                                      scale_by_cmpts_coef=infectious_cmpt_coefs)
+                        self.add_flow((recovered_cmpt, age, 'vacc_fail', 'none' ), ('E', age, 'vacc_fail', variant),
+                                      f'omicron_acq_immune_escape * {base_transm_omicron}', scale_by_cmpts=infectious_cmpts,
+                                      scale_by_cmpts_coef=infectious_cmpt_coefs)
 
     # reset terms that depend on TC; this takes about 0.08 sec, while rebuilding the whole ODE takes ~0.90 sec
     def rebuild_ode_with_new_tc(self):
         self.reset_terms({'seir': 'S'}, {'seir': 'E'})
         self.reset_terms({'seir': 'R'}, {'seir': 'E'})
+        self.reset_terms({'seir': 'R2'}, {'seir': 'E'})
         self.build_SR_to_E_ode()
 
     # define initial state y0
@@ -103,7 +101,3 @@ class CovidModelWithVariants(CovidModel):
         y0d[('I', '40-64', 'unvacc', 'none')] = 2.2
         y0d[('S', '40-64', 'unvacc', 'none')] -= 2.2
         return y0d
-
-    # don't try to write to db, since the table format doesn't match
-    def write_to_db(self, engine=None, new_spec=False):
-        pass

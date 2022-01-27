@@ -1,12 +1,10 @@
-import pandas as pd
-import numpy as np
 import datetime as dt
 import json
-import scipy.integrate as spi
-import scipy.optimize as spo
-import matplotlib.pyplot as plt
-from db import db_engine
-from utils import get_params
+
+import numpy as np
+import pandas as pd
+
+from covid_model.utils import get_params
 
 
 def normalize_date(date):
@@ -44,7 +42,8 @@ class ExternalData:
         return df
 
     def fetch_from_db(self, **args) -> pd.DataFrame:
-        return pd.read_sql(args['sql'], self.engine)
+        # return pd.read_sql(args['sql'], self.engine)
+        return pd.read_sql(con=self.engine, **args)
 
 
 class ExternalHosps(ExternalData):
