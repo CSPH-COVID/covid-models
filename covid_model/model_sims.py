@@ -79,6 +79,20 @@ class CovidModelSimulation:
         self.results = []
         self.results_hosps = []
 
+    @classmethod
+    def from_db(cls, engine, sim_id):
+        df = pd.read_sql_query(f"select * from covid_model.simulations where sim_id = {sim_id}", con=engine, coerce_float=True)
+        if len(df) == 0:
+            raise ValueError(f'{sim_id} is not a valid sim ID.')
+        row = df.iloc[0]
+        sim = CovidModelSimulation(row['spec_id'], engine, end_date=row['end_date'])
+
+        sim.results = pd.read_sql_query(f"select * from covid_model.simulation_results where sim_id = {sim_id}", con=engine, coerce_float=True)
+        sim.results_hosps = sim.results.set_index(['sim_result_id', 't'])['Ih'].unstack('sim_result_id')
+        sim.results_hosps.index = sim.model.daterange
+
+        return sim
+
     def write_to_db(self, engine):
 
         stmt = self.table.insert().values(
@@ -131,7 +145,7 @@ class CovidModelSimulation:
             self.results.append(self.model.solution_ydf.stack(level=self.model.param_attr_names))
             self.results_hosps.append(self.model.solution_sum('seir')['Ih'])
             t1 = perf_counter()
-            self.model.write_to_db(self.engine, sim_id=self.sim_id)
+            self.model.write_to_db(self.engine, sim_id=self.sim_id, sim_result_id=i, cmpts_json_attrs=tuple())
             t2 = perf_counter()
             print(f'Simulation {i+1}/{len(simulated_tcs)} completed in {round(t2-t0, 4)} sec, including {round(t2-t1, 4)} sec to write to database.')
 
@@ -139,7 +153,7 @@ class CovidModelSimulation:
         hosp_percentiles = {int(100*qt): list(results_hosps_df.quantile(0.05, axis=1).values) for qt in [0.05, 0.10, 0.25, 0.5, 0.75, 0.90, 0.95]}
 
         stmt = self.table.update().where(self.table.c.sim_id == self.sim_id).values(
-            sim_count=len(self.results),
+            sim_count=len(self.results_hosps),
             hospitalized_percentiles=hosp_percentiles
         )
 

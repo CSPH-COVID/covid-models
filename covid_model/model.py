@@ -7,11 +7,11 @@ import pyswarms as ps
 from sqlalchemy import MetaData
 from datetime import datetime
 import itertools
-from data_imports import ExternalHosps, ExternalVaccWithProjections
-from model_specs import CovidModelSpecifications
-from utils import *
 from collections import OrderedDict
-from ode_builder import *
+from covid_model.data_imports import ExternalHosps, ExternalVaccWithProjections
+from covid_model.model_specs import CovidModelSpecifications
+from covid_model.utils import *
+from covid_model.ode_builder import *
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
@@ -43,64 +43,48 @@ class CovidModel(ODEBuilder):
         self.solution_y = None
         self.solution_ydf_full = None
 
-        # used to connect up with the matching fit in the database
-        # self.fit_id = fit_id
+    def set_specifications(self, specs=None, engine=None,
+                           tslices=None, tc=None, params=None,
+                           refresh_actual_vacc=False, vacc_proj_params=None, vacc_immun_params=None,
+                           timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
+                           attribute_multipliers=None):
 
-    @classmethod
-    def build_specifications(cls, engine,
-             start_date=dt.date(2020, 1, 24), end_date=dt.date(2022, 5, 31),
-             tslices=None, tc=None,
-             params='input/params.json',
-             vacc_proj_params=json.load(open('input/vacc_proj_params.json'))['current trajectory'],
-             vacc_immun_params='input/vacc_immun_params.json',
-             param_multipliers='input/param_multipliers.json',
-             variant_prevalence='input/variant_prevalence.csv',
-             mab_prevalence='input/mab_prevalence.csv'):
-
-        specs = CovidModelSpecifications(start_date=start_date, end_date=end_date)
-        specs.set_tc(tslices, tc)
-        specs.set_model_params(params)
-        specs.set_actual_vacc(engine)
-        specs.set_vacc_proj(vacc_proj_params)
-        specs.set_vacc_immun(vacc_immun_params)
-        specs.add_timeseries_effect('variant', prevalence_data=variant_prevalence, param_multipliers=param_multipliers, fill_forward=True)
-        specs.add_timeseries_effect('mab', prevalence_data=mab_prevalence, param_multipliers=param_multipliers, fill_forward=True)
-
-        return specs
-
-    # a model must be prepped before it can be run; if any params EXCEPT the efs (i.e. TC) change, it must be re-prepped
-    def prep(self, specs=None, engine=None,
-             tslices=None,
-             tc=None,
-             params='input/params.json',
-             vacc_proj_params=json.load(open('input/vacc_proj_params.json'))['current trajectory'],
-             vacc_immun_params='input/vacc_immun_params.json',
-             param_multipliers='input/param_multipliers.json',
-             variant_prevalence='input/variant_prevalence.csv',
-             mab_prevalence='input/mab_prevalence.csv'):
-
-        # if new specs are provided, update specifications
         if specs is not None:
-            if not isinstance(specs, int):
+            if not isinstance(specs, (int, np.int64)):
                 self.specifications = specs
             else:
                 self.specifications = CovidModelSpecifications.from_db(engine, specs, new_end_date=self.end_date)
 
-        # if we have no specifications, create new ones
         if self.specifications is None:
-            if tslices is None:
-                tslices = [52, 59] + list(range(66, self.tmax, 14))
-                if tc is not None:
-                    tslices = tslices[:len(tc) - 1]
-            self.specifications = CovidModel.build_specifications(engine=engine, start_date=self.start_date, end_date=self.end_date,
-                                                                  tslices=tslices, tc=tc if tc is not None else [0] * (len(tslices) + 1),
-                                                                  params=params, vacc_proj_params=vacc_proj_params, vacc_immun_params=vacc_immun_params,
-                                                                  param_multipliers=param_multipliers, variant_prevalence=variant_prevalence, mab_prevalence=mab_prevalence)
+            self.specifications = CovidModelSpecifications(start_date=self.start_date, end_date=self.end_date)
 
-        # apply specifications
+        if tslices or tc:
+            self.specifications.set_tc(tslices, tc)
+        if params:
+            self.specifications.set_model_params(params)
+        if refresh_actual_vacc:
+            self.specifications.set_actual_vacc(engine)
+        if refresh_actual_vacc or vacc_proj_params:
+            self.specifications.set_vacc_proj(vacc_proj_params)
+        if vacc_immun_params:
+            self.specifications.set_vacc_immun(vacc_immun_params)
+
+        # TODO: make add_timeseries_effect use existing prevalence and existing multipliers if new prevalence or mults are not provided
+        # if variant_prevalence or param_multipliers:
+        if variant_prevalence:
+            self.specifications.add_timeseries_effect('variant', prevalence_data=variant_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
+        # if mab_prevalence or param_multipliers:
+        if mab_prevalence:
+            self.specifications.add_timeseries_effect('mab', prevalence_data=mab_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
+
+        if attribute_multipliers:
+            self.specifications.set_attr_mults(attribute_multipliers)
+
+    # a model must be prepped before it can be run; if any params EXCEPT the efs (i.e. TC) change, it must be re-prepped
+    def prep(self, specs=None, **specs_args):
+
+        self.set_specifications(specs=specs, **specs_args)
         self.apply_specifications()
-
-        # build ODE
         self.build_ode()
 
     def apply_specifications(self, specs: CovidModelSpecifications = None):
@@ -137,8 +121,7 @@ class CovidModel(ODEBuilder):
             for age in self.attr['age']:
                 self.set_param(f'{shot}_fail_rate', vacc_fail_per_vacc[shot][age], {'age': age})
                 for t in self.trange:
-                    for vacc in ['unvacc', 'vacc_fail']:
-                        self.set_param(f'{shot}_per_unvacc', vacc_per_unvacc_dict[shot][(t, age)], {'age': age, 'vacc': vacc}, trange=[t])
+                    self.set_param(f'{shot}_per_unvacc', vacc_per_unvacc_dict[shot][(t, age)], {'age': age}, trange=[t])
 
         # set hospitalization and mortality to 0 among the vacc successes
         self.set_param('hosp', 0, attrs={'vacc': 'vacc'})
@@ -153,7 +136,7 @@ class CovidModel(ODEBuilder):
             for t in self.trange:
                 self.set_param('vacc_eff', vacc_mean_efficacy_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
                 self.set_param('vacc_eff_vs_delta', vacc_mean_efficacy_vs_delta_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
-                self.set_param('vacc_fail_reduction_per_vacc_fail', vacc_fail_reduction_per_fail_dict[(t, age)], {'age': age, 'vacc': 'vacc_fail'}, trange=[t])
+                self.set_param('vacc_fail_reduction_per_vacc_fail', vacc_fail_reduction_per_fail_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
 
         # alter parameters based on timeseries effects
         multipliers = self.specifications.get_timeseries_effect_multipliers()
@@ -161,6 +144,11 @@ class CovidModel(ODEBuilder):
             for t, mult in mult_by_t.items():
                 if t in self.trange:
                     self.set_param(param, mult=mult, trange=[t])
+
+        # alter parameters based on attribute multipliers
+        if self.specifications.attr_mults:
+            for attr_mult_specs in self.specifications.attr_mults:
+                self.set_param(**attr_mult_specs)
 
     # handy properties for the beginning t, end t, and the full range of t values
     @property
@@ -185,16 +173,6 @@ class CovidModel(ODEBuilder):
         infect_duration = 1 / self.specifications.model_params['gamm']
         infected = (self.solution_sum('seir')['I'].shift(3) + self.solution_sum('seir')['A'].shift(3))
         return infect_duration * self.new_infections.groupby('t').sum() / infected
-
-    # calc the observed TC by applying the variant multiplier to the base TC
-    # @property
-    # def obs_ef_by_t(self):
-    #     return {t: sum(1 - (1 - self.ef_by_t[t]) * self.params[t][pcmpt]['betta'] / self.specifications.model_params['betta'] for pcmpt in self.param_compartments) / len(self.param_compartments) for t in self.trange}
-
-    # @property
-    # def obs_ef_by_slice(self):
-    #     oef_by_t = self.obs_ef_by_t
-    #     return [np.array([oef_by_t[t] for t in range(self.specifications.tslices[i], self.specifications.tslices[i + 1])]).mean() for i in range(len(self.specifications.tslices) - 1)]
 
     def set_param_using_age_dict(self, name, val, trange=None):
         if not isinstance(val, dict):
@@ -224,14 +202,8 @@ class CovidModel(ODEBuilder):
     # build ODE
     def build_ode(self):
         self.reset_ode()
-        vacc_eff_w_delta = '(vacc_eff * nondelta_prevalence + vacc_eff_vs_delta * (1 - nondelta_prevalence))'
-        base_transm = f'betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop'
-        infectious_cmpts = [(s, a, v) for a in self.attributes['age'] for v in self.attributes['vacc'] for s in ['I', 'A']]
-        infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1', 'unvacc_relative_transm' if vacc == 'unvacc' else '1']) for seir, age, vacc in infectious_cmpts]
+        self.build_SR_to_E_ode()
         for age in self.attributes['age']:
-            self.add_flow(('S', age, 'unvacc'), ('E', age, 'unvacc'), f'unvacc_relative_transm * {base_transm}', scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
-            self.add_flow(('S', age, 'vacc'), ('E', age, 'vacc'), base_transm, scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
-            self.add_flow(('S', age, 'vacc_fail'), ('E', age, 'vacc_fail'), base_transm, scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
             for seir in self.attributes['seir']:
                 self.add_flow((seir, age, 'unvacc'), (seir, age, 'vacc_fail'), 'shot1_per_unvacc * shot1_fail_rate')
                 self.add_flow((seir, age, 'unvacc'), (seir, age, 'vacc'), 'shot1_per_unvacc * (1 - shot1_fail_rate)')
@@ -251,18 +223,21 @@ class CovidModel(ODEBuilder):
                 self.add_flow(('R', age, vacc), ('R2', age, vacc), '1 / immune_decay_days_1')
                 self.add_flow(('R2', age, vacc), ('S', age, vacc), '1 / immune_decay_days_2')
 
+    def build_SR_to_E_ode(self):
+        self.reset_terms({'seir': 'S'}, {'seir': 'E'})
+        vacc_eff_w_delta = '(vacc_eff * nondelta_prevalence + vacc_eff_vs_delta * (1 - nondelta_prevalence))'
+        base_transm = f'betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop'
+        infectious_cmpts = [(s, a, v) for a in self.attributes['age'] for v in self.attributes['vacc'] for s in ['I', 'A']]
+        infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1']) for seir, age, vacc in infectious_cmpts]
+        for age in self.attributes['age']:
+            self.add_flow(('S', age, 'unvacc'), ('E', age, 'unvacc'), base_transm, scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+            self.add_flow(('S', age, 'vacc'), ('E', age, 'vacc'), base_transm, scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+            self.add_flow(('S', age, 'vacc_fail'), ('E', age, 'vacc_fail'), base_transm, scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+
     # reset terms that depend on TC; this takes about 0.08 sec, while rebuilding the whole ODE takes ~0.90 sec
     def rebuild_ode_with_new_tc(self):
         self.reset_terms({'seir': 'S'}, {'seir': 'E'})
-        for age in self.attributes['age']:
-            for vacc in self.attributes['vacc']:
-                vacc_eff_w_delta = 'vacc_eff * (1 - (1 - nondelta_prevalence) * delta_max_efficacy_reduction * (1 - vacc_eff))'
-                self.add_flow(('S', age, vacc), ('E', age, vacc),
-                              f'lamb * betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop',
-                              scale_by_cmpts=[('I', a, v) for a in self.attributes['age'] for v in self.attributes['vacc']])
-                self.add_flow(('S', age, vacc), ('E', age, vacc),
-                              f'betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop',
-                              scale_by_cmpts=[('A', a, v) for a in self.attributes['age'] for v in self.attributes['vacc']])
+        self.build_SR_to_E_ode()
 
     # define initial state y0
     @property
@@ -285,43 +260,70 @@ class CovidModel(ODEBuilder):
         sum_df = self.solution_sum('seir')
         return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.specifications.model_params['alpha']
 
+    # immunity
+    def immunity(self, variant='omicron', vacc_only=False):
+        susc_by_t = {t: 0 for t in self.trange}
+        for from_cmpt in self.compartments:
+            n = self.solution_ydf[from_cmpt]
+            for to_cmpt in self.filter_cmpts_by_attrs({'seir': 'E', 'variant': variant}):
+                # we only want actual flows into E, not movement within E
+                if from_cmpt[0] != 'E' or (to_cmpt[2] == from_cmpt[2] and vacc_only):
+                    terms = self.get_terms_by_cmpt(('S', ) + from_cmpt[1:3] + ('none', ) if vacc_only else from_cmpt, to_cmpt)
+                    for term in terms:
+                        if term.coef_by_t is not None:  # if the term is a constant, coef_by_t will be None
+                            for t in self.trange:
+                                susc_rate = term.coef_by_t[t] * self.params[t][to_cmpt[1:]]['total_pop'] / self.params[t][to_cmpt[1:]]['betta'] / (1 - self.params[t][to_cmpt[1:]]['ef'])
+                                # if t == 700:
+                                #     print(f'{from_cmpt}\t{to_cmpt}\t{round(n[t])}\t{round(susc_rate, 2)}')
+                                susc_by_t[t] += n[t] * susc_rate
+
+        return pd.Series({t: 1 - susc / self.specifications.model_params['total_pop'] for t, susc in susc_by_t.items()})
+
     # write to covid_model.results in Postgres
-    def write_to_db(self, engine=None, new_spec=False, sim_id=None):
+    def write_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
 
         # if there's no existing fit assigned, create a new fit and assign that one
         if self.specifications.spec_id is None or new_spec:
             self.specifications.write_to_db(engine)
 
-        # join the ef values onto the dataframe
-        # ef_series = pd.Series(self.specifications.tc, name='ef').rename_axis('t')
-        # oef_series = pd.Series(self.obs_ef_by_t, name='observed_ef').rename_axis('t')
-        # df = self.solution_ydf.stack(level=self.param_attr_names).join(ef_series).join(oef_series)
-        df = self.solution_ydf.stack(level=self.param_attr_names)
-
-        # created_at date
-        df['created_at'] = dt.datetime.now()
-
-        # add params
-        params_df = pd.DataFrame.from_dict(self.params, orient='index').stack(level=list(range(len(self.param_attr_names)))).map(lambda d: json.dumps(d, ensure_ascii=False))
-        df = df.join(params_df.rename_axis(index=('t', ) + tuple(self.param_attr_names)).rename('params'), how='left')
+        # build data frame with index of (t, age, vacc) and one column per seir cmpt
+        solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
 
         # Merge R and R2 into one column
-        df['R'] += df['R2']
-        del df['R2']
+        solution_sum_df['R'] += solution_sum_df['R2']
+        del solution_sum_df['R2']
 
-        # if a sim_id is provided, insert it as a simulation result
+        # build unique parameters dataframe
+        params_df = self.params_as_df
+        grouped = params_df.groupby(['t'] + list(cmpts_json_attrs))
+        unique_params = [param for param, is_unique in (grouped.nunique() == 1).all().iteritems() if is_unique]
+        unique_params_df = grouped.max()[unique_params]
+
+        # build export dataframe
+        df = pd.DataFrame(index=solution_sum_df.index)
+        df['t'] = solution_sum_df.index.get_level_values('t')
+        df['cmpt'] = solution_sum_df.index.droplevel('t').to_frame().to_dict(orient='records') if solution_sum_df.index.nlevels > 1 else None
+        df['vals'] = solution_sum_df.to_dict(orient='records')
+        for col in ['cmpt', 'vals']:
+            df[col] = df[col].map(lambda d: json.dumps(d, ensure_ascii=False))
+
+        # if a sim_id is provided, insert it as a simulation result; some fields are different
         if sim_id is None:
-            table = 'results'
+            table = 'results_v2'
             df['spec_id'] = self.specifications.spec_id
+            df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
+            df['created_at'] = dt.datetime.now()
+            df['params'] = unique_params_df.apply(lambda x: json.dumps(x.to_dict(), ensure_ascii=False), axis=1)
         else:
-            table = 'simulation_results'
+            table = 'simulation_results_v2'
             df['sim_id'] = sim_id
-            del df['params']
+            df['sim_result_id'] = sim_result_id
+            df['tc'] = unique_params_df['ef']
 
         # write to database
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
-                  , index=True, if_exists='append', method='multi')
+                  , index=False, if_exists='append', method='multi', chunksize=1000000)
 
     def write_gparams_lookup_to_csv(self, fname):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}

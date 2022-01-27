@@ -6,9 +6,9 @@ import json
 import scipy.stats as sps
 from sqlalchemy import MetaData
 
-from db import db_engine
-from data_imports import ExternalVaccWithProjections, ExternalVacc
-from utils import get_params
+from covid_model.db import db_engine
+from covid_model.data_imports import ExternalVaccWithProjections, ExternalVacc
+from covid_model.utils import get_params
 
 
 class CovidModelSpecifications:
@@ -31,6 +31,7 @@ class CovidModelSpecifications:
         self.vacc_immun_params = None
         self.vacc_proj_params = None
         self.timeseries_effects = {}
+        self.attr_mults = None
 
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df, including proj, is saved to avoid unnecessary processing
@@ -102,7 +103,7 @@ class CovidModelSpecifications:
             model_params=self.model_params,
             vacc_actual={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()},
             vacc_proj_params=self.vacc_proj_params,
-            vacc_proj={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()},
+            vacc_proj={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None,
             vacc_immun_params=self.vacc_immun_params,
             timeseries_effects=self.timeseries_effects,
         )
@@ -142,6 +143,9 @@ class CovidModelSpecifications:
 
     def set_vacc_immun(self, vacc_immun_params):
         self.vacc_immun_params = vacc_immun_params if isinstance(vacc_immun_params, dict) else json.load(open(vacc_immun_params))
+
+    def set_attr_mults(self, attr_mults):
+        self.attr_mults = attr_mults if isinstance(attr_mults, dict) else json.load(open(attr_mults))
 
     def add_timeseries_effect(self, effect_type_name, prevalence_data, param_multipliers, fill_forward=False):
         # build prevalence and multiplier dataframes from inputs
@@ -211,10 +215,9 @@ class CovidModelSpecifications:
         shots = list(self.actual_vacc_df.columns)
 
         # add projections
-        # proj_from_date = self.actual_vacc_df.index.get_level_values('measure_date').max() + dt.timedelta(days=1)
         proj_from_t = self.actual_vacc_df.index.get_level_values('t').max() + 1
         proj_to_t = (self.end_date - self.start_date).days
-        if proj_to_t >= proj_from_t:
+        if proj_to_t > proj_from_t:
             proj_trange = range(proj_from_t, proj_to_t)
             # project rates based on the last {proj_lookback} days of data
             projected_rates = self.actual_vacc_df.loc[(proj_from_t - proj_lookback):].groupby('age').sum() / float(proj_lookback)
@@ -272,6 +275,10 @@ class CovidModelSpecifications:
         fail_cumu = (fail_increase - fail_reduction).groupby('age').cumsum()
         return (fail_reduction / fail_cumu).fillna(0)
 
+    @classmethod
+    def vacc_eff_decay_mult(cls, days_ago, delay, k):
+        return (1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540)) ** k
+
     def get_vacc_mean_efficacy(self, delay=7, k=1):
         if isinstance(k, str):
             k = self.model_params[k]
@@ -283,32 +290,12 @@ class CovidModelSpecifications:
         vacc_effs = {k: v['eff'] for k, v in self.vacc_immun_params.items()}
 
         terminal_cumu_eff = pd.DataFrame(index=rate.index, columns=shots, data=0)
-        vacc_eff_decay_mult = lambda days_ago: (1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540)) ** k
         for shot, next_shot in zip(shots, shots[1:] + [None]):
             nonzero_ts = rate[shot][rate[shot] > 0].index.get_level_values('t')
             if len(nonzero_ts) > 0:
                 days_ago_range = range(nonzero_ts.max() - nonzero_ts.min() + 1)
                 for days_ago in days_ago_range:
                     terminal_rate = np.minimum(rate[shot], (cumu[shot] - cumu.groupby('age').shift(-days_ago)[next_shot]).clip(lower=0)) if next_shot is not None else rate[shot]
-                    terminal_cumu_eff[shot] += vacc_effs[shot] * vacc_eff_decay_mult(days_ago) * terminal_rate.groupby(['age']).shift(days_ago).fillna(0)
+                    terminal_cumu_eff[shot] += vacc_effs[shot] * self.vacc_eff_decay_mult(days_ago, delay, k) * terminal_rate.groupby(['age']).shift(days_ago).fillna(0)
 
         return (terminal_cumu_eff.sum(axis=1) / cumu[shots[0]]).fillna(0)
-
-
-if __name__ == '__main__':
-    engine = db_engine()
-
-    cms = CovidModelSpecifications()
-
-    tslices = [52,59,66,80,94,108,122,136,150,164,178,192,206,220,234,248,262,276,290,304,318,332,346,360,374,388,402,416,430,444,458,472,486,500,514,528,542,556,570,584,598,612,626,640]
-    tc = [0.197316961609296,0.454544487240692,0.685069601735486,0.856637090778988,0.861426345809302,0.854460394603348,0.915440489892051,0.892098858977771,0.739492039679914,0.637422871591765,0.798469951938621,0.851835863406033,0.813730276031466,0.813700514087861,0.783855416121104,0.660199184274321,0.651709658632707,0.625130887314897,0.657608378080961,0.73156467338279,0.849593417871158,0.848625913420463,0.833159585040641,0.780310629600215,0.883445159121751,0.7398057107140255,0.8609249950340425,0.7158116763408557,0.7622678721711535,0.6177221761571133,0.6873098783020569,0.8040523766488482,0.7918391066823716,0.8684805695277086,0.833325279039802,0.7805306079204452,0.8034081654073754,0.6607799134829009,0.723623378637067,0.7378782272700403,0.8027115573066969,0.8060396354961565,0.7310349476535561,0.740356922881879,0.7395080997027447]
-
-    cms.set_tc(tslices, tc)
-    cms.set_model_params('input/params.json')
-    cms.set_actual_vacc(engine)
-    cms.set_vacc_proj(json.load(open('input/vacc_proj_params.json'))['current trajectory'])
-    cms.set_vacc_immun('input/vacc_immun_params.json')
-    cms.add_timeseries_effect('variant', prevalence_data='input/variant_prevalence.csv', param_multipliers='input/param_multipliers.json', fill_forward=True)
-    cms.add_timeseries_effect('mab', prevalence_data='input/mab_prevalence.csv', param_multipliers='input/param_multipliers.json', fill_forward=True)
-
-    cms.write_to_db(engine)
