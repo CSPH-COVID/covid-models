@@ -255,6 +255,17 @@ class CovidModelSpecifications:
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
         return df
 
+    def get_vacc_per_available(self):
+        vacc_rates = self.get_vacc_rates()
+        populations = pd.Series(self.model_params['group_pop'], name='population').rename_axis(index='age')
+        cumu_vacc = vacc_rates.groupby('age').cumsum()
+        cumu_vacc = cumu_vacc.join(populations)
+        cumu_vacc['none'] = cumu_vacc['population'] - cumu_vacc['shot1']
+        cumu_vacc = cumu_vacc.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        available_for_vacc = cumu_vacc.shift(1, axis=1).drop(columns='none')
+
+        return (vacc_rates / available_for_vacc).fillna(0)
+
     def get_vacc_rate_per_unvacc(self):
         # calculate the vaccination rate per unvaccinated
         vacc_df = self.get_vacc_rates()

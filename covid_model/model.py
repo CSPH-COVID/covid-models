@@ -87,7 +87,7 @@ class CovidModel(ODEBuilder):
         self.apply_specifications()
         self.build_ode()
 
-    def apply_specifications(self, specs: CovidModelSpecifications = None):
+    def apply_specifications(self, specs: CovidModelSpecifications = None, apply_vaccines=True):
         if specs is not None:
             self.specifications = specs
 
@@ -103,40 +103,41 @@ class CovidModel(ODEBuilder):
                     v = {a: av[i] for a, av in val['value'].items()} if isinstance(val['value'], dict) else val['value'][i]
                     self.set_param_using_age_dict(name, v, trange=range(tmin, tmax))
 
-        # get vacc rates and efficacy from specifications
-        vacc_per_unvacc = self.specifications.get_vacc_rate_per_unvacc()
-        vacc_mean_efficacy = self.specifications.get_vacc_mean_efficacy()
-        vacc_mean_efficacy_vs_delta = self.specifications.get_vacc_mean_efficacy(k='delta_vacc_eff_k')
-        vacc_fail_per_vacc = self.specifications.get_vacc_fail_per_vacc()
-        vacc_fail_reduction_per_fail = self.specifications.get_vacc_fail_reduction_per_vacc_fail()
+        if apply_vaccines:
+            # get vacc rates and efficacy from specifications
+            vacc_per_unvacc = self.specifications.get_vacc_rate_per_unvacc()
+            vacc_mean_efficacy = self.specifications.get_vacc_mean_efficacy()
+            vacc_mean_efficacy_vs_delta = self.specifications.get_vacc_mean_efficacy(k='delta_vacc_eff_k')
+            vacc_fail_per_vacc = self.specifications.get_vacc_fail_per_vacc()
+            vacc_fail_reduction_per_fail = self.specifications.get_vacc_fail_reduction_per_vacc_fail()
 
-        # convert to dictionaries for performance lookup
-        vacc_per_unvacc_dict = vacc_per_unvacc.to_dict()
-        vacc_mean_efficacy_dict = vacc_mean_efficacy.to_dict()
-        vacc_mean_efficacy_vs_delta_dict = vacc_mean_efficacy_vs_delta.to_dict()
-        vacc_fail_reduction_per_fail_dict = vacc_fail_reduction_per_fail.to_dict()
+            # convert to dictionaries for performance lookup
+            vacc_per_unvacc_dict = vacc_per_unvacc.to_dict()
+            vacc_mean_efficacy_dict = vacc_mean_efficacy.to_dict()
+            vacc_mean_efficacy_vs_delta_dict = vacc_mean_efficacy_vs_delta.to_dict()
+            vacc_fail_reduction_per_fail_dict = vacc_fail_reduction_per_fail.to_dict()
 
-        # set the fail rate and vacc per unvacc rate for each dose
-        for shot in vacc_per_unvacc.columns:
+            # set the fail rate and vacc per unvacc rate for each dose
+            for shot in vacc_per_unvacc.columns:
+                for age in self.attr['age']:
+                    self.set_param(f'{shot}_fail_rate', vacc_fail_per_vacc[shot][age], {'age': age})
+                    for t in self.trange:
+                        self.set_param(f'{shot}_per_unvacc', vacc_per_unvacc_dict[shot][(t, age)], {'age': age}, trange=[t])
+
+            # set hospitalization and mortality to 0 among the vacc successes
+            self.set_param('hosp', 0, attrs={'vacc': 'vacc'})
+            self.set_param('dnh', 0, attrs={'vacc': 'vacc'})
+
+            # set vacc efficacy and fail reduction over time
+            self.set_param('vacc_eff', 0, {'vacc': 'unvacc'})
+            self.set_param('vacc_eff', 0, {'vacc': 'vacc_fail'})
+            self.set_param('vacc_eff_vs_delta', 0, {'vacc': 'unvacc'})
+            self.set_param('vacc_eff_vs_delta', 0, {'vacc': 'vacc_fail'})
             for age in self.attr['age']:
-                self.set_param(f'{shot}_fail_rate', vacc_fail_per_vacc[shot][age], {'age': age})
                 for t in self.trange:
-                    self.set_param(f'{shot}_per_unvacc', vacc_per_unvacc_dict[shot][(t, age)], {'age': age}, trange=[t])
-
-        # set hospitalization and mortality to 0 among the vacc successes
-        self.set_param('hosp', 0, attrs={'vacc': 'vacc'})
-        self.set_param('dnh', 0, attrs={'vacc': 'vacc'})
-
-        # set vacc efficacy and fail reduction over time
-        self.set_param('vacc_eff', 0, {'vacc': 'unvacc'})
-        self.set_param('vacc_eff', 0, {'vacc': 'vacc_fail'})
-        self.set_param('vacc_eff_vs_delta', 0, {'vacc': 'unvacc'})
-        self.set_param('vacc_eff_vs_delta', 0, {'vacc': 'vacc_fail'})
-        for age in self.attr['age']:
-            for t in self.trange:
-                self.set_param('vacc_eff', vacc_mean_efficacy_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
-                self.set_param('vacc_eff_vs_delta', vacc_mean_efficacy_vs_delta_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
-                self.set_param('vacc_fail_reduction_per_vacc_fail', vacc_fail_reduction_per_fail_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
+                    self.set_param('vacc_eff', vacc_mean_efficacy_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
+                    self.set_param('vacc_eff_vs_delta', vacc_mean_efficacy_vs_delta_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
+                    self.set_param('vacc_fail_reduction_per_vacc_fail', vacc_fail_reduction_per_fail_dict[(t, age)], {'age': age, 'vacc': 'vacc'}, trange=[t])
 
         # alter parameters based on timeseries effects
         multipliers = self.specifications.get_timeseries_effect_multipliers()
