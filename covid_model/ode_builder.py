@@ -271,7 +271,7 @@ class ODEBuilder:
                     from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
                     to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
                     constant_by_t=self.calc_coef_by_t(constant, to_cmpt),
-                    pool_cmpt_idxs=[self.cmpt_idx_lookup(pool_cmpt) for pool_cmpt in pool_cmpts]
+                    pool_cmpt_idxs=[self.cmpt_idx_lookup[pool_cmpt] for pool_cmpt in pool_cmpts]
                 ))
 
     # def add_flows_by_attr(self, attr_name, from_attr, to_attr, where={}, change_attrs={}, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
@@ -343,6 +343,7 @@ class ODEBuilder:
 
     def ode(self, t, y):
         dy = [0] * self.length
+        print(t)
         t_int = min(math.floor(t), len(self.trange) - 1)
 
         for term in self.terms:
