@@ -65,7 +65,8 @@ class CovidModelSpecifications:
         specs.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=row['tc_cov'])
         specs.set_model_params(row['model_params'])
 
-        specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v) for k, v in row['vacc_actual'].items()}, axis=0).unstack(0).stack(0).rename_axis(index=['t', 'age'])
+        # specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v) for k, v in row['vacc_actual'].items()}, axis=0).unstack(0).stack(0).rename_axis(index=['t', 'age'])
+        specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in row['vacc_actual'].items()}, axis=1).rename_axis(index=['t', 'age'])
         specs.set_vacc_proj(row['vacc_proj_params'])
         specs.set_vacc_immun(row['vacc_immun_params'])
 
