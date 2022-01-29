@@ -69,10 +69,10 @@ class ConstantODEFlowTerm(ODEFlowTerm):
 
 
 class ConstantFromPoolODEFlowTerm(ConstantODEFlowTerm):
-    def __init__(self, from_cmpt_idx, to_cmpt_idx, constant_by_t, from_cmpt_pool_idxs):
-        ConstantODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, constant_by_t=constant_by_t)
+    def __init__(self, from_cmpt_idx, to_cmpt_idx, constant_by_t, pool_cmpt_idxs=None):
+        ConstantODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx, constant_by_t=constant_by_t)
 
-        self.from_cmpt_pool_idxs = from_cmpt_pool_idxs if from_cmpt_pool_idxs is not None else [from_cmpt_idx]
+        self.from_cmpt_pool_idxs = pool_cmpt_idxs if pool_cmpt_idxs is not None else [from_cmpt_idx]
 
     def flow_val(self, t, y):
         return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
@@ -229,7 +229,7 @@ class ODEBuilder:
         for i in sorted(self.get_term_indices_by_attr(from_attrs, to_attrs), reverse=True):
             del self.terms[i]
 
-    def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+    def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, pool_cmpts=None):
         # self.jac_sparsity[self.cmpt_idx_lookup[from_cmpt], self.cmpt_idx_lookup[from_cmpt]] = 1
         # self.jac_sparsity[self.cmpt_idx_lookup[to_cmpt], self.cmpt_idx_lookup[from_cmpt]] = 1
         # if scale_by_cmpts:
@@ -260,26 +260,55 @@ class ODEBuilder:
                 scale_by_cmpts_coef_by_t=coef_by_t_dl))
 
         if constant is not None:
-            self.terms.append(ConstantODEFlowTerm(
-                from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
-                to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-                constant_by_t=self.calc_coef_by_t(constant, to_cmpt)
-            ))
-
-    def add_multi_flow(self, from_cmpts, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
-        if coef is not None:
-            for from_cmpt in from_cmpts:
-                self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts, scale_by_cmpts_coef=scale_by_cmpts_coef)
-
-        if constant is not None:
-            from_cmpt_idxs = [self.cmpt_idx_lookup(cmpt) for cmpt in from_cmpts]
-            for from_cmpt_idx in from_cmpt_idxs:
+            if pool_cmpts is None:
+                self.terms.append(ConstantODEFlowTerm(
+                    from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
+                    to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
+                    constant_by_t=self.calc_coef_by_t(constant, to_cmpt)
+                ))
+            else:
                 self.terms.append(ConstantFromPoolODEFlowTerm(
-                    from_cmpt_idx=from_cmpt_idx,
+                    from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
                     to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
                     constant_by_t=self.calc_coef_by_t(constant, to_cmpt),
-                    from_cmpt_pool_idxs=from_cmpt_idxs
+                    pool_cmpt_idxs=[self.cmpt_idx_lookup(pool_cmpt) for pool_cmpt in pool_cmpts]
                 ))
+
+    # def add_flows_by_attr(self, attr_name, from_attr, to_attr, where={}, change_attrs={}, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
+    #     attr_level = self.attr_level(attr_name)
+    #     from_cmpts = self.filter_cmpts_by_attrs({attr_name: from_attr, **where})
+    #     for from_cmpt in from_cmpts:
+    #         to_cmpt_list = list(from_cmpt)
+    #         to_cmpt_list[attr_level] = to_attr
+    #         to_cmpt = from_cmpt[:attr_level] + (to_attr, ) + from_cmpt[attr_level + 1:]
+    #         self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
+    #                       scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant, pool_cmpts=from_cmpts if from_pool else None)
+
+    def add_flows_by_attr(self, from_attrs, to_attrs, change_attrs={}, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
+        from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
+        for from_cmpt in from_cmpts:
+            to_cmpt_list = list(from_cmpt)
+            for attr_name, new_attr_val in to_attrs.items():
+                to_cmpt_list[self.attr_level(attr_name)] = new_attr_val
+            to_cmpt = tuple(to_cmpt_list)
+            self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
+                          scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant, pool_cmpts=from_cmpts if from_pool else None)
+
+
+    # def add_multi_flow(self, from_cmpts, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+    #     if coef is not None:
+    #         for from_cmpt in from_cmpts:
+    #             self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts, scale_by_cmpts_coef=scale_by_cmpts_coef)
+    #
+    #     if constant is not None:
+    #         from_cmpt_idxs = [self.cmpt_idx_lookup(cmpt) for cmpt in from_cmpts]
+    #         for from_cmpt_idx in from_cmpt_idxs:
+    #             self.terms.append(ConstantFromPoolODEFlowTerm(
+    #                 from_cmpt_idx=from_cmpt_idx,
+    #                 to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
+    #                 constant_by_t=self.calc_coef_by_t(constant, to_cmpt),
+    #                 pool_cmpt_idxs=from_cmpt_idxs
+    #             ))
 
 
     # def precalc_jacobians(self):
