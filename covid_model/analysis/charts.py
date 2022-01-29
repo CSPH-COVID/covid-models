@@ -10,7 +10,7 @@ import seaborn as sns
 import datetime as dt
 import numpy as np
 import pandas as pd
-import pmdarima
+# import pmdarima
 import arch
 import json
 from time import perf_counter
@@ -292,26 +292,26 @@ def vaccination(fname='output/daily_vaccination_by_age (old).csv', **plot_params
     first_shot_rate.plot(**plot_params)
 
 
-def arima_garch_fit_and_sim(data, horizon=1):
-    transformed = np.log(1 - np.array(data))
-    # arima_model = pmdarima.auto_arima(transformed)
-    arima_model = pmdarima.ARIMA(order=(2, 0, 1), suppress_warnings=True).fit(transformed)
-
-    # fit ARIMA on transformed
-    p, d, q = arima_model.order
-    arima_residuals = arima_model.arima_res_.resid
-
-    # fit a GARCH(1,1) model on the residuals of the ARIMA model
-    garch = arch.arch_model(arima_residuals, p=1, q=1)
-    garch_model = garch.fit(disp='off')
-
-    # Use ARIMA to predict mu
-    predicted_mu = arima_model.predict(n_periods=horizon)
-
-    # Use GARCH to predict the residual
-    garch_forecast = garch_model.forecast(horizon=horizon, reindex=False, method='simulation')
-    # Combine both models' output: yt = mu + et
-    return 1 - np.exp(np.array([a + predicted_mu for a in garch_forecast.simulations.values[0]]))
+# def arima_garch_fit_and_sim(data, horizon=1):
+#     transformed = np.log(1 - np.array(data))
+#     # arima_model = pmdarima.auto_arima(transformed)
+#     arima_model = pmdarima.ARIMA(order=(2, 0, 1), suppress_warnings=True).fit(transformed)
+#
+#     # fit ARIMA on transformed
+#     p, d, q = arima_model.order
+#     arima_residuals = arima_model.arima_res_.resid
+#
+#     # fit a GARCH(1,1) model on the residuals of the ARIMA model
+#     garch = arch.arch_model(arima_residuals, p=1, q=1)
+#     garch_model = garch.fit(disp='off')
+#
+#     # Use ARIMA to predict mu
+#     predicted_mu = arima_model.predict(n_periods=horizon)
+#
+#     # Use GARCH to predict the residual
+#     garch_forecast = garch_model.forecast(horizon=horizon, reindex=False, method='simulation')
+#     # Combine both models' output: yt = mu + et
+#     return 1 - np.exp(np.array([a + predicted_mu for a in garch_forecast.simulations.values[0]]))
 
 
 def format_date_axis(ax, interval_months=None, **locator_params):
