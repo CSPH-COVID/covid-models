@@ -261,7 +261,7 @@ class CovidModel(ODEBuilder):
         return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.specifications.model_params['alpha']
 
     # immunity
-    def immunity(self, variant='omicron', vacc_only=False):
+    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False):
         susc_by_t = {t: 0 for t in self.trange}
         for from_cmpt in self.compartments:
             n = self.solution_ydf[from_cmpt]
@@ -273,11 +273,18 @@ class CovidModel(ODEBuilder):
                         if term.coef_by_t is not None:  # if the term is a constant, coef_by_t will be None
                             for t in self.trange:
                                 susc_rate = term.coef_by_t[t] * self.params[t][to_cmpt[1:]]['total_pop'] / self.params[t][to_cmpt[1:]]['betta'] / (1 - self.params[t][to_cmpt[1:]]['ef'])
-                                # if t == 700:
-                                #     print(f'{from_cmpt}\t{to_cmpt}\t{round(n[t])}\t{round(susc_rate, 2)}')
                                 susc_by_t[t] += n[t] * susc_rate
 
-        return pd.Series({t: 1 - susc / self.specifications.model_params['total_pop'] for t, susc in susc_by_t.items()})
+        susc = pd.Series(susc_by_t)
+
+        if to_hosp:
+            params_df = self.params_as_df
+            hosp_vuln = params_df['hosp'] / params_df['hosp'].xs('unvacc', level='vacc')
+            infected = self.solution_ydf.transpose().xs('I', level='seir') + self.solution_ydf.transpose().xs('A', level='seir')
+            infected = infected.stack().reorder_levels(hosp_vuln.index.names)
+            susc *= (infected * hosp_vuln).groupby('t').sum() / infected.groupby('t').sum()
+
+        return 1 - susc / self.specifications.model_params['total_pop']
 
     # write to covid_model.results in Postgres
     def write_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):

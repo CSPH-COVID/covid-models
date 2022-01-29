@@ -28,23 +28,12 @@ if __name__ == '__main__':
 
     print('Running model...')
     model.solve_seir()
+    build_legacy_output_df(model).to_csv('output/out2.csv')
 
     print('Producing charts...')
     fig, axs = plt.subplots(2, 2, figsize=(17, 8))
 
     axs = axs.flatten()
-
-    # tc shift scenarios
-    base_tslices = model.specifications.tslices.copy()
-    base_tc = model.specifications.tc.copy()
-    for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
-        start_t = 725
-        future_tslices = list(range(start_t, start_t + tc_shift_days))
-        future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
-        model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
-        model.solve_seir()
-        modeled(model, 'Ih', ax=axs[1], label=f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Current trajectory')
-        modeled(model, ['I', 'A'], share_of_total=True, ax=axs[0], label=f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Current Trajectory')
 
     # prevalence
     axs[0].set_ylabel('SARS-CoV-2 Prevalence')
@@ -67,6 +56,7 @@ if __name__ == '__main__':
     axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
     axs[3].plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
     axs[3].plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
+    axs[3].plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Omicron Hospitalization', color='black')
     axs[3].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     axs[3].set_ylim(0, 1)
     axs[3].set_ylabel('Percent Immune')
@@ -74,8 +64,23 @@ if __name__ == '__main__':
 
     actual_hosps(engine, ax=axs[1], color='black')
 
-    # export
-    build_legacy_output_df(model).to_csv('output/out2.csv')
+    # tc shift scenarios
+    base_tslices = model.specifications.tslices.copy()
+    base_tc = model.specifications.tc.copy()
+    hosps_df = pd.DataFrame(index=model.trange)
+    for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
+        start_t = 725
+        future_tslices = list(range(start_t, start_t + tc_shift_days))
+        future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
+        model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
+        model.solve_seir()
+        label = f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Current trajectory'
+        modeled(model, 'Ih', ax=axs[1], label=label)
+        modeled(model, ['I', 'A'], share_of_total=True, ax=axs[0], label=label)
+        hosps_df[label] = model.solution_sum('seir')['Ih']
+
+    hosps_df.index = model.daterange
+    hosps_df.loc[:'2022-02-28'].round(1).to_csv('output/omicron_report_hospitalization_scenarios.csv')
 
     # formatting
     for ax in axs:
