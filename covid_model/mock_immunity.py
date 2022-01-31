@@ -24,15 +24,6 @@ def two_cmpt_decay(t, scale1, scale2):
     return in_cmpt1 + in_cmpt2
 
 
-# x = np.exp(-t / scale1)
-# if scale1 != scale2:
-#     y = (scale2 * np.exp(-(t * (scale1 + scale2)) / (scale1 * scale2)) * (np.exp(t / scale2) - np.exp(t / scale1))) / (scale1 - scale2)
-#     z = (np.exp(-(t * (scale1 + scale2)) / (scale1 * scale2)) * (scale2 * np.exp(t / scale1) - np.exp(t / scale2) * (scale2 * np.exp(t / scale1) + scale1 * (-np.exp(t / scale1)) + scale1))) / (scale1 - scale2)
-# else:
-#     y = t * np.exp(-t / scale1) / scale1
-#     z = (np.exp(-t / scale1) * (scale1 * np.exp(t / scale1) - scale1 - t)) / scale1
-
-
 if __name__ == '__main__':
     engine = db_engine()
 

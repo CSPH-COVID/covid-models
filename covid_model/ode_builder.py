@@ -75,7 +75,10 @@ class ConstantFromPoolODEFlowTerm(ConstantODEFlowTerm):
         self.from_cmpt_pool_idxs = pool_cmpt_idxs if pool_cmpt_idxs is not None else [from_cmpt_idx]
 
     def flow_val(self, t, y):
-        return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
+        if y[self.from_cmpt_idx] == 0:
+            return 0
+        else:
+            return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
 
 
 class ODEBuilder:
@@ -159,14 +162,17 @@ class ODEBuilder:
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
-    def set_param(self, param, val=None, attrs=None, trange=None, mult=None):
+    def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None):
         if val is not None:
             def apply(t, cmpt, param):
                 self.params[t][cmpt][param] = val
-        else:
+        elif mult is not None:
             def apply(t, cmpt, param):
                 self.params[t][cmpt][param] *= mult
-        if type(val if val is not None else mult) not in (int, float, np.float64):
+        elif pow is not None:
+            def apply(t, cmpt, param):
+                self.params[t][cmpt][param] = self.params[t][cmpt][param] ** pow
+        if type(val if val is not None else mult if mult is not None else val) not in (int, float, np.float64):
             raise TypeError(f'Parameter value (or multiplier) must be numeric; {val if val is not None else mult} is {type(val if val is not None else mult)}')
         if trange is None:
             actual_trange = self.trange
@@ -343,7 +349,6 @@ class ODEBuilder:
 
     def ode(self, t, y):
         dy = [0] * self.length
-        print(t)
         t_int = min(math.floor(t), len(self.trange) - 1)
 
         for term in self.terms:

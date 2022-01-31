@@ -62,5 +62,6 @@
   "om_seed": {"tslices": [662, 687], "value": [0, 1, 0]},
   "omicron_acq_immune_escape": 0.5,
   "delta_vacc_eff_k": 1.6,
-  "omicron_vacc_eff_k": 4.5
+  "omicron_vacc_eff_k": 4.5,
+  "immunity": 0
 }

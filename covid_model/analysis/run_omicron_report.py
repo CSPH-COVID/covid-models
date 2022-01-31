@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     print('Running model...')
     model.solve_seir()
-    build_legacy_output_df(model).to_csv('output/out2.csv')
+    # build_legacy_output_df(model).to_csv('output/out2.csv')
 
     print('Producing charts...')
     fig, axs = plt.subplots(2, 2, figsize=(17, 8))
@@ -52,16 +52,16 @@ if __name__ == '__main__':
     axs[2].lines.pop(0)
     axs[2].legend(loc='best')
 
-    # immunity
-    axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron', color='cyan')
-    axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
-    axs[3].plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
-    axs[3].plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
-    axs[3].plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Omicron Hospitalization', color='black')
-    axs[3].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-    axs[3].set_ylim(0, 1)
-    axs[3].set_ylabel('Percent Immune')
-    axs[3].legend(loc='best')
+    # # immunity
+    # axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron', color='cyan')
+    # axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
+    # axs[3].plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
+    # axs[3].plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
+    # axs[3].plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Omicron Hospitalization', color='black')
+    # axs[3].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    # axs[3].set_ylim(0, 1)
+    # axs[3].set_ylabel('Percent Immune')
+    # axs[3].legend(loc='best')
 
     actual_hosps(engine, ax=axs[1], color='black')
 
@@ -69,7 +69,8 @@ if __name__ == '__main__':
     base_tslices = model.specifications.tslices.copy()
     base_tc = model.specifications.tc.copy()
     hosps_df = pd.DataFrame(index=model.trange)
-    for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
+    # for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
+    for tc_shift, tc_shift_days in [(0, 0)]:
         start_t = 725
         future_tslices = list(range(start_t, start_t + tc_shift_days))
         future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
