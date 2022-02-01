@@ -59,18 +59,14 @@ class CovidModelWithVariants(CovidModel):
         base_transm = f'betta * (1 - ef) * (1 - {vacc_eff_w_delta}) / total_pop'
         base_transm_omicron = f'betta * (1 - ef) * (1 - omicron_vacc_eff) / total_pop'
         for variant in self.attributes['variant']:
-            infectious_cmpts = [(s, a, v, variant) for a in self.attributes['age'] for v in self.attributes['vacc'] for s in ['I', 'A']]
-            infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1']) for seir, age, vacc, variant in infectious_cmpts]
-            # transmission to susceptibles
-            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant},
-                                   coef=base_transm_omicron if variant == 'omicron' else base_transm,
-                                   scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
-            # transmission to recovered (a.k.a. acquired-immune escape)
+            sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
+            asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})
+            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef='lamb * ' + (base_transm_omicron if variant == 'omicron' else base_transm), scale_by_cmpts=sympt_cmpts)
+            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef=base_transm_omicron if variant == 'omicron' else base_transm, scale_by_cmpts=asympt_cmpts)
             if variant == 'omicron':
                 for recovered_cmpt in ('R', 'R2'):
-                    self.add_flows_by_attr({'seir': recovered_cmpt, 'variant': 'none'}, {'seir': 'E', 'variant': variant},
-                                           coef=f'omicron_acq_immune_escape * {base_transm_omicron}',
-                                           scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+                    self.add_flows_by_attr({'seir': recovered_cmpt, 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef='omicron_acq_immune_escape * lamb * ' + (base_transm_omicron if variant == 'omicron' else base_transm), scale_by_cmpts=sympt_cmpts)
+                    self.add_flows_by_attr({'seir': recovered_cmpt, 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef='omicron_acq_immune_escape * ' + (base_transm_omicron if variant == 'omicron' else base_transm), scale_by_cmpts=asympt_cmpts)
 
     # reset terms that depend on TC; this takes about 0.08 sec, while rebuilding the whole ODE takes ~0.90 sec
     def rebuild_ode_with_new_tc(self):
