@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import sympy as sym
 from sympy.parsing.sympy_parser import parse_expr
 from time import perf_counter
@@ -14,71 +14,113 @@ import numbers
 
 
 class ODEFlowTerm:
-    def __init__(self, from_cmpt_idx, to_cmpt_idx, coef_by_t, scale_by_cmpts_idxs, scale_by_cmpts_coef_by_t):
+    def __init__(self, from_cmpt_idx, to_cmpt_idx):
         self.from_cmpt_idx = from_cmpt_idx
         self.to_cmpt_idx = to_cmpt_idx
+
+    def flow_val(self, t_int, y):
+        pass
+
+    def add_to_linear_matrix(self, matrix, t_int):
+        pass
+
+    def add_to_constant_vector(self, vector, t_int):
+        pass
+
+    def add_to_nonlinear_matrices(self, matrices, t_int):
+        pass
+
+    @classmethod
+    def build(cls, from_cmpt_idx, to_cmpt_idx, coef_by_t=None, scale_by_cmpts_idxs=None, scale_by_cmpts_coef_by_t=None, constant_by_t=None, pool_cmpt_idxs=None):
+        if pool_cmpt_idxs is not None:
+            return ConstantFromPoolODEFlowTerm(from_cmpt_idx, to_cmpt_idx, constant_by_t=constant_by_t, pool_cmpt_idxs=pool_cmpt_idxs)
+        elif constant_by_t is not None:
+            return ConstantODEFlowTerm(from_cmpt_idx, to_cmpt_idx, constant_by_t=constant_by_t)
+        elif scale_by_cmpts_coef_by_t is not None:
+            return WeightedScaledODEFlowTerm(from_cmpt_idx, to_cmpt_idx, coef_by_t=coef_by_t, scale_by_cmpts_idxs=scale_by_cmpts_idxs, scale_by_cmpts_coef_by_t=scale_by_cmpts_coef_by_t)
+        elif scale_by_cmpts_idxs is not None:
+            return ScaledODEFlowTerm(from_cmpt_idx, to_cmpt_idx, coef_by_t=coef_by_t, scale_by_cmpts_idxs=scale_by_cmpts_idxs)
+        else:
+            return LinearODEFlowTerm(from_cmpt_idx, to_cmpt_idx, coef_by_t=coef_by_t)
+
+
+class LinearODEFlowTerm(ODEFlowTerm):
+    def __init__(self, from_cmpt_idx, to_cmpt_idx, coef_by_t):
+        ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx)
         self.coef_by_t = coef_by_t
-        self.is_scaled_by_cmpts = scale_by_cmpts_idxs is not None and scale_by_cmpts_idxs != []
+
+    def flow_val(self, t_int, y):
+        return y[self.from_cmpt_idx] * self.coef_by_t[t_int]
+
+    def add_to_linear_matrix(self, matrix, t_int):
+        if self.coef_by_t[t_int] != 0:
+            matrix[self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
+            matrix[self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
+
+
+class ScaledODEFlowTerm(ODEFlowTerm):
+    def __init__(self, from_cmpt_idx, to_cmpt_idx, coef_by_t, scale_by_cmpts_idxs):
+        ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx)
+        self.coef_by_t = coef_by_t
+        self.scale_by_cmpt_idxs = sorted(scale_by_cmpts_idxs)
+
+    def flow_val(self, t_int, y):
+        return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(itemgetter(*self.scale_by_cmpt_idxs)(y))
+
+    def add_to_nonlinear_matrices(self, matrices, t_int):
+        if self.coef_by_t[t_int] != 0:
+            matrices[tuple(self.scale_by_cmpt_idxs)][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
+            matrices[tuple(self.scale_by_cmpt_idxs)][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
+        # print(matrices)
+        # for scale_by_cmpt_idx in self.scale_by_cmpt_idxs:
+        #     matrices[scale_by_cmpt_idx][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
+        #     matrices[scale_by_cmpt_idx][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
+
+
+class WeightedScaledODEFlowTerm(ODEFlowTerm):
+    def __init__(self, from_cmpt_idx, to_cmpt_idx, coef_by_t, scale_by_cmpts_idxs, scale_by_cmpts_coef_by_t=None):
+        ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx)
+        self.coef_by_t = coef_by_t
         self.scale_by_cmpt_idxs = scale_by_cmpts_idxs
         self.scale_by_cmpts_coef_by_t = scale_by_cmpts_coef_by_t
 
-        self.solution = None
-        self.solution_y = None
-        self.solution_ydf = None
-
     def flow_val(self, t_int, y):
-        if self.is_scaled_by_cmpts:
-            if self.scale_by_cmpts_coef_by_t:
-                return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(a * b for a, b in zip(itemgetter(*self.scale_by_cmpt_idxs)(y), self.scale_by_cmpts_coef_by_t[t_int]))
-            else:
-                return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(itemgetter(*self.scale_by_cmpt_idxs)(y))
+        if self.scale_by_cmpts_coef_by_t:
+            return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(
+                a * b for a, b in zip(itemgetter(*self.scale_by_cmpt_idxs)(y), self.scale_by_cmpts_coef_by_t[t_int]))
         else:
-            return y[self.from_cmpt_idx] * self.coef_by_t[t_int]
+            return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(itemgetter(*self.scale_by_cmpt_idxs)(y))
 
-    def jacobian(self, t, y):
-        jac = spsp.lil_matrix((len(y), len(y)))
-        if self.scale_by_cmpt_idxs is None or len(self.scale_by_cmpt_idxs) > 0:
-            jac[self.from_cmpt_idx, self.from_cmpt_idx] = -self.coef_by_t[t]
-            jac[self.to_cmpt_idx, self.from_cmpt_idx] = self.coef_by_t[t]
-        else:
-            if self.scale_by_cmpts_coef_by_t is not None:
-                for sbc_idx, sbc_coef in zip(self.scale_by_cmpt_idxs, self.scale_by_cmpts_coef_by_t[t]):
-                    jac[self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t] * sbc_coef * y[sbc_idx]
-                    jac[self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t] * sbc_coef * y[sbc_idx]
-                    jac[self.from_cmpt_idx, sbc_idx] = -self.coef_by_t[t] * sbc_coef * y[self.from_cmpt_idx]
-                    jac[self.to_cmpt_idx, sbc_idx] = self.coef_by_t[t] * sbc_coef * y[self.from_cmpt_idx]
-            else:
-                for sbc_idx in self.scale_by_cmpt_idxs:
-                    jac[self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t] * y[sbc_idx]
-                    jac[self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t] * y[sbc_idx]
-                    jac[self.from_cmpt_idx, sbc_idx] = -self.coef_by_t[t] * y[self.from_cmpt_idx]
-                    jac[self.to_cmpt_idx, sbc_idx] = self.coef_by_t[t] * y[self.from_cmpt_idx]
-
-        return jac
+    def add_to_nonlinear_matrices(self, matrices, t_int):
+        scale_by_cmpts_coef_by_t = self.scale_by_cmpts_coef_by_t[t_int] if self.scale_by_cmpts_coef_by_t else [1] * len(self.scale_by_cmpt_idxs)
+        for scale_by_cmpt_idx, scale_by_cmpt_coef in zip(self.scale_by_cmpt_idxs, scale_by_cmpts_coef_by_t):
+            matrices[scale_by_cmpt_idx][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int] * scale_by_cmpt_coef
+            matrices[scale_by_cmpt_idx][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int] * scale_by_cmpt_coef
 
 
 class ConstantODEFlowTerm(ODEFlowTerm):
     def __init__(self, from_cmpt_idx, to_cmpt_idx, constant_by_t):
-        ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx, coef_by_t=None,
-                             scale_by_cmpts_idxs=None, scale_by_cmpts_coef_by_t=None)
-
+        ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx)
         self.constant_by_t = constant_by_t
 
     def flow_val(self, t, y):
         return self.constant_by_t[t]
 
+    def add_to_constant_vector(self, vector, t_int):
+        vector[self.from_cmpt_idx] -= self.constant_by_t[t_int]
+        vector[self.to_cmpt_idx] += self.constant_by_t[t_int]
 
-class ConstantFromPoolODEFlowTerm(ConstantODEFlowTerm):
-    def __init__(self, from_cmpt_idx, to_cmpt_idx, constant_by_t, pool_cmpt_idxs=None):
-        ConstantODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx, constant_by_t=constant_by_t)
 
-        self.from_cmpt_pool_idxs = pool_cmpt_idxs if pool_cmpt_idxs is not None else [from_cmpt_idx]
-
-    def flow_val(self, t, y):
-        if y[self.from_cmpt_idx] == 0:
-            return 0
-        else:
-            return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
+# class ConstantFromPoolODEFlowTerm(ConstantODEFlowTerm):
+#     def __init__(self, from_cmpt_idx, to_cmpt_idx, constant_by_t, pool_cmpt_idxs=None):
+#         ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx, constant_by_t=constant_by_t)
+#         self.from_cmpt_pool_idxs = pool_cmpt_idxs if pool_cmpt_idxs is not None else [from_cmpt_idx]
+#
+#     def flow_val(self, t, y):
+#         if y[self.from_cmpt_idx] == 0:
+#             return 0
+#         else:
+#             return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
 
 
 class ODEBuilder:
@@ -140,12 +182,6 @@ class ODEBuilder:
         self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
         self.terms = []
 
-        # self.jac_sparsity = spsp.lil_matrix((self.length, self.length), dtype=int)
-        # self.jac_fixed_by_t = {}
-
-        # self.jacobians = {t: np.zeros((self.length, self.length)) for t in self.trange}
-        # self.linear_jacobians_by_t = {}
-
     @property
     def params_as_df(self):
         return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
@@ -181,10 +217,6 @@ class ODEBuilder:
         for cmpt in self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments:
             for t in actual_trange:
                 apply(t, cmpt, param)
-                # if val is not None:
-                #     self.params[t][cmpt][name] = val
-                # else:
-                #     self.params[t][cmpt][name] *= mult
 
     def calc_coef_by_t(self, coef, cmpt):
 
@@ -227,21 +259,10 @@ class ODEBuilder:
         return [self.terms[i] for i in self.get_term_indices_by_attr(from_attrs, to_attrs)]
 
     def reset_terms(self, from_attrs, to_attrs):
-        # to_delete = []
-        # for i, term in enumerate(self.terms):
-        #     if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs):
-        #         to_delete.append(i)
-
         for i in sorted(self.get_term_indices_by_attr(from_attrs, to_attrs), reverse=True):
             del self.terms[i]
 
     def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, pool_cmpts=None):
-        # self.jac_sparsity[self.cmpt_idx_lookup[from_cmpt], self.cmpt_idx_lookup[from_cmpt]] = 1
-        # self.jac_sparsity[self.cmpt_idx_lookup[to_cmpt], self.cmpt_idx_lookup[from_cmpt]] = 1
-        # if scale_by_cmpts:
-        #     for scale_by_cmpt in scale_by_cmpts:
-        #         self.jac_sparsity[self.cmpt_idx_lookup[from_cmpt], self.cmpt_idx_lookup[scale_by_cmpt]] = 1
-        #         self.jac_sparsity[self.cmpt_idx_lookup[to_cmpt], self.cmpt_idx_lookup[scale_by_cmpt]] = 1
         if len(from_cmpt) < len(self.attributes.keys()):
             raise ValueError(f'Origin compartment `{from_cmpt}` does not have the right number of attributes.')
         if len(to_cmpt) < len(self.attributes.keys()):
@@ -258,39 +279,17 @@ class ODEBuilder:
                 coef_by_t_dl = {t: [dic[t] for dic in coef_by_t_ld] for t in self.trange}
             else:
                 coef_by_t_dl = None
-            self.terms.append(ODEFlowTerm(
-                from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
-                to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-                coef_by_t=self.calc_coef_by_t(coef, to_cmpt),
-                scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in scale_by_cmpts] if scale_by_cmpts is not None else [],
-                scale_by_cmpts_coef_by_t=coef_by_t_dl))
 
-        if constant is not None:
-            if pool_cmpts is None:
-                self.terms.append(ConstantODEFlowTerm(
-                    from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
-                    to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-                    constant_by_t=self.calc_coef_by_t(constant, to_cmpt)
-                ))
-            else:
-                self.terms.append(ConstantFromPoolODEFlowTerm(
-                    from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
-                    to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-                    constant_by_t=self.calc_coef_by_t(constant, to_cmpt),
-                    pool_cmpt_idxs=[self.cmpt_idx_lookup[pool_cmpt] for pool_cmpt in pool_cmpts]
-                ))
+        self.terms.append(ODEFlowTerm.build(
+            from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
+            to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
+            coef_by_t=self.calc_coef_by_t(coef, to_cmpt),
+            scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in scale_by_cmpts] if scale_by_cmpts is not None else None,
+            scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
+            constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None,
+            pool_cmpt_idxs=[self.cmpt_idx_lookup[pool_cmpt] for pool_cmpt in pool_cmpts] if pool_cmpts is not None else None))
 
-    # def add_flows_by_attr(self, attr_name, from_attr, to_attr, where={}, change_attrs={}, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
-    #     attr_level = self.attr_level(attr_name)
-    #     from_cmpts = self.filter_cmpts_by_attrs({attr_name: from_attr, **where})
-    #     for from_cmpt in from_cmpts:
-    #         to_cmpt_list = list(from_cmpt)
-    #         to_cmpt_list[attr_level] = to_attr
-    #         to_cmpt = from_cmpt[:attr_level] + (to_attr, ) + from_cmpt[attr_level + 1:]
-    #         self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
-    #                       scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant, pool_cmpts=from_cmpts if from_pool else None)
-
-    def add_flows_by_attr(self, from_attrs, to_attrs, change_attrs={}, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
+    def add_flows_by_attr(self, from_attrs, to_attrs, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
         for from_cmpt in from_cmpts:
             to_cmpt_list = list(from_cmpt)
@@ -300,46 +299,24 @@ class ODEBuilder:
             self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
                           scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant, pool_cmpts=from_cmpts if from_pool else None)
 
+    def compile(self):
+        self.linear_matrix = {t: spsp.lil_matrix((self.length, self.length)) for t in self.trange}
+        self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.length, self.length))) for t in self.trange}
+        self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
 
-    # def add_multi_flow(self, from_cmpts, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
-    #     if coef is not None:
-    #         for from_cmpt in from_cmpts:
-    #             self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts, scale_by_cmpts_coef=scale_by_cmpts_coef)
-    #
-    #     if constant is not None:
-    #         from_cmpt_idxs = [self.cmpt_idx_lookup(cmpt) for cmpt in from_cmpts]
-    #         for from_cmpt_idx in from_cmpt_idxs:
-    #             self.terms.append(ConstantFromPoolODEFlowTerm(
-    #                 from_cmpt_idx=from_cmpt_idx,
-    #                 to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-    #                 constant_by_t=self.calc_coef_by_t(constant, to_cmpt),
-    #                 pool_cmpt_idxs=from_cmpt_idxs
-    #             ))
-
-
-    # def precalc_jacobians(self):
-    #     for t in self.trange:
-    #         self.jac_fixed_by_t[t] = spsp.lil_matrix((self.length, self.length))
-    #         for term in self.terms:
-    #             if term.scale_by_cmpt_idxs is None or len(term.scale_by_cmpt_idxs) == 0:
-    #                 self.jac_fixed_by_t[t][term.from_cmpt_idx, term.from_cmpt_idx] -= term.coef_by_t[t]
-    #                 self.jac_fixed_by_t[t][term.to_cmpt_idx, term.from_cmpt_idx] += term.coef_by_t[t]
-
-    # def jacobian(self, t, y):
-    #     t_int = min(np.floor(t), len(self.trange) - 1)
-    #     jac = spsp.lil_matrix((self.length, self.length))
-    #     for term in self.terms:
-    #         if term.scale_by_cmpt_idxs is None or len(term.scale_by_cmpt_idxs) == 0:
-    #             jac[term.from_cmpt_idx, term.from_cmpt_idx] -= term.coef_by_t[t_int]
-    #             jac[term.to_cmpt_idx, term.from_cmpt_idx] += term.coef_by_t[t_int]
-    #         else:
-    #             for sbc_idx, sbc_coef in zip(term.scale_by_cmpt_idxs, term.scale_by_cmpts_coef_by_t[t_int] if term.scale_by_cmpts_coef_by_t is not None else [1] * len(term.scale_by_cmpt_idxs)):
-    #                 jac[term.from_cmpt_idx, term.from_cmpt_idx] -= term.coef_by_t[t_int] * sbc_coef * y[sbc_idx]
-    #                 jac[term.to_cmpt_idx, term.from_cmpt_idx] += term.coef_by_t[t_int] * sbc_coef * y[sbc_idx]
-    #                 jac[term.from_cmpt_idx, sbc_idx] -= -term.coef_by_t[t_int] * sbc_coef * y[term.from_cmpt_idx]
-    #                 jac[term.to_cmpt_idx, sbc_idx] += term.coef_by_t[t_int] * sbc_coef * y[term.from_cmpt_idx]
-    #
-    #     return jac
+        t0 = perf_counter()
+        for term in self.terms:
+            for t in self.trange:
+                term.add_to_linear_matrix(self.linear_matrix[t], t)
+                term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
+                term.add_to_constant_vector(self.constant_vector[t], t)
+        t1 = perf_counter()
+        print(f'{t1 - t0} seconds to compile {len(self.terms)} terms')
+        # convert to CSR for better performance
+        for t in self.trange:
+            self.linear_matrix[t] = self.linear_matrix[t].tocsr()
+            for k, v in self.nonlinear_matrices[t].items():
+                self.nonlinear_matrices[t][k] = v.tocsr()
 
     def y0_from_dict(self, y0_dict):
         y0 = [0]*self.length
@@ -351,11 +328,11 @@ class ODEBuilder:
         dy = [0] * self.length
         t_int = min(math.floor(t), len(self.trange) - 1)
 
-        for term in self.terms:
-            val = term.flow_val(t_int, y)
+        dy += self.linear_matrix[t_int].dot(y)
+        for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
+            dy += sum(itemgetter(*scale_by_cmpt_idxs)(y)) * matrix.dot(y)
 
-            dy[term.from_cmpt_idx] -= val
-            dy[term.to_cmpt_idx] += val
+        dy += self.constant_vector[t_int]
 
         return dy
 

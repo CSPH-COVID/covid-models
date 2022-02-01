@@ -55,21 +55,19 @@ class ImmunityModel(CovidModelWithVariants):
     #     self.apply_specifications(apply_vaccines=False)
     #     self.build_ode()
 
+
 if __name__ == '__main__':
     engine = db_engine()
 
     model = ImmunityModel()
-
-    print('Prepping model...')
-    # print(timeit('model.prep(521, engine=engine)', number=1, globals=globals()), 'seconds to prep model.')
+    model.set_param('shot2_per_available', 1)
     model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
-    print('Running model...')
     model.solve_seir()
 
     fig, ax = plt.subplots()
 
     by_immun = model.solution_sum('immun')
-    ((by_immun * model.params_as_df.loc[(0, '0-19', 'shot3', 'wt'), 'immunity']).sum(axis=1) / by_immun.sum(axis=1)).plot(label='Booster Immunity vs Wildtype')
-    ((by_immun * model.params_as_df.loc[(0, '0-19', 'shot3', 'omicron'), 'immunity']).sum(axis=1) / by_immun.sum(axis=1)).plot(label='Booster Immunity vs Omicron')
+    ((by_immun * model.params_as_df.loc[(0, '0-19', 'shot2', 'wt'), 'immunity']).sum(axis=1) / by_immun.sum(axis=1)).plot(label='Booster Immunity vs Wildtype')
+    ((by_immun * model.params_as_df.loc[(0, '0-19', 'shot2', 'omicron'), 'immunity']).sum(axis=1) / by_immun.sum(axis=1)).plot(label='Booster Immunity vs Omicron')
     plt.legend(loc='best')
     plt.show()

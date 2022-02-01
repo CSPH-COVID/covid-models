@@ -12,6 +12,7 @@ from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.model_specs import CovidModelSpecifications
 
+
 class CovidModelWithVariants(CovidModel):
 
     attr = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
@@ -28,6 +29,7 @@ class CovidModelWithVariants(CovidModel):
         self.apply_specifications(apply_vaccines=False)
         self.apply_new_vacc_params()
         self.build_ode()
+        self.compile()
 
     def apply_new_vacc_params(self):
         vacc_per_available = self.specifications.get_vacc_per_available()
@@ -75,10 +77,12 @@ class CovidModelWithVariants(CovidModel):
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
         # apply flow from S to E (note that S now encompasses recovered as well
         for variant in self.attributes['variant'][1:]:
-            infectious_cmpts = [(seir, age, vacc, variant, immun) for age in self.attributes['age'] for vacc in self.attributes['vacc'] for seir in ['I', 'A'] for immun in self.attributes['immun']]
-            infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1']) for seir, age, vacc, variant, immun in infectious_cmpts]
-            self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef='betta * (1 - immunity) * (1 - ef) / total_pop',
-                                   scale_by_cmpts=infectious_cmpts, scale_by_cmpts_coef=infectious_cmpt_coefs)
+            # infectious_cmpts = [(seir, age, vacc, variant, immun) for age in self.attributes['age'] for vacc in self.attributes['vacc'] for seir in ['I', 'A'] for immun in self.attributes['immun']]
+            sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
+            asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})
+            # infectious_cmpt_coefs = [' * '.join(['lamb' if seir == 'I' else '1']) for seir, age, vacc, variant, immun in infectious_cmpts]
+            self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef='lamb * betta * (1 - immunity) * (1 - ef) / total_pop', scale_by_cmpts=sympt_cmpts)
+            self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef='betta * (1 - immunity) * (1 - ef) / total_pop', scale_by_cmpts=asympt_cmpts)
 
     # define initial state y0
     @property
