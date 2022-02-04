@@ -6,17 +6,14 @@
   {"attrs": {"variant": "omicron"}, "param": "alpha", "mult": 0.6},
   {"attrs": {"variant": "omicron"}, "param": "gamm", "mult": 1.66667},
 
-  {"attrs": {"immun": "imm1"}, "param": "immunity", "val": 0.9},
-  {"attrs": {"immun": "imm2"}, "param": "immunity", "val": 1},
   {"attrs": {"immun": "imm3"}, "param": "immunity", "val": 1},
+  {"attrs": {"immun": "imm2"}, "param": "immunity", "val": 1},
+  {"attrs": {"immun": "imm1"}, "param": "immunity", "val": 0.9},
+  {"attrs": {"immun": "none"}, "param": "immunity", "val": 0},
 
-  {"attrs": {"immun": "imm1", "vacc": "shot2"}, "param": "hosp", "mult": 0},
-  {"attrs": {"immun": "imm1", "vacc": "shot3"}, "param": "hosp", "mult": 0},
-  {"attrs": {"immun": "imm2", "vacc": "shot2"}, "param": "hosp", "mult": 0},
-  {"attrs": {"immun": "imm2", "vacc": "shot3"}, "param": "hosp", "mult": 0},
-  {"attrs": {"immun": "imm3", "vacc": "shot2"}, "param": "hosp", "mult": 0},
-  {"attrs": {"immun": "imm3", "vacc": "shot3"}, "param": "hosp", "mult": 0},
+  {"attrs": {"vacc": "shot2"}, "except_attrs": {"immun":  "none"},"param": "severe_immunity", "val": 1},
+  {"attrs": {"vacc": "shot3"}, "except_attrs": {"immun":  "none"},"param": "severe_immunity", "val": 1},
 
-  {"attrs": {"variant": "omicron", "immun": "imm1"}, "param": "immunity", "val": 0.5},
-  {"attrs": {"variant": "omicron", "immun": "imm2"}, "param": "immunity", "val": 1}
+  {"attrs": {"immun": "imm1", "variant": "none"}, "param": "delta_immunity_reduction", "val": 0.2},
+  {"attrs": {"immun": "imm1"}, "except_attrs": {"variant": "omicron"}, "param": "omicron_immunity_reduction", "val": 0.5}
 ]

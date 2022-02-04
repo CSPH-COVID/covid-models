@@ -86,6 +86,7 @@ class CovidModel(ODEBuilder):
         self.set_specifications(specs=specs, **specs_args)
         self.apply_specifications()
         self.build_ode()
+        # self.compile()
 
     def apply_specifications(self, specs: CovidModelSpecifications = None, apply_vaccines=True):
         if specs is not None:
