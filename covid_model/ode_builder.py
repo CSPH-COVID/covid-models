@@ -71,10 +71,6 @@ class ScaledODEFlowTerm(ODEFlowTerm):
         if self.coef_by_t[t_int] != 0:
             matrices[tuple(self.scale_by_cmpt_idxs)][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
             matrices[tuple(self.scale_by_cmpt_idxs)][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
-        # print(matrices)
-        # for scale_by_cmpt_idx in self.scale_by_cmpt_idxs:
-        #     matrices[scale_by_cmpt_idx][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
-        #     matrices[scale_by_cmpt_idx][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
 
 
 class WeightedScaledODEFlowTerm(ODEFlowTerm):
@@ -85,11 +81,8 @@ class WeightedScaledODEFlowTerm(ODEFlowTerm):
         self.scale_by_cmpts_coef_by_t = scale_by_cmpts_coef_by_t
 
     def flow_val(self, t_int, y):
-        if self.scale_by_cmpts_coef_by_t:
-            return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(
-                a * b for a, b in zip(itemgetter(*self.scale_by_cmpt_idxs)(y), self.scale_by_cmpts_coef_by_t[t_int]))
-        else:
-            return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(itemgetter(*self.scale_by_cmpt_idxs)(y))
+        return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(
+            a * b for a, b in zip(itemgetter(*self.scale_by_cmpt_idxs)(y), self.scale_by_cmpts_coef_by_t[t_int]))
 
     def add_to_nonlinear_matrices(self, matrices, t_int):
         scale_by_cmpts_coef_by_t = self.scale_by_cmpts_coef_by_t[t_int] if self.scale_by_cmpts_coef_by_t else [1] * len(self.scale_by_cmpt_idxs)
@@ -186,6 +179,18 @@ class ODEBuilder:
     def params_as_df(self):
         return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
 
+    @property
+    def mean_params_as_df(self):
+        params = self.params_as_df.rename_axis('param', axis=1)
+
+        non_param_attr_names = [attr_name for attr_name in self.attr_names if attr_name not in self.param_attr_names]
+        stacked_solution = self.solution_ydf.stack(level=list(self.param_attr_names)).rename_axis(non_param_attr_names, axis=1)
+
+        expanded_params = pd.concat({col: params for col in stacked_solution.columns}, axis=1, names=[*non_param_attr_names])
+        expanded_solution = pd.concat({col: stacked_solution for col in params.columns}, axis=1, names=['param']).reorder_levels([*non_param_attr_names, 'param'], axis=1)
+
+        return (expanded_params * expanded_solution).groupby('t').sum() / stacked_solution.groupby('t').sum()
+
     def attr_level(self, attr_name):
         return self.attr_names.index(attr_name)
 
@@ -198,7 +203,7 @@ class ODEBuilder:
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
-    def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None):
+    def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None, except_attrs=None):
         if val is not None:
             def apply(t, cmpt, param):
                 self.params[t][cmpt][param] = val
@@ -208,17 +213,24 @@ class ODEBuilder:
         elif pow is not None:
             def apply(t, cmpt, param):
                 self.params[t][cmpt][param] = self.params[t][cmpt][param] ** pow
+        else:
+            raise ValueError('Must provide val, mult, or pow.')
         if type(val if val is not None else mult if mult is not None else val) not in (int, float, np.float64):
             raise TypeError(f'Parameter value (or multiplier) must be numeric; {val if val is not None else mult} is {type(val if val is not None else mult)}')
         if trange is None:
             actual_trange = self.trange
         else:
             actual_trange = set(self.trange).intersection(trange)
-        for cmpt in self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments:
+        cmpts = self.param_compartments
+        if attrs:
+            cmpts = self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True)
+        if except_attrs:
+            cmpts = [cmpt for cmpt in cmpts if cmpt not in self.filter_cmpts_by_attrs(except_attrs, is_param_cmpts=True)]
+        for cmpt in cmpts:
             for t in actual_trange:
                 apply(t, cmpt, param)
 
-    def calc_coef_by_t(self, coef, cmpt):
+    def calc_coef_by_t(self, coef, cmpt, other_cmpts=None):
 
         if len(cmpt) > len(self.param_attr_names):
             param_cmpt = tuple(attr for attr, level in zip(cmpt, self.attr_names) if level in self.param_attr_names)
@@ -236,12 +248,13 @@ class ODEBuilder:
                 coef_by_t = {}
                 expr = parse_expr(coef)
                 relevant_params = [str(s) for s in expr.free_symbols]
+                param_cmpts_by_param = {**{param: param_cmpt for param in relevant_params}, **(other_cmpts if other_cmpts else {})}
                 if len(relevant_params) == 1 and coef == relevant_params[0]:
                     coef_by_t = {t: self.params[t][param_cmpt][coef] for t in self.trange}
                 else:
                     func = sym.lambdify(relevant_params, expr)
                     for t in self.trange:
-                        coef_by_t[t] = func(**{k: v for k, v in self.params[t][param_cmpt].items() if k in relevant_params})
+                        coef_by_t[t] = func(**{param: self.params[t][param_cmpts_by_param[param]][param] for param in relevant_params})
             return coef_by_t
         else:
             return {t: coef for t in self.trange}
@@ -283,7 +296,7 @@ class ODEBuilder:
         self.terms.append(ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
             to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-            coef_by_t=self.calc_coef_by_t(coef, to_cmpt),
+            coef_by_t=self.calc_coef_by_t(coef, from_cmpt),  # switched by to setting parameters use the FROM cmpt
             scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in scale_by_cmpts] if scale_by_cmpts is not None else None,
             scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
             constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None,

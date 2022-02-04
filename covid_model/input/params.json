@@ -63,5 +63,8 @@
   "omicron_acq_immune_escape": 0.5,
   "delta_vacc_eff_k": 1.6,
   "omicron_vacc_eff_k": 4.5,
-  "immunity": 0
+  "immunity": 0,
+  "severe_immunity": 0,
+  "variant_immunity_reduction": 0,
+  "omicron_immunity_reduction": 0
 }
