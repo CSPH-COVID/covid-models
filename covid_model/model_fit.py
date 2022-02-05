@@ -100,6 +100,7 @@ class CovidModelFit:
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
+            model.specifications.write_to_db(engine)
             print(f'Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds.')
 
         self.fitted_tc = tc

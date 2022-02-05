@@ -296,7 +296,7 @@ class ODEBuilder:
         self.terms.append(ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
             to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-            coef_by_t=self.calc_coef_by_t(coef, from_cmpt),  # switched by to setting parameters use the FROM cmpt
+            coef_by_t=self.calc_coef_by_t(coef, from_cmpt),  # switched BACK to setting parameters use the TO cmpt
             scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in scale_by_cmpts] if scale_by_cmpts is not None else None,
             scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
             constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None,
