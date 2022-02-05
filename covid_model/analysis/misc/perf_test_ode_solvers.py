@@ -17,11 +17,12 @@ from covid_model.model_specs import CovidModelSpecifications
 if __name__ == '__main__':
     engine = db_engine()
 
-    model = CovidModelWithVariants()
+    # model = CovidModelWithVariants()
+    model = CovidModel(end_date=dt.date(2022, 1, 1))
 
     print('Prepping model...')
-    print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
-    print(timeit('model.compile()', number=1, globals=globals()), 'seconds to build matrices.')
+    print(timeit("model.prep(591, engine=engine, params='input/params.json')", number=1, globals=globals()), 'seconds to prep model.')
+    # print(timeit("model.prep(591, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
 
     # vals_json_attr = 'seir'
