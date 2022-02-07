@@ -47,7 +47,8 @@ class CovidModel(ODEBuilder):
                            tslices=None, tc=None, params=None,
                            refresh_actual_vacc=False, vacc_proj_params=None, vacc_immun_params=None,
                            timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
-                           attribute_multipliers=None):
+                           attribute_multipliers=None, region=None
+                           ):
 
         if specs is not None:
             if not isinstance(specs, (int, np.int64)):
@@ -61,7 +62,7 @@ class CovidModel(ODEBuilder):
         if tslices or tc:
             self.specifications.set_tc(tslices, tc)
         if params:
-            self.specifications.set_model_params(params)
+            self.specifications.set_model_params(params, region=region)
         if refresh_actual_vacc:
             self.specifications.set_actual_vacc(engine)
         if refresh_actual_vacc or vacc_proj_params:

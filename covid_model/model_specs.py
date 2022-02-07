@@ -128,8 +128,24 @@ class CovidModelSpecifications:
         self.tc = (self.tc if append else []) + list(tc)
         self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
 
-    def set_model_params(self, model_params):
-        self.model_params = model_params if type(model_params) == dict else json.load(open(model_params))
+    def set_model_params(self, model_params, region=None):
+        # model params may be dictionary or path to json file which will be converted to json
+        # the top level of the dict now allows "default" or a specific region which adds-to and overwrites default
+        # the add-overwrite behavior is based on python's dictionary.update() method, so be careful when using nested dictionaries (i.e. the entire value of a nested dictionary will be replaced)
+        # for backwards compatability, if "default" is not a top level key, then we assume there is no top level, like the olden days
+        model_params_base = model_params if type(model_params) == dict else json.load(open(model_params))
+        if "default" in model_params_base.keys():
+            model_params = model_params_base["default"]
+            if region is not None:
+                model_params.update(model_params_base[region])
+                self.tags['region'] = region   # record which option we ran with
+                self.tags['county_fips'] = model_params['county_fips']
+                self.tags['county_names'] = model_params['county_names']
+                _ = model_params.pop('county_fips')   # remove from the parameters
+                _ = model_params.pop('county_names')   # remove from the parameters
+        else:
+            model_params = model_params_base
+        self.model_params = model_params
         self.group_pops = self.model_params['group_pop']
 
     def set_vacc_proj(self, vacc_proj_params=None):
@@ -172,7 +188,6 @@ class CovidModelSpecifications:
             columns=params,
             data=1.0
         )
-
         multiplier_dict = {}
         for effect_type in self.timeseries_effects.keys():
             prevalence_df = pd.DataFrame(index=pd.date_range(self.start_date, self.end_date))
@@ -182,6 +197,8 @@ class CovidModelSpecifications:
                     effect_specs['start_date'] = '20' + effect_specs['start_date']
                 start_date = dt.datetime.strptime(effect_specs['start_date'], '%Y-%m-%d').date()
                 end_date = self.end_date
+                if start_date > end_date:
+                    continue
                 # end_date = start_date + dt.timedelta(days=len(effect_specs['prevalence']) - 1)
 
                 prevalence = effect_specs['prevalence']
@@ -199,8 +216,9 @@ class CovidModelSpecifications:
             prevalence = prevalence_df.stack().rename_axis(index=['t', 'effect'])
             remainder = 1 - prevalence.groupby('t').sum()
 
-            multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
-            multipliers = multipliers.multiply(multipliers_for_this_effect_type)
+            if len(multiplier_df) > 0:
+                multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
+                multipliers = multipliers.multiply(multipliers_for_this_effect_type)
 
         multipliers.index = (multipliers.index.to_series().dt.date - self.start_date).dt.days
 
