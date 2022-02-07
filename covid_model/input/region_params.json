@@ -1,9 +1,4 @@
 {
-  "co": {
-    "county_fips": "08",
-    "county_names": "ALL"
-  },
-
   "ad": {
     "total_pop": 520264,
     "group_pop": {

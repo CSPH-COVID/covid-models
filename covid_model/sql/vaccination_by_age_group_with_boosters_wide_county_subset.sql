@@ -10,5 +10,5 @@ select
 	, sum(final_dose_rate) as shot2
 	, sum(booster_dose_rate) as shot3
 from cdphe.covid19_vaccinations_by_age_by_county v
-where county_id in %(county_ids)s
+where county_id = any(%(county_ids)s)
 group by 1, 2;
