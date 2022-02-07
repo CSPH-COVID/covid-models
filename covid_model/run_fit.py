@@ -51,6 +51,7 @@ def run():
     parser.add_argument("-ws", "--window_size", type=int, help="the number of days in each TC-window; default to 14")
     parser.add_argument("-f", "--fit_id", type=int, help="the fit_id for the last production fit, which will be used to set historical TC values for windows that will not be refit")
     parser.add_argument("-p", "--params", type=str, help="the path to the params file to use for fitting; default to 'input/params.json'")
+    parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
     # parser.add_argument("-rv", "--refresh_vacc", type=bool, help="1 if you want to pull new vacc. data from the database, otherwise 0; default 0")
     parser.add_argument("-ahs", "--actual_hosp_sql", type=str, help="path for file containing sql query that fetches actual hospitalization data")
     parser.add_argument("-rv", "--refresh_vacc", action="store_true", help="1 if you want to pull new vacc. data from the database, otherwise 0; default 0")
@@ -67,8 +68,8 @@ def run():
     window_size = fit_params.window_size if fit_params.window_size is not None else 14
     fit_id = fit_params.fit_id if fit_params.fit_id is not None else 865
     params = fit_params.params if fit_params.params is not None else 'input/params.json'
-    # refresh_vacc_data = fit_params.refresh_vacc if fit_params.refresh_vacc is not None else False
     refresh_vacc_data = fit_params.refresh_vacc
+    region_params = fit_params.region_params
     region = fit_params.region
     write_batch_output = fit_params.write_batch_output
 
@@ -83,23 +84,17 @@ def run():
         actual_hosp_sql = fit_params.actual_hosp_sql if fit_params.actual_hosp_sql is not None else 'sql/emresource_hospitalizations.sql'
         fit.set_actual_hosp(engine, actual_hosp_sql=actual_hosp_sql)
     else:
-        counties = json.load(open(params))[region]['county_names']
+        counties = json.load(open(region_params))[region]['county_names']
         counties = counties if type(counties) == list else [counties]
         hosp_data = pd.read_csv(fit_params.hosp_data)[['date'] + counties]
         tstart = pd.to_datetime(hosp_data['date']).min()
         tend = pd.to_datetime(hosp_data['date']).max()
         fit.base_specs.start_date = dt.date(tstart.year, tstart.month, tstart.day)
-        fit.base_specs.end_date = dt.date(tend.year, tend.month, tend.day)
+        #fit.base_specs.end_date = dt.date(tend.year, tend.month, tend.day)
         fit.actual_hosp = hosp_data.drop('date', axis=1).sum(axis=1)
     ####################################################################################################################
 
-    import pdb; pdb.set_trace()
 
-
-    # if params:
-    #     fit.base_specs.set_model_params(params)
-    # if refresh_vacc_data:
-    #     fit.base_specs.set_actual_vacc(engine)
 
     fit.run(engine, look_back=look_back, batch_size=batch_size, increment_size=increment_size, window_size=window_size,
             params=params,
@@ -111,6 +106,7 @@ def run():
             mab_prevalence='input/timeseries_effects/mab_prevalence.csv',
             model_class=CovidModelWithVariants if fit_params.model_with_omicron else CovidModel,
             attribute_multipliers='input/attribute_multipliers.json' if fit_params.model_with_omicron else None,
+            region_params=region_params,
             region=region,
             write_batch_output=write_batch_output
             )

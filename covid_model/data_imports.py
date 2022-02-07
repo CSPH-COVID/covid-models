@@ -57,6 +57,7 @@ class ExternalVacc(ExternalData):
             sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
+            county_ids = county_ids if type(county_ids) == list else [county_ids]
             sql = open('sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 

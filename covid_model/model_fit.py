@@ -63,7 +63,6 @@ class CovidModelFit:
     # method = 'curve_fit' or 'minimize'
     def run(self, engine, model_class=CovidModel, method='curve_fit', window_size=14, look_back=None,
             last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, **spec_args):
-
         # get the end date from actual hosps
         end_t = self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)

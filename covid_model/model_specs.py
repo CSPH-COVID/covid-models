@@ -36,13 +36,13 @@ class CovidModelSpecifications:
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df, including proj, is saved to avoid unnecessary processing
 
-    def set_all(self, spec_id, tslices, tc, tc_cov, model_params, actual_vacc_df, vacc_proj_params, vacc_immun_params, timeseries_effects, base_spec_id=None, tags={}):
+    def set_all(self, spec_id, tslices, tc, tc_cov, model_params, actual_vacc_df, vacc_proj_params, vacc_immun_params, timeseries_effects, base_spec_id=None, tags={}, region_model_params=None, region=None):
         self.spec_id = spec_id
         self.base_spec_id = base_spec_id
         self.tags = tags
 
         self.set_tc(tslices, tc)
-        self.set_model_params(model_params)
+        self.set_model_params(model_params, region_model_params, region)
         self.tc_cov = tc_cov
 
         self.actual_vacc_df = actual_vacc_df
@@ -77,6 +77,7 @@ class CovidModelSpecifications:
     def copy(self, new_end_date=None):
         specs = CovidModelSpecifications(self.start_date, new_end_date if new_end_date is not None else self.end_date)
 
+        # no need to deal with region here, it's already been integrated into model_params
         specs.set_all(spec_id=None, base_spec_id=self.spec_id, tags=self.tags, tslices=self.tslices, tc=self.tc, tc_cov=self.tc_cov,
                       model_params=self.model_params, actual_vacc_df=self.actual_vacc_df,
                       vacc_proj_params=self.vacc_proj_params,
@@ -128,23 +129,19 @@ class CovidModelSpecifications:
         self.tc = (self.tc if append else []) + list(tc)
         self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
 
-    def set_model_params(self, model_params, region=None):
-        # model params may be dictionary or path to json file which will be converted to json
-        # the top level of the dict now allows "default" or a specific region which adds-to and overwrites default
-        # the add-overwrite behavior is based on python's dictionary.update() method, so be careful when using nested dictionaries (i.e. the entire value of a nested dictionary will be replaced)
-        # for backwards compatability, if "default" is not a top level key, then we assume there is no top level, like the olden days
-        model_params_base = model_params if type(model_params) == dict else json.load(open(model_params))
-        if "default" in model_params_base.keys():
-            model_params = model_params_base["default"]
-            if region is not None:
-                model_params.update(model_params_base[region])
-                self.tags['region'] = region   # record which option we ran with
-                self.tags['county_fips'] = model_params['county_fips']
-                self.tags['county_names'] = model_params['county_names']
-                _ = model_params.pop('county_fips')   # remove from the parameters
-                _ = model_params.pop('county_names')   # remove from the parameters
-        else:
-            model_params = model_params_base
+    def set_model_params(self, model_params, region_model_params=None, region=None):
+        # model_params may be dictionary or path to json file which will be converted to json
+        # region_model_params is the same, but will only be used if region != None. Contains region specific modifications to parameters
+        # every key present in region_model_params will completely overwrite that entry in model_params
+        model_params = model_params if type(model_params) == dict else json.load(open(model_params))
+        if region is not None:
+            region_model_params = region_model_params if type(region_model_params) == dict else json.load(open(region_model_params))
+            model_params.update(region_model_params[region])
+            self.tags['region'] = region   # record which option we ran with
+            self.tags['county_fips'] = model_params['county_fips']
+            self.tags['county_names'] = model_params['county_names']
+            _ = model_params.pop('county_fips')   # remove from the parameters
+            _ = model_params.pop('county_names')   # remove from the parameters
         self.model_params = model_params
         self.group_pops = self.model_params['group_pop']
 
@@ -153,9 +150,9 @@ class CovidModelSpecifications:
             self.vacc_proj_params = vacc_proj_params if isinstance(vacc_proj_params, dict) else json.load(open(vacc_proj_params))
         self.proj_vacc_df = self.get_proj_vacc()
 
-    def set_actual_vacc(self, engine):
+    def set_actual_vacc(self, engine, county_ids=None):
         # vacc_rate_df = ExternalVaccWithProjections(engine, t0_date=self.start_date, fill_to_date=self.end_date).fetch(proj_params=self.vacc_proj_params, group_pop=self.model_params['group_pop'])
-        self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch()
+        self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids)
         # self.actual_vacc_df = ExternalVacc(engine).fetch()
 
     def set_vacc_immun(self, vacc_immun_params):
@@ -266,7 +263,6 @@ class CovidModelSpecifications:
                             projections.loc[(t, groups[i + 1])] += excess_rate
 
                     cumu_vacc += projections.loc[t]
-
             return projections
 
     def get_vacc_rates(self):
