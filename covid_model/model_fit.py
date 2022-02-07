@@ -61,7 +61,8 @@ class CovidModelFit:
 
     # run an optimization to minimize the cost function using scipy.optimize.minimize()
     # method = 'curve_fit' or 'minimize'
-    def run(self, engine, model_class=CovidModel, method='curve_fit', window_size=14, look_back=3, last_window_min_size=21, batch_size=None, increment_size=1, **spec_args):
+    def run(self, engine, model_class=CovidModel, method='curve_fit', window_size=14, look_back=None,
+            last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, **spec_args):
 
         # get the end date from actual hosps
         end_t = self.actual_hosp.index.max() + 1
@@ -101,6 +102,9 @@ class CovidModelFit:
 
             t1 = perf_counter()
             print(f'Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds.')
+            if write_batch_output:
+                model.specifications.tags['run_type'] = 'intermediate-fit'
+                model.specifications.write_to_db(engine)
 
         self.fitted_tc = tc
         self.fitted_tc_cov = fitted_tc_cov
