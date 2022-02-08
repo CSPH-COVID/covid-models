@@ -41,14 +41,15 @@ class CovidModelFit:
             print(zip_county_mapping.join(hosps_by_zip, on='zip'))
             # print(zip_county_mapping['share_of_zip_in_county'] * hosps_by_zip)
 
-    def single_fit(self, model: CovidModel, look_back, method='curve_fit'):
+    def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
+        # define initial states
         fitted_tc, fitted_tc_cov = (None, None)
         fixed_tc = model.specifications.tc[:-look_back]
         if method == 'curve_fit':
             def func(trange, *test_tc):
                 combined_tc = fixed_tc + list(test_tc)
                 model.apply_tc(combined_tc)
-                model.solve_seir()
+                model.solve_seir(y0_dict=y0d)
                 return model.solution_sum('seir')['Ih']
             fitted_tc, fitted_tc_cov = spo.curve_fit(
                 f=func
@@ -84,7 +85,6 @@ class CovidModelFit:
         # if there's no batch size, set the batch size to be the total number of windows to be fit
         if batch_size is None:
             batch_size = look_back
-
         trim_off_end_list = list(range(look_back - batch_size, 0, -increment_size)) + [0]
         for i, trim_off_end in enumerate(trim_off_end_list):
             t0 = perf_counter()
@@ -96,7 +96,13 @@ class CovidModelFit:
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
             model.build_ode()
 
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
+            # Initial infectious based on hospitalizations and assumed hosp rate
+            I0 = max(2.2,  self.actual_hosp[0] / model.params[0][('40-64', 'unvacc', 'none')]['hosp'])
+            y0d = {('S', age, 'unvacc', 'none'): n for age, n in model.specifications.group_pops.items()}
+            y0d[('I', '40-64', 'unvacc', 'none')] = I0
+            y0d[('S', '40-64', 'unvacc', 'none')] -= I0
+
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method, y0d=None)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
