@@ -22,15 +22,31 @@ class CovidModelWithVariants(CovidModel):
                         'variant': ['none', 'omicron'],
                         'immun': ['none', 'imm1', 'imm2', 'imm3']})
 
-    param_attr_names = ('age', 'vacc', 'variant', 'immun')
+    param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
     # do not apply vaccines in the traditional way; we'll cover them using attribute_multipliers instead
     def prep(self, specs=None, **specs_args):
+        t0 = perf_counter()
         self.set_specifications(specs=specs, **specs_args)
+        t1 = perf_counter()
+        print(t1 - t0)
+        t0 = perf_counter()
         self.apply_specifications(apply_vaccines=False)
+        t1 = perf_counter()
+        print(t1 - t0)
+        t0 = perf_counter()
         self.apply_new_vacc_params()
+        t1 = perf_counter()
+        print(t1 - t0)
+        t0 = perf_counter()
         self.build_ode()
+        t1 = perf_counter()
+        print(t1 - t0)
+        t0 = perf_counter()
         self.compile()
+        t1 = perf_counter()
+        print(t1 - t0)
+        t0 = perf_counter()
 
     def apply_new_vacc_params(self):
         vacc_per_available = self.specifications.get_vacc_per_available()
@@ -72,15 +88,15 @@ class CovidModelWithVariants(CovidModel):
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * dnh * (1 - severe_immunity)')
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
         # immunity decay
-        self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / 400')
-        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 400')
-        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'none'}, coef='1 / 400')
+        self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / 90')
+        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 360')
+        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'none'}, coef='1 / 540')
 
     def build_SR_to_E_ode(self):
         # seed omicron
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
         # apply flow from S to E (note that S now encompasses recovered as well
-        asymptomatic_transmission = '(1 - immunity * (1 - variant_immunity_reduction)) * betta * (1 - ef) / total_pop'
+        asymptomatic_transmission = '(1 - immunity) * betta * (1 - ef) / total_pop'
         for variant in self.attributes['variant']:
             sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
             asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})

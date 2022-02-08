@@ -179,18 +179,6 @@ class ODEBuilder:
     def params_as_df(self):
         return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
 
-    @property
-    def mean_params_as_df(self):
-        params = self.params_as_df.rename_axis('param', axis=1)
-
-        non_param_attr_names = [attr_name for attr_name in self.attr_names if attr_name not in self.param_attr_names]
-        stacked_solution = self.solution_ydf.stack(level=list(self.param_attr_names)).rename_axis(non_param_attr_names, axis=1)
-
-        expanded_params = pd.concat({col: params for col in stacked_solution.columns}, axis=1, names=[*non_param_attr_names])
-        expanded_solution = pd.concat({col: stacked_solution for col in params.columns}, axis=1, names=['param']).reorder_levels([*non_param_attr_names, 'param'], axis=1)
-
-        return (expanded_params * expanded_solution).groupby('t').sum() / stacked_solution.groupby('t').sum()
-
     def attr_level(self, attr_name):
         return self.attr_names.index(attr_name)
 
@@ -317,14 +305,12 @@ class ODEBuilder:
         self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.length, self.length))) for t in self.trange}
         self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
 
-        t0 = perf_counter()
         for term in self.terms:
             for t in self.trange:
                 term.add_to_linear_matrix(self.linear_matrix[t], t)
                 term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
                 term.add_to_constant_vector(self.constant_vector[t], t)
-        t1 = perf_counter()
-        print(f'{t1 - t0} seconds to compile {len(self.terms)} terms')
+
         # convert to CSR for better performance
         for t in self.trange:
             self.linear_matrix[t] = self.linear_matrix[t].tocsr()
@@ -369,3 +355,18 @@ class ODEBuilder:
     def solution_sum(self, group_by_attr_levels=None):
         if group_by_attr_levels:
             return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
+
+    def mean_params_as_df(self, group_by_attr_levels=None):
+        params = self.params_as_df.rename_axis('param', axis=1)
+
+        if group_by_attr_levels is None:
+            stacked_solution = self.solution_ydf.stack(level=list(self.attr_names))
+            expanded_params = params
+            expanded_solution = pd.concat({col: stacked_solution for col in params.columns}, axis=1, names=['param'])
+        else:
+            non_group_by_attr_levels = [attr_name for attr_name in self.attr_names if attr_name not in group_by_attr_levels]
+            stacked_solution = self.solution_ydf.stack(level=list(non_group_by_attr_levels)).rename_axis(group_by_attr_levels, axis=1)
+            expanded_params = pd.concat({col: params for col in stacked_solution.columns}, axis=1, names=[*group_by_attr_levels])
+            expanded_solution = pd.concat({col: stacked_solution for col in params.columns}, axis=1, names=['param']).reorder_levels([*group_by_attr_levels, 'param'], axis=1)
+
+        return (expanded_params * expanded_solution).groupby('t').sum() / stacked_solution.groupby('t').sum()

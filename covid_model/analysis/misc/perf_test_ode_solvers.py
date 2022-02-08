@@ -18,11 +18,11 @@ if __name__ == '__main__':
     engine = db_engine()
 
     # model = CovidModelWithVariants()
-    model = CovidModel(end_date=dt.date(2022, 1, 1))
+    model = CovidModelWithVariants(end_date=dt.date(2022, 3, 1))
 
     print('Prepping model...')
-    print(timeit("model.prep(591, engine=engine, params='input/params.json')", number=1, globals=globals()), 'seconds to prep model.')
-    # print(timeit("model.prep(591, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
+    print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
+    # print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
 
     # vals_json_attr = 'seir'
@@ -31,7 +31,10 @@ if __name__ == '__main__':
 
     # model.write_to_db(engine, cmpts_json_attrs=('age', 'vacc', 'variant'))
 
-    fig, ax = plt.subplots()
-    modeled(model, 'Ih')
-    actual_hosps(engine)
+    fig, axs = plt.subplots(2, 2)
+    modeled(model, 'Ih', ax=axs.flatten()[0])
+    actual_hosps(engine, ax=axs.flatten()[0])
+    modeled(model, model.attr['seir'], groupby='vacc', ax=axs.flatten()[1])
+    modeled(model, model.attr['seir'], groupby='priorinf', ax=axs.flatten()[2])
+    modeled(model, model.attr['seir'], groupby='immun', ax=axs.flatten()[3])
     plt.show()

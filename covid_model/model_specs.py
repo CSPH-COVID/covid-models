@@ -182,25 +182,26 @@ class CovidModelSpecifications:
                     effect_specs['start_date'] = '20' + effect_specs['start_date']
                 start_date = dt.datetime.strptime(effect_specs['start_date'], '%Y-%m-%d').date()
                 end_date = self.end_date
-                # end_date = start_date + dt.timedelta(days=len(effect_specs['prevalence']) - 1)
 
-                prevalence = effect_specs['prevalence']
-                prevalence = prevalence[:(end_date - start_date).days]
-                while len(prevalence) < (end_date - start_date).days:
-                    prevalence.append(prevalence[-1])
+                if start_date < end_date:
+                    prevalence = effect_specs['prevalence']
+                    prevalence = prevalence[:(end_date - start_date).days]
+                    while len(prevalence) < (end_date - start_date).days:
+                        prevalence.append(prevalence[-1])
 
-                prevalence_df[effect_specs['effect_name']] = 0
-                prevalence_df.loc[start_date:(end_date - dt.timedelta(days=1)), effect_specs['effect_name']] = prevalence
-                multiplier_dict[effect_specs['effect_name']] = {**{param: 1.0 for param in params}, **effect_specs['multipliers']}
+                    prevalence_df[effect_specs['effect_name']] = 0
+                    prevalence_df.loc[start_date:(end_date - dt.timedelta(days=1)), effect_specs['effect_name']] = prevalence
+                    multiplier_dict[effect_specs['effect_name']] = {**{param: 1.0 for param in params}, **effect_specs['multipliers']}
 
-            prevalence_df = prevalence_df.sort_index()
-            multiplier_df = pd.DataFrame.from_dict(multiplier_dict, orient='index').rename_axis(index='effect').fillna(1)
+            if len(multiplier_dict) > 0:
+                prevalence_df = prevalence_df.sort_index()
+                multiplier_df = pd.DataFrame.from_dict(multiplier_dict, orient='index').rename_axis(index='effect').fillna(1)
 
-            prevalence = prevalence_df.stack().rename_axis(index=['t', 'effect'])
-            remainder = 1 - prevalence.groupby('t').sum()
+                prevalence = prevalence_df.stack().rename_axis(index=['t', 'effect'])
+                remainder = 1 - prevalence.groupby('t').sum()
 
-            multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
-            multipliers = multipliers.multiply(multipliers_for_this_effect_type)
+                multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
+                multipliers = multipliers.multiply(multipliers_for_this_effect_type)
 
         multipliers.index = (multipliers.index.to_series().dt.date - self.start_date).dt.days
 
@@ -259,10 +260,15 @@ class CovidModelSpecifications:
         vacc_rates = self.get_vacc_rates()
         populations = pd.Series(self.model_params['group_pop'], name='population').rename_axis(index='age')
         cumu_vacc = vacc_rates.groupby('age').cumsum()
-        cumu_vacc = cumu_vacc.join(populations)
-        cumu_vacc['none'] = cumu_vacc['population'] - cumu_vacc['shot1']
-        cumu_vacc = cumu_vacc.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
-        available_for_vacc = cumu_vacc.shift(1, axis=1).drop(columns='none')
+        by_last_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
+        by_last_shot['none'] = by_last_shot.join(populations)['population'] - by_last_shot.sum(axis=1)
+        by_last_shot = by_last_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        available_for_vacc = by_last_shot.shift(1, axis=1).drop(columns='none')
+
+        # cumu_vacc = cumu_vacc.join(populations)
+        # cumu_vacc['none'] = cumu_vacc['population'] - cumu_vacc['shot1']
+        # cumu_vacc = cumu_vacc.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        # available_for_vacc = cumu_vacc.shift(1, axis=1).drop(columns='none')
 
         return (vacc_rates / available_for_vacc).fillna(0)
 
