@@ -22,6 +22,9 @@ class MyTestCase(unittest.TestCase):
             run_str += " --write_batch_output"
         output = os.system(run_str)
         if output == 1:
+            # try again (could be db connection issue)
+            output = os.system(run_str)
+        if output == 1:
             self.fail(f"Failed: {region}")
 
     def test_ad(self):
