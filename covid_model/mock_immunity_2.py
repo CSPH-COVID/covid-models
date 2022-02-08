@@ -59,20 +59,57 @@ from model_with_immunity_rework import CovidModelWithVariants
 if __name__ == '__main__':
     engine = db_engine()
 
-    model = CovidModelWithVariants()
+    model = CovidModelWithVariants(end_date=dt.date(2020, 7, 24))
     model.set_param('shot2_per_available', 1)
     model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
 
     fig, ax = plt.subplots()
 
-    model.solve_ode({('S', age, 'shot3', 'none', 'imm3'): n for age, n in model.specifications.group_pops.items()})
-    mean_params = model.mean_params_as_df
-    mean_params[('S', 'immunity')].plot(label='Booster Immunity vs Wildtype')
-    mean_params[('S', 'immunity * (1 - delta_immunity_reduction')].plot(label='Booster Immunity vs Delta')
-    mean_params[('S', 'immunity * (1 - omicron_immunity_reduction')].plot(label='Booster Immunity vs Omicron')
-    (mean_params[('S', 'immunity')] * mean_params[('S', 'severe_immunity')]).plot(label='Booster Immunity vs Severe Wildtype')
-    (mean_params[('S', 'immunity * (1 - delta_immunity_reduction')] * mean_params[('S', 'severe_immunity')]).plot(label='Booster Immunity vs Severe Delta')
-    (mean_params[('S', 'immunity * (1 - omicron_immunity_reduction')] * mean_params[('S', 'severe_immunity')]).plot(label='Booster Immunity vs Severe Omicron')
+    scens = {
+        'Booster Immunity vs Wildtype': {('S', age, 'shot3', 'none', 'none', 'imm3'): n for age, n in model.specifications.group_pops.items()},
+        'Booster Immunity vs Omicron': {('S', age, 'shot3', 'none', 'omicron', 'imm3'): n for age, n in model.specifications.group_pops.items()},
+        '2-Dose Immunity vs Wildtype': {('S', age, 'shot2', 'none', 'none', 'imm2'): n for age, n in model.specifications.group_pops.items()},
+        '2-Dose Immunity vs Omicron': {('S', age, 'shot2', 'none', 'omicron', 'imm2'): n for age, n in model.specifications.group_pops.items()},
+    }
+
+    for label, y0_dict in scens.items():
+        model.solve_ode(y0_dict)
+        params = model.params_as_df
+        n = model.solution_sum(model.param_attr_names).stack(level=model.param_attr_names)
+
+        immunity = (n * params['immunity']).groupby('t').sum() / n.groupby('t').sum()
+        immunity.plot(label=label)
+
+        net_severe_immunity = (n * (1 - (1 - params['immunity']) * (1 - params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
+        net_severe_immunity.plot(label=label + ' (Severe)')
+
+
+    # print(immunity)
+    # immunity.xs('none', level='variant').plot(label='2-Dose Immunity vs Wildtype')
+    # immunity.xs('omicron', level='variant').plot(label='2-Dose Immunity vs Omicron')
+    # net_severe_immunity.xs('none', level='variant').plot(label='2-Dose Immunity vs Severe Wildtype')
+    # net_severe_immunity.xs('omicron', level='variant').plot(label='2-Dose Immunity vs Severe Omicron')
+    # immunity_to_wt.plot(label='2-Dose Immunity vs Wildtype')
+
+    # mean_params = model.mean_params_as_df(['seir', 'variant'])
+    # # print(mean_params.xs('immunity', level='param', axis=1))
+    # immunity = mean_params.xs('immunity', level='param', axis=1)#.xs('S', level='seir', axis=1)
+    # print(immunity)
+    # exit()
+    # severe_immunity = mean_params.xs('severe_immunity', level='param', axis=1).xs('I', level='seir', axis=1)
+    # net_severe_immunity = 1 - (1 - immunity) * (1 - severe_immunity)
+
+    # immunity['none'].plot(label='Booster Immunity vs Wildtype')
+    # immunity['omicron'].plot(label='Booster Immunity vs Omicron')
+    # severe_immunity['none'].plot(label='Booster Immunity vs Severe Wildtype')
+    # severe_immunity['omicron'].plot(label='Booster Immunity vs Severe Omicron')
+
+
+    # mean_params[('S', 'immunity * (1 - delta_immunity_reduction')].plot(label='Booster Immunity vs Delta')
+    # mean_params[('S', 'immunity * (1 - omicron_immunity_reduction')].plot(label='Booster Immunity vs Omicron')
+    # (mean_params[('S', 'immunity')] * mean_params[('S', 'severe_immunity')]).plot(label='Booster Immunity vs Severe Wildtype')
+    # (mean_params[('S', 'immunity * (1 - delta_immunity_reduction')] * mean_params[('S', 'severe_immunity')]).plot(label='Booster Immunity vs Severe Delta')
+    # (mean_params[('S', 'immunity * (1 - omicron_immunity_reduction')] * mean_params[('S', 'severe_immunity')]).plot(label='Booster Immunity vs Severe Omicron')
 
     # model.solve_ode({('S', age, 'shot3', 'omicron', 'imm3'): n for age, n in model.specifications.group_pops.items()})
     # mean_params = model.mean_params_as_df
