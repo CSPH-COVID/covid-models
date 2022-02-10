@@ -14,7 +14,6 @@ import pandas as pd
 
 
 regions = {
-  "co": "Colorado",
   "ad": "Adams County",
   "ar": "Arapahoe County",
   "bo": "Boulder County",
@@ -56,7 +55,7 @@ def run():
     parser.add_argument("-ahs", "--actual_hosp_sql", type=str, help="path for file containing sql query that fetches actual hospitalization data")
     parser.add_argument("-rv", "--refresh_vacc", action="store_true", help="1 if you want to pull new vacc. data from the database, otherwise 0; default 0")
     parser.add_argument("-om", "--model_with_omicron", action="store_true")
-    parser.add_argument("-rg", "--region", choices=regions.keys(), required=False, default="co", help="Specify the region to be run, defaults to Colorado statewide model")
+    parser.add_argument("-rg", "--region", choices=regions.keys(), required=False, help="Specify the region to be run, if not specified, just runs default parameters")
     parser.add_argument("-hd", "--hosp_data", type=str, help="the path to the hospitalizations data for regions (temporary fix)")
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
     parser.set_defaults(refresh_vacc=False, model_with_omicron=False)
@@ -80,7 +79,7 @@ def run():
 
     ####################################################################################################################
     # temporary code, currently loads region hospitalizations from  local files
-    if region == "co":
+    if region is None:
         actual_hosp_sql = fit_params.actual_hosp_sql if fit_params.actual_hosp_sql is not None else 'sql/emresource_hospitalizations.sql'
         fit.set_actual_hosp(engine, actual_hosp_sql=actual_hosp_sql)
     else:
