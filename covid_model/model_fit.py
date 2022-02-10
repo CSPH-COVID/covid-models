@@ -97,12 +97,13 @@ class CovidModelFit:
             model.build_ode()
 
             # Initial infectious based on hospitalizations and assumed hosp rate
-            I0 = max(2.2,  self.actual_hosp[0] / model.params[0][('40-64', 'unvacc', 'none')]['hosp'])
-            y0d = {('S', age, 'unvacc', 'none'): n for age, n in model.specifications.group_pops.items()}
-            y0d[('I', '40-64', 'unvacc', 'none')] = I0
-            y0d[('S', '40-64', 'unvacc', 'none')] -= I0
+            hosp_rate = list(model.get_param('hosp', {'age': '40-64', 'vacc': 'unvacc'}, trange=[0]).values())[0][0]  # Take first compartment's hosp rate
+            I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
+            y0d = model.y0_dict
+            y0d[model.get_default_cmpt_by_attrs({'seir': 'I', 'age': '40-64', 'vacc': 'unvacc'})] = I0
+            y0d[model.get_default_cmpt_by_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'unvacc'})] -= I0
 
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method, y0d=None)
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method, y0d=y0d)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
