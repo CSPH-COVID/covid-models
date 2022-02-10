@@ -25,8 +25,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08001",
-    "county_names": "Adams"
+    "county_fips": ["08001"],
+    "county_names": ["Adams"]
   },
 
   "ar": {
@@ -55,8 +55,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08005",
-    "county_names": "Arapahoe"
+    "county_fips": ["08005"],
+    "county_names": ["Arapahoe"]
   },
 
   "bo": {
@@ -85,8 +85,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08013",
-    "county_names": "Boulder"
+    "county_fips": ["08013"],
+    "county_names": ["Boulder"]
   },
 
   "brm": {
@@ -115,8 +115,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08014",
-    "county_names": "Broomfield"
+    "county_fips": ["08014"],
+    "county_names": ["Broomfield"]
   },
   
   "den": {
@@ -145,8 +145,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08031",
-    "county_names": "Denver"
+    "county_fips": ["08031"],
+    "county_names": ["Denver"]
   },
   
   "doug": {
@@ -175,8 +175,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08035",
-    "county_names": "Douglas"
+    "county_fips": ["08035"],
+    "county_names": ["Douglas"]
   },
   
   "ep": {
@@ -205,8 +205,8 @@
             "65+": [9.6355, 9.5245, 8.3875, 7.7156, 7.7039]
         }
       },
-    "county_fips": "08041",
-    "county_names": "El Paso"
+    "county_fips": ["08041"],
+    "county_names": ["El Paso"]
   },
   
   "jeff": {
@@ -235,8 +235,8 @@
             "65+": [9.359, 8.4547, 7.7275, 8.0109, 8.1065]
         }
       },
-    "county_fips": "08059",
-    "county_names": "Jefferson"
+    "county_fips": ["08059"],
+    "county_names": ["Jefferson"]
   },
   
   "lar": {
@@ -265,8 +265,8 @@
             "65+": [8.1745, 7.1307, 7.3133, 7.4729, 9.2734]
         }
       },
-    "county_fips": "08069",
-    "county_names": "Larimer"
+    "county_fips": ["08069"],
+    "county_names": ["Larimer"]
   },
   
   "mesa": {
@@ -295,8 +295,8 @@
             "65+": [5.8333, 10.4153, 9.0165, 9.6332, 8.7596]
         }
       },
-    "county_fips": "08077",
-    "county_names": "Mesa"
+    "county_fips": ["08077"],
+    "county_names": ["Mesa"]
   },
   
   "pueb": {
@@ -325,8 +325,8 @@
             "65+": [10.7222, 10.2316, 8.4673, 9.0712, 8.1382]
         }
       },
-    "county_fips": "08101",
-    "county_names": "Pueblo"
+    "county_fips": ["08101"],
+    "county_names": ["Pueblo"]
   },
   
   "weld": {
@@ -355,8 +355,8 @@
             "65+": [8.1745, 7.1307, 7.3133, 7.4729, 9.2734]
         }
       },
-    "county_fips": "08123",
-    "county_names": "Weld"
+    "county_fips": ["08123"],
+    "county_names": ["Weld"]
   },
   
   "cent": {
