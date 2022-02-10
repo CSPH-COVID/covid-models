@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import json
+import copy
 
 import scipy.stats as sps
 from sqlalchemy import MetaData
@@ -133,7 +134,7 @@ class CovidModelSpecifications:
         # model_params may be dictionary or path to json file which will be converted to json
         # region_model_params is the same, but will only be used if region != None. Contains region specific modifications to parameters
         # every key present in region_model_params will completely overwrite that entry in model_params
-        model_params = model_params if type(model_params) == dict else json.load(open(model_params))
+        model_params = copy.deepcopy(model_params) if type(model_params) == dict else json.load(open(model_params))
         if region is not None:
             region_model_params = region_model_params if type(region_model_params) == dict else json.load(open(region_model_params))
             model_params.update(region_model_params[region])
