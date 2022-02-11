@@ -132,7 +132,8 @@ class ODEBuilder:
         self.length = len(self.cmpt_idx_lookup)
 
         self.param_attr_names = list(param_attr_names if param_attr_names is not None else self.attr_names)
-        self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
+        self.param_compartments = list({tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names): None for cmpt in self.compartments}.keys())
+        #self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
         self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
         self.terms = []
@@ -189,7 +190,7 @@ class ODEBuilder:
         else:
             actual_trange = set(self.trange).intersection(trange)
         cmpt_list = self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments
-        return {cmpt: [self.params[t][cmpt][param] for t in actual_trange] for cmpt in cmpt_list}
+        return [(cmpt, [self.params[t][cmpt][param] for t in actual_trange]) for cmpt in cmpt_list]
 
     def calc_coef_by_t(self, coef, cmpt):
 
