@@ -22,7 +22,7 @@ if __name__ == '__main__':
     model = CovidModelWithVariants(end_date=dt.date(2022, 3, 1))
 
     print('Prepping model...')
-    print(timeit("model.prep(682, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
+    print(timeit("model.prep(729, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     # print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
 
@@ -39,16 +39,22 @@ if __name__ == '__main__':
     # modeled(model, model.attr['seir'], groupby='immun', ax=axs.flatten()[3])
 
 
-    groupbys = ['age', 'vacc', ['vacc', 'priorinf']]
-    fig, axs = plt.subplots(2, len(groupbys))
+    groupbys = ['age', 'vacc', 'priorinf']
+    fig, axs = plt.subplots(3, len(groupbys))
 
     for attr_name, ax in zip(groupbys, axs.flatten()[:len(groupbys)]):
+        modeled(model, ['S'], groupby=attr_name, share_of_total=True, ax=ax)
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.set_ylabel(f'susceptible by {attr_name}')
+        ax.legend(loc='upper left')
+
+    for attr_name, ax in zip(groupbys, axs.flatten()[len(groupbys):2*len(groupbys)]):
         modeled(model, ['I', 'A'], groupby=attr_name, share_of_total=True, ax=ax)
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
         ax.set_ylabel(f'infected by {attr_name}')
         ax.legend(loc='upper left')
 
-    for attr_name, ax in zip(groupbys, axs.flatten()[len(groupbys):]):
+    for attr_name, ax in zip(groupbys, axs.flatten()[len(2*groupbys):]):
         modeled(model, ['Ih'], groupby=attr_name, share_of_total=True, ax=ax)
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
         ax.set_ylabel(f'hospitalized by {attr_name}')

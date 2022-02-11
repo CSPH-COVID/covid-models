@@ -66,6 +66,8 @@ def build_default_model():
     model.set_param('shot1_per_available', 0)
     model.set_param('shot2_per_available', 0)
     model.set_param('shot3_per_available', 0)
+    model.set_param('ef', 1)
+    model.set_param('betta', 0)
 
     return model
     # model.build_ode()
@@ -81,7 +83,7 @@ if __name__ == '__main__':
         'Omicron': 'omicron'}
 
     immunities = {
-        '2-Dose': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2]}},
+        'Dose-2': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2]}},
         'Booster': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2, 3]}},
         'Prior Delta Infection': {'initial_attrs': {'seir': 'E', 'variant': 'none'}, 'params': {}},
         'Prior Omicron Infection': {'initial_attrs': {'seir': 'E', 'variant': 'omicron'}, 'params': {}}
@@ -105,8 +107,8 @@ if __name__ == '__main__':
         model.solve_ode({model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.specifications.group_pops.items()})
 
         params = model.params_as_df
-        group_by_attr_names = [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']
-        n = model.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
+        group_by_attr_names = ['seir'] + [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']
+        n = model.solution_sum(group_by_attr_names).stack(level=group_by_attr_names).xs('S', level='seir')
 
         for variant_label, variant in variants.items():
 
@@ -122,9 +124,10 @@ if __name__ == '__main__':
         ax.legend(loc='best')
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
         ax.grid(color='lightgray')
-        ax.set_xlabel(None)
+        ax.set_xlabel(f'Days Since {immunity_label}')
         ax.set_ylim((0, 1))
         ax.set_xticks(np.arange(0, 365, 30))
+        ax.set_xlim((30, 360))
 
     # plt.legend(loc='best')
     fig.tight_layout()
