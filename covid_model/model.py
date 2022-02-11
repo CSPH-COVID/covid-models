@@ -47,7 +47,8 @@ class CovidModel(ODEBuilder):
                            tslices=None, tc=None, params=None,
                            refresh_actual_vacc=False, vacc_proj_params=None, vacc_immun_params=None,
                            timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
-                           attribute_multipliers=None):
+                           attribute_multipliers=None, region_params=None, region=None,
+                           ):
 
         if specs is not None:
             if not isinstance(specs, (int, np.int64)):
@@ -61,9 +62,9 @@ class CovidModel(ODEBuilder):
         if tslices or tc:
             self.specifications.set_tc(tslices, tc)
         if params:
-            self.specifications.set_model_params(params)
+            self.specifications.set_model_params(params, region_model_params=region_params, region=region)
         if refresh_actual_vacc:
-            self.specifications.set_actual_vacc(engine)
+            self.specifications.set_actual_vacc(engine, county_ids=self.specifications.tags["county_fips"] if region is not None else None)
         if refresh_actual_vacc or vacc_proj_params:
             self.specifications.set_vacc_proj(vacc_proj_params)
         if vacc_immun_params:
@@ -248,8 +249,9 @@ class CovidModel(ODEBuilder):
         return y0d
 
     # override solve_ode to use default y0_dict
-    def solve_seir(self, method='RK45'):
-        self.solve_ode(y0_dict=self.y0_dict, method=method)
+    def solve_seir(self, method='RK45', y0_dict=None):
+        y0_dict = y0_dict if y0_dict is not None else self.y0_dict
+        self.solve_ode(y0_dict=y0_dict, method=method)
 
     # count the total hosps by t as the sum of Ih and Ic
     def total_hosps(self):

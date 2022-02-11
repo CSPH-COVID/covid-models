@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import json
+import copy
 
 import scipy.stats as sps
 from sqlalchemy import MetaData
@@ -36,13 +37,13 @@ class CovidModelSpecifications:
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df, including proj, is saved to avoid unnecessary processing
 
-    def set_all(self, spec_id, tslices, tc, tc_cov, model_params, actual_vacc_df, vacc_proj_params, vacc_immun_params, timeseries_effects, base_spec_id=None, tags={}):
+    def set_all(self, spec_id, tslices, tc, tc_cov, model_params, actual_vacc_df, vacc_proj_params, vacc_immun_params, timeseries_effects, base_spec_id=None, tags={}, region_model_params=None, region=None):
         self.spec_id = spec_id
         self.base_spec_id = base_spec_id
         self.tags = tags
 
         self.set_tc(tslices, tc)
-        self.set_model_params(model_params)
+        self.set_model_params(model_params, region_model_params, region)
         self.tc_cov = tc_cov
 
         self.actual_vacc_df = actual_vacc_df
@@ -77,6 +78,7 @@ class CovidModelSpecifications:
     def copy(self, new_end_date=None):
         specs = CovidModelSpecifications(self.start_date, new_end_date if new_end_date is not None else self.end_date)
 
+        # no need to deal with region here, it's already been integrated into model_params
         specs.set_all(spec_id=None, base_spec_id=self.spec_id, tags=self.tags, tslices=self.tslices, tc=self.tc, tc_cov=self.tc_cov,
                       model_params=self.model_params, actual_vacc_df=self.actual_vacc_df,
                       vacc_proj_params=self.vacc_proj_params,
@@ -128,8 +130,20 @@ class CovidModelSpecifications:
         self.tc = (self.tc if append else []) + list(tc)
         self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
 
-    def set_model_params(self, model_params):
-        self.model_params = model_params if type(model_params) == dict else json.load(open(model_params))
+    def set_model_params(self, model_params, region_model_params=None, region=None):
+        # model_params may be dictionary or path to json file which will be converted to json
+        # region_model_params is the same, but will only be used if region != None. Contains region specific modifications to parameters
+        # every key present in region_model_params will completely overwrite that entry in model_params
+        model_params = copy.deepcopy(model_params) if type(model_params) == dict else json.load(open(model_params))
+        if region is not None:
+            region_model_params = region_model_params if type(region_model_params) == dict else json.load(open(region_model_params))
+            model_params.update(region_model_params[region])
+            self.tags['region'] = region   # record which option we ran with
+            self.tags['county_fips'] = model_params['county_fips']
+            self.tags['county_names'] = model_params['county_names']
+            _ = model_params.pop('county_fips')   # remove from the parameters
+            _ = model_params.pop('county_names')   # remove from the parameters
+        self.model_params = model_params
         self.group_pops = self.model_params['group_pop']
 
     def set_vacc_proj(self, vacc_proj_params=None):
@@ -137,9 +151,9 @@ class CovidModelSpecifications:
             self.vacc_proj_params = vacc_proj_params if isinstance(vacc_proj_params, dict) else json.load(open(vacc_proj_params))
         self.proj_vacc_df = self.get_proj_vacc()
 
-    def set_actual_vacc(self, engine):
+    def set_actual_vacc(self, engine, county_ids=None):
         # vacc_rate_df = ExternalVaccWithProjections(engine, t0_date=self.start_date, fill_to_date=self.end_date).fetch(proj_params=self.vacc_proj_params, group_pop=self.model_params['group_pop'])
-        self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch()
+        self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids)
         # self.actual_vacc_df = ExternalVacc(engine).fetch()
 
     def set_vacc_immun(self, vacc_immun_params):
@@ -172,7 +186,6 @@ class CovidModelSpecifications:
             columns=params,
             data=1.0
         )
-
         multiplier_dict = {}
         for effect_type in self.timeseries_effects.keys():
             prevalence_df = pd.DataFrame(index=pd.date_range(self.start_date, self.end_date))
@@ -182,6 +195,8 @@ class CovidModelSpecifications:
                     effect_specs['start_date'] = '20' + effect_specs['start_date']
                 start_date = dt.datetime.strptime(effect_specs['start_date'], '%Y-%m-%d').date()
                 end_date = self.end_date
+                if start_date > end_date:
+                    continue
                 # end_date = start_date + dt.timedelta(days=len(effect_specs['prevalence']) - 1)
 
                 prevalence = effect_specs['prevalence']
@@ -199,8 +214,9 @@ class CovidModelSpecifications:
             prevalence = prevalence_df.stack().rename_axis(index=['t', 'effect'])
             remainder = 1 - prevalence.groupby('t').sum()
 
-            multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
-            multipliers = multipliers.multiply(multipliers_for_this_effect_type)
+            if len(multiplier_df) > 0:
+                multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
+                multipliers = multipliers.multiply(multipliers_for_this_effect_type)
 
         multipliers.index = (multipliers.index.to_series().dt.date - self.start_date).dt.days
 
@@ -248,7 +264,6 @@ class CovidModelSpecifications:
                             projections.loc[(t, groups[i + 1])] += excess_rate
 
                     cumu_vacc += projections.loc[t]
-
             return projections
 
     def get_vacc_rates(self):
