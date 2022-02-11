@@ -91,7 +91,7 @@ class CovidModelWithVariants(CovidModel):
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
         # immunity decay
         self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / 90')
-        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 180')
+        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 270')
         self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / 270')
 
     def build_SR_to_E_ode(self):
@@ -128,12 +128,13 @@ class CovidModelWithVariants(CovidModel):
         n = self.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
 
         if vacc_only:
-            params.loc[params.index.get_level_values('priorinf') == 'none', 'immunity'] = 0
-            params.loc[params.index.get_level_values('priorinf') == 'none', 'severe_immunity'] = 0
+            params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
+            params.loc[params.index.get_level_values('vacc') == 'none', 'severe_immunity'] = 0
 
         variant_params = params.xs(variant, level='variant')
         if to_hosp:
-            return (n * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
+            weights = variant_params['hosp'] * n
+            return (weights * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / weights.groupby('t').sum()
         else:
             return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
