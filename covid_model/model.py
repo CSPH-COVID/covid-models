@@ -64,7 +64,7 @@ class CovidModel(ODEBuilder):
         if params:
             self.specifications.set_model_params(params, region_model_params=region_params, region=region)
         if refresh_actual_vacc:
-            self.specifications.set_actual_vacc(engine, county_ids=self.specifications.tags["county_fips"])
+            self.specifications.set_actual_vacc(engine, county_ids=self.specifications.tags["county_fips"] if region is not None else None)
         if refresh_actual_vacc or vacc_proj_params:
             self.specifications.set_vacc_proj(vacc_proj_params)
         if vacc_immun_params:
