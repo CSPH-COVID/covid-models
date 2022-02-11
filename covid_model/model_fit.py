@@ -97,7 +97,7 @@ class CovidModelFit:
             model.build_ode()
 
             # Initial infectious based on hospitalizations and assumed hosp rate
-            hosp_rate = model.get_param('hosp', {'age': '40-64', 'vacc': 'unvacc'}, trange=[0])[0][1]  # Take first compartment's hosp rate
+            hosp_rate = model.get_param('hosp', {'age': '40-64', 'vacc': 'unvacc'}, trange=[0])[0][1][0]  # Take first compartment's hosp rate
             I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
             y0d = model.y0_dict
             y0d[model.get_default_cmpt_by_attrs({'seir': 'I', 'age': '40-64', 'vacc': 'unvacc'})] = I0
