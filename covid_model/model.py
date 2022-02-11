@@ -299,8 +299,9 @@ class CovidModel(ODEBuilder):
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
 
         # Merge R and R2 into one column
-        solution_sum_df['R'] += solution_sum_df['R2']
-        del solution_sum_df['R2']
+        if 'R2' in solution_sum_df.columns:
+            solution_sum_df['R'] += solution_sum_df['R2']
+            del solution_sum_df['R2']
 
         # build unique parameters dataframe
         params_df = self.params_as_df

@@ -9,11 +9,12 @@
   {"attrs": {"immun": "imm3"}, "param": "immunity", "val": 1},
   {"attrs": {"immun": "imm2"}, "param": "immunity", "val": 1},
   {"attrs": {"immun": "imm1"}, "param": "immunity", "val": 0.75},
+  {"attrs": {"immun": "imm0"}, "param": "immunity", "val": 0},
   {"attrs": {"immun": "none"}, "param": "immunity", "val": 0},
 
-  {"attrs": {"vacc": "shot2"}, "except_attrs": {"immun":  "none"},"param": "severe_immunity", "val": 1},
-  {"attrs": {"vacc": "shot3"}, "except_attrs": {"immun":  "none"},"param": "severe_immunity", "val": 1},
+  {"attrs": {"variant": "none"}, "except_attrs": {"immun":  "none"}, "param": "severe_immunity", "val": 0.95},
+  {"attrs": {"variant": "omicron"}, "except_attrs": {"immun":  "none"}, "param": "severe_immunity", "val": 0.6},
+  {"attrs": {"variant": "omicron", "vacc": "shot3"}, "except_attrs": {"immun":  "none"}, "param": "severe_immunity", "val": 0.9},
 
-  {"attrs": {"variant": "omicron"}, "except_attrs": {"priorinf": "omicron", "immun": "imm3"}, "param": "immunity", "mult": 0.5},
-  {"attrs": {"variant": "omicron"}, "except_attrs": {"priorinf": "omicron", "immun": "imm3"}, "param": "severe_immunity", "mult": 0.5}
+  {"attrs": {"variant": "omicron", "immun": "imm1"}, "except_attrs": {"priorinf": "omicron"}, "param": "immunity", "mult": 0}
 ]

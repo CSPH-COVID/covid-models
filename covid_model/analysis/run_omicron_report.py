@@ -30,6 +30,7 @@ if __name__ == '__main__':
     print('Running model...')
     model.solve_seir()
     # build_legacy_output_df(model).to_csv('output/out2.csv')
+    # model.write_to_db(engine, cmpts_json_attrs=('age', 'variant'))
 
     print('Producing charts...')
     fig, axs = plt.subplots(2, 2, figsize=(17, 8))
@@ -46,22 +47,34 @@ if __name__ == '__main__':
     axs[1].legend(loc='best')
 
     # variants
-    modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=axs[2])
+    # modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=axs[2])
+    # axs[2].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    # axs[2].set_ylabel('Variant Share of Infections')
+    # axs[2].lines.pop(0)
+    # axs[2].legend(loc='best')
+
+    # modeled(model, ['Ih'], groupby='variant', share_of_total=True, ax=axs[2])
+    # axs[2].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    # axs[2].set_ylabel('Variant Share of Hospitalization')
+    # axs[2].lines.pop(0)
+    # axs[2].legend(loc='best')
+
+    modeled(model, ['Ih'], groupby='immun', share_of_total=True, ax=axs[2])
     axs[2].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-    axs[2].set_ylabel('Variant Share of Infections')
-    axs[2].lines.pop(0)
+    axs[2].set_ylabel('Hospitalization by Immunity Status')
     axs[2].legend(loc='best')
 
-    # # immunity
-    # axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron', color='cyan')
-    # axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
-    # axs[3].plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
-    # axs[3].plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
-    # axs[3].plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Omicron Hospitalization', color='black')
-    # axs[3].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-    # axs[3].set_ylim(0, 1)
-    # axs[3].set_ylabel('Percent Immune')
-    # axs[3].legend(loc='best')
+    # immunity
+    axs[3].plot(model.daterange, model.immunity('none'), label='Immunity vs non-Omicron', color='cyan')
+    axs[3].plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
+    axs[3].plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
+    axs[3].plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
+    axs[3].plot(model.daterange, model.immunity('none', to_hosp=True), label='Immunity vs non-Omicron Hospitalization', color='darkgray')
+    axs[3].plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Omicron Hospitalization', color='black')
+    axs[3].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    axs[3].set_ylim(0, 1)
+    axs[3].set_ylabel('Percent Immune')
+    axs[3].legend(loc='best')
 
     actual_hosps(engine, ax=axs[1], color='black')
 
@@ -87,11 +100,11 @@ if __name__ == '__main__':
     # formatting
     for ax in axs:
         format_date_axis(ax)
-        ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 2, 28))
+        ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 5, 31))
         ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
 
-    axs[3].set_xlim(dt.date(2020, 4, 1), dt.date(2022, 3, 31))
+    axs[3].set_xlim(dt.date(2020, 4, 1), dt.date(2022, 5, 31))
 
     fig.tight_layout()
     fig.savefig('output/omicron_report.png')

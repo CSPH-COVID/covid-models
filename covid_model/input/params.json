@@ -66,5 +66,8 @@
   "immunity": 0,
   "severe_immunity": 0,
   "variant_immunity_reduction": 0,
-  "omicron_immunity_reduction": 0
+  "omicron_immunity_reduction": 0,
+  "shot1_fail_rate": {"0-19": 0.02, "20-39": 0.02, "40-64": 0.02, "65+": 0.06},
+  "shot2_fail_rate": {"0-19": 0.02, "20-39": 0.02, "40-64": 0.02, "65+": 0.06},
+  "shot3_fail_rate": {"0-19": 0.01, "20-39": 0.01, "40-64": 0.01, "65+": 0.03}
 }
