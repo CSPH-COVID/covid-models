@@ -11,6 +11,8 @@ from operator import itemgetter
 from itertools import count
 import math
 import numbers
+from operator import mul
+from functools import reduce
 
 
 class ODEFlowTerm:
@@ -116,6 +118,20 @@ class ConstantODEFlowTerm(ODEFlowTerm):
 #             return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
 
 
+class FittableFlowMultiplier:
+    def __init__(self, bool_matrix):
+        self.bool_matrix = bool_matrix
+        self.ones_matrix = np.ones_like(bool_matrix)
+        self.mult_by_t = {}
+
+    def set_mult(self, mult, trange):
+        for t in trange:
+            self.mult_by_t[t] = mult
+
+    def mult_matrix(self, t):
+        return self.mult_by_t[t] * self.bool_matrix + 1
+
+
 class ODEBuilder:
     """
     Parameters
@@ -175,6 +191,12 @@ class ODEBuilder:
         self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
         self.terms = []
 
+        self.linear_matrix = {t: spsp.lil_matrix((self.length, self.length)) for t in self.trange}
+        self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.length, self.length))) for t in self.trange}
+        self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
+
+        self.nonlinear_multiplier = {}
+
     @property
     def params_as_df(self):
         return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
@@ -190,6 +212,9 @@ class ODEBuilder:
 
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
+
+    def get_default_cmpt_by_attrs(self, attrs):
+        return tuple(attrs[attr_name] if attr_name in attrs.keys() else attr_list[0] for attr_name, attr_list in self.attributes.items())
 
     def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None, except_attrs=None):
         if val is not None:
@@ -211,14 +236,23 @@ class ODEBuilder:
             actual_trange = set(self.trange).intersection(trange)
         cmpts = self.param_compartments
         if attrs:
-            cmpts = self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True)
+            for attr in [attrs] if isinstance(attrs, dict) else attrs:
+                cmpts = self.filter_cmpts_by_attrs(attr, is_param_cmpts=True)
         if except_attrs:
-            cmpts = [cmpt for cmpt in cmpts if cmpt not in self.filter_cmpts_by_attrs(except_attrs, is_param_cmpts=True)]
+            for except_attr in [except_attrs] if isinstance(except_attrs, dict) else except_attrs:
+                cmpts = [cmpt for cmpt in cmpts if cmpt not in self.filter_cmpts_by_attrs(except_attr, is_param_cmpts=True)]
         for cmpt in cmpts:
             for t in actual_trange:
                 apply(t, cmpt, param)
 
-    def calc_coef_by_t(self, coef, cmpt, other_cmpts=None):
+    def set_nonlinear_multiplier(self, mult, trange=None):
+        trange = trange if trange is not None else self.trange
+        for t in trange:
+            self.nonlinear_multiplier[t] = mult
+
+    def calc_coef_by_t(self, coef, cmpt, other_cmpts=None, trange=None):
+
+        trange = trange if trange is not None else self.trange
 
         if len(cmpt) > len(self.param_attr_names):
             param_cmpt = tuple(attr for attr, level in zip(cmpt, self.attr_names) if level in self.param_attr_names)
@@ -226,26 +260,26 @@ class ODEBuilder:
             param_cmpt = cmpt
 
         if isinstance(coef, dict):
-            return {t: coef[t] if t in coef.keys() else 0 for t in self.trange}
+            return {t: coef[t] if t in coef.keys() else 0 for t in trange}
         elif callable(coef):
-            return {t: coef(t) for t in self.trange}
+            return {t: coef(t) for t in trange}
         elif isinstance(coef, str):
             if coef == '1':
-                coef_by_t = {t: 1 for t in self.trange}
+                coef_by_t = {t: 1 for t in trange}
             else:
                 coef_by_t = {}
                 expr = parse_expr(coef)
                 relevant_params = [str(s) for s in expr.free_symbols]
                 param_cmpts_by_param = {**{param: param_cmpt for param in relevant_params}, **(other_cmpts if other_cmpts else {})}
                 if len(relevant_params) == 1 and coef == relevant_params[0]:
-                    coef_by_t = {t: self.params[t][param_cmpt][coef] for t in self.trange}
+                    coef_by_t = {t: self.params[t][param_cmpt][coef] for t in trange}
                 else:
                     func = sym.lambdify(relevant_params, expr)
-                    for t in self.trange:
+                    for t in trange:
                         coef_by_t[t] = func(**{param: self.params[t][param_cmpts_by_param[param]][param] for param in relevant_params})
             return coef_by_t
         else:
-            return {t: coef for t in self.trange}
+            return {t: coef for t in trange}
 
     def reset_ode(self):
         self.terms = []
@@ -281,14 +315,23 @@ class ODEBuilder:
             else:
                 coef_by_t_dl = None
 
-        self.terms.append(ODEFlowTerm.build(
+        term = ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
             to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-            coef_by_t=self.calc_coef_by_t(coef, from_cmpt),  # switched BACK to setting parameters use the TO cmpt
-            scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in scale_by_cmpts] if scale_by_cmpts is not None else None,
+            coef_by_t=self.calc_coef_by_t(coef, to_cmpt),  # switched BACK to setting parameters use the TO cmpt
+            scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in
+                                 scale_by_cmpts] if scale_by_cmpts is not None else None,
             scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
             constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None,
-            pool_cmpt_idxs=[self.cmpt_idx_lookup[pool_cmpt] for pool_cmpt in pool_cmpts] if pool_cmpts is not None else None))
+            pool_cmpt_idxs=[self.cmpt_idx_lookup[pool_cmpt] for pool_cmpt in
+                            pool_cmpts] if pool_cmpts is not None else None)
+
+        self.terms.append(term)
+
+        for t in self.trange:
+            term.add_to_linear_matrix(self.linear_matrix[t], t)
+            term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
+            term.add_to_constant_vector(self.constant_vector[t], t)
 
     def add_flows_by_attr(self, from_attrs, to_attrs, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
@@ -301,17 +344,6 @@ class ODEBuilder:
                           scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant, pool_cmpts=from_cmpts if from_pool else None)
 
     def compile(self):
-        self.linear_matrix = {t: spsp.lil_matrix((self.length, self.length)) for t in self.trange}
-        self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.length, self.length))) for t in self.trange}
-        self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
-
-        for term in self.terms:
-            for t in self.trange:
-                term.add_to_linear_matrix(self.linear_matrix[t], t)
-                term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
-                term.add_to_constant_vector(self.constant_vector[t], t)
-
-        # convert to CSR for better performance
         for t in self.trange:
             self.linear_matrix[t] = self.linear_matrix[t].tocsr()
             for k, v in self.nonlinear_matrices[t].items():
@@ -327,9 +359,9 @@ class ODEBuilder:
         dy = [0] * self.length
         t_int = min(math.floor(t), len(self.trange) - 1)
 
-        dy += self.linear_matrix[t_int].dot(y)
+        dy += (self.linear_matrix[t_int]).dot(y)
         for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
-            dy += sum(itemgetter(*scale_by_cmpt_idxs)(y)) * matrix.dot(y)
+            dy += self.nonlinear_multiplier[t_int] * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * (matrix).dot(y)
 
         dy += self.constant_vector[t_int]
 

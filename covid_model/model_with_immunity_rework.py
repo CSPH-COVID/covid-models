@@ -20,58 +20,60 @@ class CovidModelWithVariants(CovidModel):
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
                         'variant': ['none', 'omicron'],
-                        'immun': ['none', 'imm1', 'imm2', 'imm3']})
+                        'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
     # do not apply vaccines in the traditional way; we'll cover them using attribute_multipliers instead
     def prep(self, specs=None, **specs_args):
-        t0 = perf_counter()
         self.set_specifications(specs=specs, **specs_args)
-        t1 = perf_counter()
-        print(t1 - t0)
-        t0 = perf_counter()
         self.apply_specifications(apply_vaccines=False)
-        t1 = perf_counter()
-        print(t1 - t0)
-        t0 = perf_counter()
         self.apply_new_vacc_params()
-        t1 = perf_counter()
-        print(t1 - t0)
-        t0 = perf_counter()
         self.build_ode()
-        t1 = perf_counter()
-        print(t1 - t0)
-        t0 = perf_counter()
         self.compile()
-        t1 = perf_counter()
-        print(t1 - t0)
-        t0 = perf_counter()
+
+    def apply_tc(self, tc=None, tslices=None, suppress_ode_rebuild=False):
+        super().apply_tc(tc=tc, tslices=tslices, suppress_ode_rebuild=True)
+        self.rebuild_ode_with_new_tc()
 
     def apply_new_vacc_params(self):
         vacc_per_available = self.specifications.get_vacc_per_available()
-        vacc_fail_per_vacc = self.specifications.get_vacc_fail_per_vacc()
+        # vacc_fail_per_vacc = self.specifications.get_vacc_fail_per_vacc()
 
         # convert to dictionaries for performance lookup
         vacc_per_available_dict = vacc_per_available.to_dict()
 
         # set the fail rate and vacc per unvacc rate for each dose
+        vacc_delay = 14
         for shot in self.attr['vacc'][1:]:
+            self.set_param(f'{shot}_per_available', 0, trange=range(0, vacc_delay))
             for age in self.attr['age']:
-                self.set_param(f'{shot}_fail_rate', vacc_fail_per_vacc[shot][age], {'age': age})
-                for t in self.trange:
-                    self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t, age)], {'age': age}, trange=[t])
+                # self.set_param(f'{shot}_fail_rate', vacc_fail_per_vacc[shot][age], {'age': age})
+                for t in range(vacc_delay, self.tmax):
+                    self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t - vacc_delay, age)], {'age': age}, trange=[t])
 
     # build ODE
     def build_ode(self):
         self.reset_ode()
         # build S to E and R to E elements of the ODE
         self.build_SR_to_E_ode()
-        # add flows by attributes
         # vaccination
-        for i in range(1, len(self.attributes['vacc'])):
-            self.add_flows_by_attr({'vacc': f'shot{i-1}' if i >= 2 else 'none'}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate)')
-            self.add_flows_by_attr({'vacc': f'shot{i-1}' if i >= 2 else 'none'}, {'vacc': f'shot{i}'}, coef=f'shot{i}_per_available * shot{i}_fail_rate')
+        # first shot
+        self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'imm1'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
+        self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, coef=f'shot1_per_available * shot1_fail_rate')
+        # second and third shot
+        for i in [2, 3]:
+            for immun in self.attributes['immun']:
+                if immun == 'none':
+                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i-1}_fail_rate)')
+                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i-1}_fail_rate)')
+                else:
+                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available')
+        # # third shot
+        # self.add_flows_by_attr({'vacc': f'shot2'}, {'vacc': f'shot2', 'immun': f'imm2'}, coef=f'shot2_per_available')
+        # for i in range(1, len(self.attributes['vacc'])):
+        #     self.add_flows_by_attr({'vacc': f'shot{i-1}' if i >= 2 else 'none'}, {'vacc': f'shot{i}', 'immun': f'imm{max(i, 2)}'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate)')
+        #     self.add_flows_by_attr({'vacc': f'shot{i-1}' if i >= 2 else 'none'}, {'vacc': f'shot{i}'}, coef=f'shot{i}_per_available * shot{i}_fail_rate')
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'A'}, coef='1 / alpha * (1 - pS)')
@@ -89,20 +91,22 @@ class CovidModelWithVariants(CovidModel):
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
         # immunity decay
         self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / 90')
-        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 360')
-        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'none'}, coef='1 / 540')
+        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 180')
+        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / 270')
 
     def build_SR_to_E_ode(self):
         # seed omicron
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
         # apply flow from S to E (note that S now encompasses recovered as well
-        asymptomatic_transmission = '(1 - immunity) * betta * (1 - ef) / total_pop'
+        asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
         for variant in self.attributes['variant']:
             sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
             asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})
             # immunity = f'immunity * (1 - {f"{variant}_immunity_reduction" if variant in ("delta", "omicron") else "0"})'
             self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
             self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+        # add tc multiplier
+        self.rebuild_ode_with_new_tc()
 
     # define initial state y0
     @property
@@ -111,6 +115,27 @@ class CovidModelWithVariants(CovidModel):
         y0d[('S', '40-64', 'none', 'none', 'none', 'none')] -= 2.2
         y0d[('I', '40-64', 'none', 'none', 'none', 'none')] = 2.2
         return y0d
+
+    # reset terms that depend on TC; this takes about 0.08 sec, while rebuilding the whole ODE takes ~0.90 sec
+    def rebuild_ode_with_new_tc(self):
+        for tmin, tmax, ef in zip([self.tmin] + self.specifications.tslices, self.specifications.tslices + [self.tmax], self.specifications.tc):
+            self.set_nonlinear_multiplier(1 - ef, trange=range(tmin, tmax))
+
+    # immunity
+    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False):
+        params = self.params_as_df
+        group_by_attr_names = [attr_name for attr_name in self.param_attr_names if attr_name != 'variant']
+        n = self.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
+
+        if vacc_only:
+            params.loc[params.index.get_level_values('priorinf') == 'none', 'immunity'] = 0
+            params.loc[params.index.get_level_values('priorinf') == 'none', 'severe_immunity'] = 0
+
+        variant_params = params.xs(variant, level='variant')
+        if to_hosp:
+            return (n * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
+        else:
+            return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
 
 if __name__ == '__main__':

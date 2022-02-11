@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 import seaborn as sns
 import datetime as dt
 import json
@@ -21,7 +22,7 @@ if __name__ == '__main__':
     model = CovidModelWithVariants(end_date=dt.date(2022, 3, 1))
 
     print('Prepping model...')
-    print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
+    print(timeit("model.prep(682, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     # print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
 
@@ -31,10 +32,26 @@ if __name__ == '__main__':
 
     # model.write_to_db(engine, cmpts_json_attrs=('age', 'vacc', 'variant'))
 
-    fig, axs = plt.subplots(2, 2)
-    modeled(model, 'Ih', ax=axs.flatten()[0])
-    actual_hosps(engine, ax=axs.flatten()[0])
-    modeled(model, model.attr['seir'], groupby='vacc', ax=axs.flatten()[1])
-    modeled(model, model.attr['seir'], groupby='priorinf', ax=axs.flatten()[2])
-    modeled(model, model.attr['seir'], groupby='immun', ax=axs.flatten()[3])
+    # modeled(model, 'Ih', ax=axs.flatten()[0])
+    # actual_hosps(engine, ax=axs.flatten()[0])
+    # modeled(model, model.attr['seir'], groupby='vacc', ax=axs.flatten()[1])
+    # modeled(model, model.attr['seir'], groupby='priorinf', ax=axs.flatten()[2])
+    # modeled(model, model.attr['seir'], groupby='immun', ax=axs.flatten()[3])
+
+
+    groupbys = ['age', 'vacc', ['vacc', 'priorinf']]
+    fig, axs = plt.subplots(2, len(groupbys))
+
+    for attr_name, ax in zip(groupbys, axs.flatten()[:len(groupbys)]):
+        modeled(model, ['I', 'A'], groupby=attr_name, share_of_total=True, ax=ax)
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.set_ylabel(f'infected by {attr_name}')
+        ax.legend(loc='upper left')
+
+    for attr_name, ax in zip(groupbys, axs.flatten()[len(groupbys):]):
+        modeled(model, ['Ih'], groupby=attr_name, share_of_total=True, ax=ax)
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.set_ylabel(f'hospitalized by {attr_name}')
+        ax.legend(loc='upper left')
+
     plt.show()

@@ -2,7 +2,7 @@ import json
 
 from db import db_engine
 from model import CovidModel, CovidModelSpecifications
-from model_with_omicron import CovidModelWithVariants
+from model_with_immunity_rework import CovidModelWithVariants
 from model_fit import CovidModelFit
 from data_imports import ExternalHosps
 from analysis.charts import actual_hosps, modeled

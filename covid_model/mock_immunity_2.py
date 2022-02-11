@@ -4,7 +4,9 @@ import datetime as dt
 import scipy.integrate as spi
 import scipy.optimize as spo
 import pyswarms as ps
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, ticker as mtick
+import matplotlib as mpl
+from cycler import cycler
 from sqlalchemy import MetaData
 from datetime import datetime
 import itertools
@@ -56,32 +58,77 @@ from model_with_immunity_rework import CovidModelWithVariants
     #     self.build_ode()
 
 
+def build_default_model():
+    model = CovidModelWithVariants(end_date=dt.date(2021, 1, 24))
+    model.set_specifications(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    model.apply_specifications(apply_vaccines=False)
+    # model.apply_new_vacc_params()
+    model.set_param('shot1_per_available', 0)
+    model.set_param('shot2_per_available', 0)
+    model.set_param('shot3_per_available', 0)
+
+    return model
+    # model.build_ode()
+    # model.compile()
+
+    # model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+
 if __name__ == '__main__':
     engine = db_engine()
 
-    model = CovidModelWithVariants(end_date=dt.date(2020, 7, 24))
-    model.set_param('shot2_per_available', 1)
-    model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    variants = {
+        'Non-Omicron': 'none',
+        'Omicron': 'omicron'}
 
-    fig, ax = plt.subplots()
-
-    scens = {
-        'Booster Immunity vs Wildtype': {('S', age, 'shot3', 'none', 'none', 'imm3'): n for age, n in model.specifications.group_pops.items()},
-        'Booster Immunity vs Omicron': {('S', age, 'shot3', 'none', 'omicron', 'imm3'): n for age, n in model.specifications.group_pops.items()},
-        '2-Dose Immunity vs Wildtype': {('S', age, 'shot2', 'none', 'none', 'imm2'): n for age, n in model.specifications.group_pops.items()},
-        '2-Dose Immunity vs Omicron': {('S', age, 'shot2', 'none', 'omicron', 'imm2'): n for age, n in model.specifications.group_pops.items()},
+    immunities = {
+        '2-Dose': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2]}},
+        'Booster': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2, 3]}},
+        'Prior Delta Infection': {'initial_attrs': {'seir': 'E', 'variant': 'none'}, 'params': {}},
+        'Prior Omicron Infection': {'initial_attrs': {'seir': 'E', 'variant': 'omicron'}, 'params': {}}
     }
 
-    for label, y0_dict in scens.items():
-        model.solve_ode(y0_dict)
+    fig, axs = plt.subplots(2, 2)
+    # colors = ['violet', 'mediumorchid', 'indigo', 'gold', 'orange']
+    # colors = ['violet', 'indigo', 'gold', 'orange']
+    # mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=['violet', 'indigo', 'gold', 'orange'])
+
+    for (immunity_label, immunity_specs), ax in zip(immunities.items(), axs.flatten()):
+        ax.set_prop_cycle(cycler(color=['paleturquoise', 'darkcyan', 'violet', 'indigo']))
+        ax.set_title(f'Immunity from {immunity_label}')
+
+        print(f'Prepping and running model for {immunity_label} immunity...')
+        model = build_default_model()
+        for k, v in immunity_specs['params'].items():
+            model.set_param(k, v)
+        model.build_ode()
+        model.compile()
+        model.solve_ode({model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.specifications.group_pops.items()})
+
         params = model.params_as_df
-        n = model.solution_sum(model.param_attr_names).stack(level=model.param_attr_names)
+        group_by_attr_names = [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']
+        n = model.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
 
-        immunity = (n * params['immunity']).groupby('t').sum() / n.groupby('t').sum()
-        immunity.plot(label=label)
+        for variant_label, variant in variants.items():
 
-        net_severe_immunity = (n * (1 - (1 - params['immunity']) * (1 - params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
-        net_severe_immunity.plot(label=label + ' (Severe)')
+            variant_params = params.xs(variant, level='variant')
+
+            net_severe_immunity = (n * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
+            net_severe_immunity.plot(label=f'Immunity vs Severe {variant_label}', ax=ax)
+
+            if immunity_label != 'Prior Omicron Infection' or variant_label == 'Non-Omicron':
+                immunity = (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
+                immunity.plot(label=f'Immunity vs {"Infection" if immunity_label == "Prior Omicron Infection" else variant_label}', ax=ax)
+
+        ax.legend(loc='best')
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.grid(color='lightgray')
+        ax.set_xlabel(None)
+        ax.set_ylim((0, 1))
+        ax.set_xticks(np.arange(0, 365, 30))
+
+    # plt.legend(loc='best')
+    fig.tight_layout()
+    plt.show()
 
 
     # print(immunity)
@@ -125,5 +172,4 @@ if __name__ == '__main__':
     # ((by_immun * model.params_as_df.loc[(0, '0-19', 'shot2', 'wt'), 'immunity']).sum(axis=1) / by_immun.sum(axis=1)).plot(label='Booster Immunity vs Wildtype')
     # ((by_immun * model.params_as_df.loc[(0, '0-19', 'shot2', 'omicron'), 'immunity']).sum(axis=1) / by_immun.sum(axis=1)).plot(label='Booster Immunity vs Omicron')
 
-    plt.legend(loc='best')
-    plt.show()
+
