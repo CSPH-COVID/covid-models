@@ -10,14 +10,15 @@ class MyTestCase(unittest.TestCase):
             for cred_key, cred_val in json.load(creds_file).items():
                 os.environ[cred_key] = cred_val
 
-    def region_test(self, region, batch_size=6, increment_size=2, write_batch_output=False):
+    def region_test(self, region=None, batch_size=6, increment_size=2, write_batch_output=False):
         os.chdir('../covid_model')
         run_str = f"python run_fit.py -om --fit_id 553 --batch_size {batch_size}"\
                   f" --increment_size {increment_size}" \
-                  f" --params input/params.json --region {region}" \
-                  f" --region_params input/region_params.json" \
-                  f" --refresh_vacc "\
-                  f" --hosp_data ../../data/processed_lpha_hospbycounty_20220128.csv"
+                  f" --params input/params.json " \
+                  f" --refresh_vacc "
+        if region is not None:
+            run_str += f"--region {region} --region_params input/region_params.json"
+            run_str += f" --hosp_data ../../data/processed_lpha_hospbycounty_20220128.csv"
         if write_batch_output:
             run_str += " --write_batch_output"
         output = os.system(run_str)
@@ -97,7 +98,7 @@ class MyTestCase(unittest.TestCase):
         self.region_test("wcp")
 
     def test_co(self):
-        self.region_test("co")
+        self.region_test()
 
 
 if __name__ == '__main__':
