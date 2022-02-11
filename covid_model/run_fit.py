@@ -121,9 +121,9 @@ def run():
     fit.fitted_model.specifications.write_to_db(engine)
     # fit.fitted_model.write_to_db(engine)
 
-    actual_hosps(engine)
-    modeled(fit.fitted_model, 'Ih')
-    plt.show()
+    #actual_hosps(engine)
+    #modeled(fit.fitted_model, 'Ih')
+    #plt.show()
 
 
 if __name__ == '__main__':
