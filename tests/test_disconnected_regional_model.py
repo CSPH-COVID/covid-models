@@ -37,8 +37,8 @@ class MyTestCase(unittest.TestCase):
     def test_bo(self):
         self.region_test("bo")
 
-    def test_br(self):
-        self.region_test("br")
+    def test_brm(self):
+        self.region_test("brm")
 
     def test_den(self):
         self.region_test("den")
