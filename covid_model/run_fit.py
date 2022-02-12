@@ -17,7 +17,7 @@ regions = {
   "ad": "Adams County",
   "ar": "Arapahoe County",
   "bo": "Boulder County",
-  "br": "Broomfield County",
+  "brm": "Broomfield County",
   "den": "Denver County",
   "doug": "Douglas County",
   "ep": "El Paso County",
