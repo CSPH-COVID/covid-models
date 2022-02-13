@@ -60,7 +60,7 @@ from model_with_immunity_rework import CovidModelWithVariants
 
 def build_default_model():
     model = CovidModelWithVariants(end_date=dt.date(2021, 1, 24))
-    model.set_specifications(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    model.set_specifications(702, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
     model.apply_specifications(apply_vaccines=False)
     # model.apply_new_vacc_params()
     model.set_param('shot1_per_available', 0)
@@ -80,7 +80,8 @@ if __name__ == '__main__':
 
     variants = {
         'Non-Omicron': 'none',
-        'Omicron': 'omicron'}
+        'Omicron': 'omicron'
+    }
 
     immunities = {
         'Dose-2': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2]}},
@@ -111,13 +112,12 @@ if __name__ == '__main__':
         n = model.solution_sum(group_by_attr_names).stack(level=group_by_attr_names).xs('S', level='seir')
 
         for variant_label, variant in variants.items():
-
-            variant_params = params.xs(variant, level='variant')
-
-            net_severe_immunity = (n * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
-            net_severe_immunity.plot(label=f'Immunity vs Severe {variant_label}', ax=ax)
-
             if immunity_label != 'Prior Omicron Infection' or variant_label == 'Non-Omicron':
+                variant_params = params.xs(variant, level='variant')
+
+                net_severe_immunity = (n * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
+                net_severe_immunity.plot(label=f'Immunity vs Severe {"Disease" if immunity_label == "Prior Omicron Infection" else variant_label}', ax=ax)
+
                 immunity = (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
                 immunity.plot(label=f'Immunity vs {"Infection" if immunity_label == "Prior Omicron Infection" else variant_label}', ax=ax)
 

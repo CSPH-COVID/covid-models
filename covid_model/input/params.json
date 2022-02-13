@@ -55,7 +55,7 @@
   "vacc_eff": 1,
   "vacc_fail_rate": {"0-19": 0.03, "20-39": 0.03, "40-64": 0.03, "65+": 0.14},
   "immune_rate_I": 0.925,
-  "immune_rate_A": 0.85,
+  "immune_rate_A": 0.925,
   "immune_decay_days_1": 400,
   "immune_decay_days_2": 400,
   "nondelta_prevalence": 1,
