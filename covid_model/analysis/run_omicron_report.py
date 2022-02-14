@@ -88,7 +88,8 @@ if __name__ == '__main__':
     base_tc = model.specifications.tc.copy()
     hosps_df = pd.DataFrame(index=model.trange)
     # for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
-    for tc_shift, tc_shift_days in [(0, 0), (-0.40, 7)]:
+    # for tc_shift, tc_shift_days in [(0, 0), (-0.40, 7)]:
+    for tc_shift, tc_shift_days in [(0, 0)]:
         start_t = 749
         future_tslices = list(range(start_t, start_t + tc_shift_days))
         future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))

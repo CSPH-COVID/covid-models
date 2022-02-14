@@ -33,10 +33,8 @@ class ODEFlowTerm:
         pass
 
     @classmethod
-    def build(cls, from_cmpt_idx, to_cmpt_idx, coef_by_t=None, scale_by_cmpts_idxs=None, scale_by_cmpts_coef_by_t=None, constant_by_t=None, pool_cmpt_idxs=None):
-        if pool_cmpt_idxs is not None:
-            return ConstantFromPoolODEFlowTerm(from_cmpt_idx, to_cmpt_idx, constant_by_t=constant_by_t, pool_cmpt_idxs=pool_cmpt_idxs)
-        elif constant_by_t is not None:
+    def build(cls, from_cmpt_idx, to_cmpt_idx, coef_by_t=None, scale_by_cmpts_idxs=None, scale_by_cmpts_coef_by_t=None, constant_by_t=None):
+        if constant_by_t is not None:
             return ConstantODEFlowTerm(from_cmpt_idx, to_cmpt_idx, constant_by_t=constant_by_t)
         elif scale_by_cmpts_coef_by_t is not None:
             return WeightedScaledODEFlowTerm(from_cmpt_idx, to_cmpt_idx, coef_by_t=coef_by_t, scale_by_cmpts_idxs=scale_by_cmpts_idxs, scale_by_cmpts_coef_by_t=scale_by_cmpts_coef_by_t)
@@ -106,32 +104,6 @@ class ConstantODEFlowTerm(ODEFlowTerm):
         vector[self.to_cmpt_idx] += self.constant_by_t[t_int]
 
 
-# class ConstantFromPoolODEFlowTerm(ConstantODEFlowTerm):
-#     def __init__(self, from_cmpt_idx, to_cmpt_idx, constant_by_t, pool_cmpt_idxs=None):
-#         ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx, constant_by_t=constant_by_t)
-#         self.from_cmpt_pool_idxs = pool_cmpt_idxs if pool_cmpt_idxs is not None else [from_cmpt_idx]
-#
-#     def flow_val(self, t, y):
-#         if y[self.from_cmpt_idx] == 0:
-#             return 0
-#         else:
-#             return self.constant_by_t[t] * y[self.from_cmpt_idx] / sum(itemgetter(*self.from_cmpt_pool_idxs)(y))
-
-
-class FittableFlowMultiplier:
-    def __init__(self, bool_matrix):
-        self.bool_matrix = bool_matrix
-        self.ones_matrix = np.ones_like(bool_matrix)
-        self.mult_by_t = {}
-
-    def set_mult(self, mult, trange):
-        for t in trange:
-            self.mult_by_t[t] = mult
-
-    def mult_matrix(self, t):
-        return self.mult_by_t[t] * self.bool_matrix + 1
-
-
 class ODEBuilder:
     """
     Parameters
@@ -196,6 +168,10 @@ class ODEBuilder:
         self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
 
         self.nonlinear_multiplier = {}
+
+        self.solution = None
+        self.solution_y = None
+        self.solution_ydf = None
 
     @property
     def params_as_df(self):
@@ -297,7 +273,7 @@ class ODEBuilder:
         for i in sorted(self.get_term_indices_by_attr(from_attrs, to_attrs), reverse=True):
             del self.terms[i]
 
-    def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, pool_cmpts=None):
+    def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         if len(from_cmpt) < len(self.attributes.keys()):
             raise ValueError(f'Origin compartment `{from_cmpt}` does not have the right number of attributes.')
         if len(to_cmpt) < len(self.attributes.keys()):
@@ -322,18 +298,17 @@ class ODEBuilder:
             scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in
                                  scale_by_cmpts] if scale_by_cmpts is not None else None,
             scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
-            constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None,
-            pool_cmpt_idxs=[self.cmpt_idx_lookup[pool_cmpt] for pool_cmpt in
-                            pool_cmpts] if pool_cmpts is not None else None)
+            constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None)
 
         self.terms.append(term)
 
+        # add term to matrices
         for t in self.trange:
             term.add_to_linear_matrix(self.linear_matrix[t], t)
             term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
             term.add_to_constant_vector(self.constant_vector[t], t)
 
-    def add_flows_by_attr(self, from_attrs, to_attrs, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None, from_pool=False):
+    def add_flows_by_attr(self, from_attrs, to_attrs, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
         for from_cmpt in from_cmpts:
             to_cmpt_list = list(from_cmpt)
@@ -341,7 +316,7 @@ class ODEBuilder:
                 to_cmpt_list[self.attr_level(attr_name)] = new_attr_val
             to_cmpt = tuple(to_cmpt_list)
             self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
-                          scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant, pool_cmpts=from_cmpts if from_pool else None)
+                          scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant)
 
     def compile(self):
         for t in self.trange:
@@ -373,8 +348,6 @@ class ODEBuilder:
             t_span=[min(self.trange), max(self.trange)],
             y0=self.y0_from_dict(y0_dict),
             t_eval=self.trange,
-            # jac_sparsity=self.jac_sparsity,
-            # jac=self.jacobian,
             method=method)
         if not self.solution.success:
             raise RuntimeError(f'ODE solver failed with message: {self.solution.message}')
@@ -387,18 +360,3 @@ class ODEBuilder:
     def solution_sum(self, group_by_attr_levels=None):
         if group_by_attr_levels:
             return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
-
-    def mean_params_as_df(self, group_by_attr_levels=None):
-        params = self.params_as_df.rename_axis('param', axis=1)
-
-        if group_by_attr_levels is None:
-            stacked_solution = self.solution_ydf.stack(level=list(self.attr_names))
-            expanded_params = params
-            expanded_solution = pd.concat({col: stacked_solution for col in params.columns}, axis=1, names=['param'])
-        else:
-            non_group_by_attr_levels = [attr_name for attr_name in self.attr_names if attr_name not in group_by_attr_levels]
-            stacked_solution = self.solution_ydf.stack(level=list(non_group_by_attr_levels)).rename_axis(group_by_attr_levels, axis=1)
-            expanded_params = pd.concat({col: params for col in stacked_solution.columns}, axis=1, names=[*group_by_attr_levels])
-            expanded_solution = pd.concat({col: stacked_solution for col in params.columns}, axis=1, names=['param']).reorder_levels([*group_by_attr_levels, 'param'], axis=1)
-
-        return (expanded_params * expanded_solution).groupby('t').sum() / stacked_solution.groupby('t').sum()
