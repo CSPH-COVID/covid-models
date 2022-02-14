@@ -38,7 +38,6 @@ class CovidModelWithVariants(CovidModel):
 
     def apply_new_vacc_params(self):
         vacc_per_available = self.specifications.get_vacc_per_available()
-        # vacc_fail_per_vacc = self.specifications.get_vacc_fail_per_vacc()
 
         # convert to dictionaries for performance lookup
         vacc_per_available_dict = vacc_per_available.to_dict()
@@ -48,7 +47,6 @@ class CovidModelWithVariants(CovidModel):
         for shot in self.attr['vacc'][1:]:
             self.set_param(f'{shot}_per_available', 0, trange=range(0, vacc_delay))
             for age in self.attr['age']:
-                # self.set_param(f'{shot}_fail_rate', vacc_fail_per_vacc[shot][age], {'age': age})
                 for t in range(vacc_delay, self.tmax):
                     self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t - vacc_delay, age)], {'age': age}, trange=[t])
 
@@ -69,11 +67,6 @@ class CovidModelWithVariants(CovidModel):
                     self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i-1}_fail_rate)')
                 else:
                     self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available')
-        # # third shot
-        # self.add_flows_by_attr({'vacc': f'shot2'}, {'vacc': f'shot2', 'immun': f'imm2'}, coef=f'shot2_per_available')
-        # for i in range(1, len(self.attributes['vacc'])):
-        #     self.add_flows_by_attr({'vacc': f'shot{i-1}' if i >= 2 else 'none'}, {'vacc': f'shot{i}', 'immun': f'imm{max(i, 2)}'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate)')
-        #     self.add_flows_by_attr({'vacc': f'shot{i-1}' if i >= 2 else 'none'}, {'vacc': f'shot{i}'}, coef=f'shot{i}_per_available * shot{i}_fail_rate')
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'A'}, coef='1 / alpha * (1 - pS)')
@@ -90,9 +83,9 @@ class CovidModelWithVariants(CovidModel):
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * dnh * (1 - severe_immunity)')
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
         # immunity decay
-        self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / 90')
-        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / 270')
-        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / 270')
+        self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / imm3_decay_days')
+        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / imm2_decay_days')
+        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / imm1_decay_days')
 
     def build_SR_to_E_ode(self):
         # seed omicron
@@ -102,7 +95,6 @@ class CovidModelWithVariants(CovidModel):
         for variant in self.attributes['variant']:
             sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
             asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})
-            # immunity = f'immunity * (1 - {f"{variant}_immunity_reduction" if variant in ("delta", "omicron") else "0"})'
             self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
             self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
         # add tc multiplier
@@ -145,7 +137,6 @@ if __name__ == '__main__':
     model = CovidModelWithVariants()
 
     print('Prepping model...')
-    # print(timeit('model.prep(521, engine=engine)', number=1, globals=globals()), 'seconds to prep model.')
     model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
     print('Running model...')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')

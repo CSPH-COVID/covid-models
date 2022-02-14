@@ -114,11 +114,6 @@ class CovidModelSpecifications:
 
         self.spec_id = result.inserted_primary_key[0]
 
-        # if self.model is not None:
-        #     self.model.fit_id = result.inserted_primary_key[0]
-
-        # return result.inserted_primary_key[0]
-
     @property
     def days(self):
         return (self.end_date - self.start_date).days
@@ -138,9 +133,7 @@ class CovidModelSpecifications:
         self.proj_vacc_df = self.get_proj_vacc()
 
     def set_actual_vacc(self, engine):
-        # vacc_rate_df = ExternalVaccWithProjections(engine, t0_date=self.start_date, fill_to_date=self.end_date).fetch(proj_params=self.vacc_proj_params, group_pop=self.model_params['group_pop'])
         self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch()
-        # self.actual_vacc_df = ExternalVacc(engine).fetch()
 
     def set_vacc_immun(self, vacc_immun_params):
         self.vacc_immun_params = vacc_immun_params if isinstance(vacc_immun_params, dict) else json.load(open(vacc_immun_params))
@@ -264,11 +257,6 @@ class CovidModelSpecifications:
         by_last_shot['none'] = by_last_shot.join(populations)['population'] - by_last_shot.sum(axis=1)
         by_last_shot = by_last_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
         available_for_vacc = by_last_shot.shift(1, axis=1).drop(columns='none')
-
-        # cumu_vacc = cumu_vacc.join(populations)
-        # cumu_vacc['none'] = cumu_vacc['population'] - cumu_vacc['shot1']
-        # cumu_vacc = cumu_vacc.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
-        # available_for_vacc = cumu_vacc.shift(1, axis=1).drop(columns='none')
 
         return (vacc_rates / available_for_vacc).fillna(0)
 
