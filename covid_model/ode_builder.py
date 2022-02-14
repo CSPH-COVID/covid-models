@@ -132,7 +132,8 @@ class ODEBuilder:
         self.length = len(self.cmpt_idx_lookup)
 
         self.param_attr_names = list(param_attr_names if param_attr_names is not None else self.attr_names)
-        self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
+        self.param_compartments = list({tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names): None for cmpt in self.compartments}.keys())
+        #self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
         self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
         self.terms = []
@@ -159,6 +160,9 @@ class ODEBuilder:
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
+    def get_default_cmpt_by_attrs(self, attrs):
+        return tuple(attrs[attr_name] if attr_name in attrs.keys() else attr_list[0] for attr_name, attr_list in self.attributes.items())
+
     def set_param(self, param, val=None, attrs=None, trange=None, mult=None):
         if val is not None:
             def apply(t, cmpt, param):
@@ -179,6 +183,14 @@ class ODEBuilder:
                 #     self.params[t][cmpt][name] = val
                 # else:
                 #     self.params[t][cmpt][name] *= mult
+
+    def get_param(self, param, attrs=None, trange=None):
+        if trange is None:
+            actual_trange = self.trange
+        else:
+            actual_trange = set(self.trange).intersection(trange)
+        cmpt_list = self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments
+        return [(cmpt, [self.params[t][cmpt][param] for t in actual_trange]) for cmpt in cmpt_list]
 
     def calc_coef_by_t(self, coef, cmpt):
 

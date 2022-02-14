@@ -47,7 +47,8 @@ class CovidModel(ODEBuilder):
                            tslices=None, tc=None, params=None,
                            refresh_actual_vacc=False, vacc_proj_params=None, vacc_immun_params=None,
                            timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
-                           attribute_multipliers=None):
+                           attribute_multipliers=None, region_params=None, region=None,
+                           ):
 
         if specs is not None:
             if not isinstance(specs, (int, np.int64)):
@@ -61,9 +62,9 @@ class CovidModel(ODEBuilder):
         if tslices or tc:
             self.specifications.set_tc(tslices, tc)
         if params:
-            self.specifications.set_model_params(params)
+            self.specifications.set_model_params(params, region_model_params=region_params, region=region)
         if refresh_actual_vacc:
-            self.specifications.set_actual_vacc(engine)
+            self.specifications.set_actual_vacc(engine, county_ids=self.specifications.tags["county_fips"] if region is not None else None)
         if refresh_actual_vacc or vacc_proj_params:
             self.specifications.set_vacc_proj(vacc_proj_params)
         if vacc_immun_params:
@@ -248,8 +249,9 @@ class CovidModel(ODEBuilder):
         return y0d
 
     # override solve_ode to use default y0_dict
-    def solve_seir(self, method='RK45'):
-        self.solve_ode(y0_dict=self.y0_dict, method=method)
+    def solve_seir(self, method='RK45', y0_dict=None):
+        y0_dict = y0_dict if y0_dict is not None else self.y0_dict
+        self.solve_ode(y0_dict=y0_dict, method=method)
 
     # count the total hosps by t as the sum of Ih and Ic
     def total_hosps(self):
@@ -261,7 +263,7 @@ class CovidModel(ODEBuilder):
         return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.specifications.model_params['alpha']
 
     # immunity
-    def immunity(self, variant='omicron', vacc_only=False):
+    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False):
         susc_by_t = {t: 0 for t in self.trange}
         for from_cmpt in self.compartments:
             n = self.solution_ydf[from_cmpt]
@@ -273,11 +275,18 @@ class CovidModel(ODEBuilder):
                         if term.coef_by_t is not None:  # if the term is a constant, coef_by_t will be None
                             for t in self.trange:
                                 susc_rate = term.coef_by_t[t] * self.params[t][to_cmpt[1:]]['total_pop'] / self.params[t][to_cmpt[1:]]['betta'] / (1 - self.params[t][to_cmpt[1:]]['ef'])
-                                # if t == 700:
-                                #     print(f'{from_cmpt}\t{to_cmpt}\t{round(n[t])}\t{round(susc_rate, 2)}')
                                 susc_by_t[t] += n[t] * susc_rate
 
-        return pd.Series({t: 1 - susc / self.specifications.model_params['total_pop'] for t, susc in susc_by_t.items()})
+        susc = pd.Series(susc_by_t)
+
+        if to_hosp:
+            params_df = self.params_as_df
+            hosp_vuln = params_df['hosp'] / params_df['hosp'].xs('unvacc', level='vacc')
+            infected = self.solution_ydf.transpose().xs('I', level='seir') + self.solution_ydf.transpose().xs('A', level='seir')
+            infected = infected.stack().reorder_levels(hosp_vuln.index.names)
+            susc *= (infected * hosp_vuln).groupby('t').sum() / infected.groupby('t').sum()
+
+        return 1 - susc / self.specifications.model_params['total_pop']
 
     # write to covid_model.results in Postgres
     def write_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
