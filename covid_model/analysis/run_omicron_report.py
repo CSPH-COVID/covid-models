@@ -25,7 +25,8 @@ if __name__ == '__main__':
     print('Prepping model...')
     engine = db_engine()
     model = CovidModelWithVariants(end_date=dt.date(2022, 10, 31))
-    model.prep(run_args.spec_id, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    model.prep(run_args.spec_id, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json',
+               timeseries_effect_multipliers='input/timeseries_effects/multipliers.json', variant_prevalence='input/timeseries_effects/variant_prevalence.csv')
     model.apply_tc(tc=model.specifications.tc + [1.0], tslices=model.specifications.tslices + [850])
 
     print('Running model...')
@@ -106,13 +107,13 @@ if __name__ == '__main__':
     # formatting
     for ax in axs:
         format_date_axis(ax)
-        ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 5, 31))
+        ax.set_xlim(dt.date(2020, 3, 1), dt.date(2022, 5, 30))
         ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
         ax.legend(loc='best')
 
-    axs[2].set_xlim(dt.date(2021, 1, 1), dt.date(2022, 6, 30))
-    axs[3].set_xlim(dt.date(2021, 1, 1), dt.date(2022, 6, 30))
+    axs[2].set_xlim(dt.date(2021, 1, 1), dt.date(2022, 5, 30))
+    axs[3].set_xlim(dt.date(2021, 1, 1), dt.date(2022, 5, 30))
 
     fig.tight_layout()
     fig.savefig('output/omicron_report.png')

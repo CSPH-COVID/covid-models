@@ -1,61 +1,81 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-import seaborn as sns
 import datetime as dt
-import json
-from time import perf_counter
-from timeit import timeit
+from matplotlib import pyplot as plt, ticker as mtick
+from cycler import cycler
+import argparse
 
 from covid_model.db import db_engine
-from covid_model.model import CovidModel
-from covid_model.model_with_omicron import CovidModelWithVariants
-from covid_model.model_specs import CovidModelSpecifications
+from covid_model.ode_builder import *
+from model_with_immunity_rework import CovidModelWithVariants
 
 
-def two_cmpt_decay(t, scale1, scale2):
-    in_cmpt1 = np.exp(-t / scale1)
-    if scale1 == scale2:
-        in_cmpt2 = t * np.exp(-t / scale1) / scale1
-    else:
-        in_cmpt2 = (scale2 * np.exp(-(t * (scale1 + scale2)) / (scale1 * scale2)) * (np.exp(t / scale2) - np.exp(t / scale1))) / (scale1 - scale2)
+def build_default_model():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--days", type=int, help="the number of days of immunity to plot")
+    parser.set_defaults(days=180)
+    clargs = parser.parse_args()
 
-    return in_cmpt1 + in_cmpt2
+    arbitrary_start_date = dt.date(1970, 1, 1)
+    model = CovidModelWithVariants(end_date=CovidModelWithVariants.default_start_date + clargs.)
+    model.set_specifications(702, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    model.apply_specifications(apply_vaccines=False)
+    model.set_param('shot1_per_available', 0)
+    model.set_param('shot2_per_available', 0)
+    model.set_param('shot3_per_available', 0)
+    model.set_param('betta', 0)
+
+    return model
 
 
 if __name__ == '__main__':
     engine = db_engine()
 
-    spec_id = 532
-    tmin = 30
-    tmax = 30*18
+    variants = {
+        'Non-Omicron': 'none',
+        'Omicron': 'omicron'
+    }
 
-    specs = CovidModelSpecifications.from_db(engine, 532)
-    t = np.arange(tmin, tmax, 1.0)
+    immunities = {
+        'Dose-2': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2]}},
+        'Booster': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2, 3]}},
+        'Prior Delta Infection': {'initial_attrs': {'seir': 'E', 'variant': 'none'}, 'params': {}},
+        'Prior Omicron Infection': {'initial_attrs': {'seir': 'E', 'variant': 'omicron'}, 'params': {}}
+    }
 
-    immunity_timeseries = dict()
+    fig, axs = plt.subplots(2, 2)
 
-    vacc_specs = specs.vacc_immun_params['shot2']
-    initial_vacc_immunity = 1 - (pd.Series(vacc_specs['fail_rate']) * pd.Series(specs.model_params['group_pop']) / pd.Series(specs.model_params['group_pop']).sum()).sum()
-    immunity_timeseries['Vaccine Immunity vs Alpha'] = initial_vacc_immunity * np.array([specs.vacc_eff_decay_mult(tx, 7, 1) for tx in t])
-    immunity_timeseries['Vaccine Immunity vs Delta'] = initial_vacc_immunity * np.array([specs.vacc_eff_decay_mult(tx, 7, specs.model_params['delta_vacc_eff_k']) for tx in t])
-    immunity_timeseries['Vaccine Immunity vs Omicron'] = initial_vacc_immunity * np.array([specs.vacc_eff_decay_mult(tx, 7, specs.model_params['omicron_vacc_eff_k']) for tx in t])
+    for (immunity_label, immunity_specs), ax in zip(immunities.items(), axs.flatten()):
+        ax.set_prop_cycle(cycler(color=['paleturquoise', 'darkcyan', 'violet', 'indigo']))
+        ax.set_title(f'Immunity from {immunity_label}')
 
-    initial_pinf_immunity = (specs.model_params['immune_rate_I'] + specs.model_params['immune_rate_A']) / (specs.model_params['lamb'] + 1)
-    immunity_timeseries['Prior-Infection Immunity vs Alpha or Delta'] = initial_pinf_immunity * two_cmpt_decay(t, specs.model_params['immune_decay_days_1'], specs.model_params['immune_decay_days_2'])
-    immunity_timeseries['Prior-Infection (non-Omicron) Immunity vs Omicron'] = specs.model_params['omicron_acq_immune_escape'] * immunity_timeseries['Prior-Infection Immunity vs Alpha or Delta']
+        print(f'Prepping and running model for {immunity_label} immunity...')
+        model = build_default_model()
+        for k, v in immunity_specs['params'].items():
+            model.set_param(k, v)
+        model.build_ode()
+        model.compile()
+        model.solve_ode({model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.specifications.group_pops.items()})
 
-    fig, ax = plt.subplots()
-    colors = ['violet', 'mediumorchid', 'indigo', 'gold', 'orange']
-    for (label, data), color in zip(immunity_timeseries.items(), colors):
-        ax.plot(t, data, label=label, color=color)
+        params = model.params_as_df
+        group_by_attr_names = ['seir'] + [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']
+        n = model.solution_sum(group_by_attr_names).stack(level=group_by_attr_names).xs('S', level='seir')
 
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-    plt.xticks(np.arange(tmin, tmax, 30))
-    ax.set_xlabel('Days Since Infection or Vaccination')
-    ax.set_ylabel('Infection Risk Reduction from Immunity')
-    ax.grid(color='lightgray')
-    ax.legend()
+        for variant_label, variant in variants.items():
+            if immunity_label != 'Prior Omicron Infection' or variant_label == 'Non-Omicron':
+                variant_params = params.xs(variant, level='variant')
 
+                net_severe_immunity = (n * (1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby('t').sum() / n.groupby('t').sum()
+                net_severe_immunity.plot(label=f'Immunity vs Severe {"Disease" if immunity_label == "Prior Omicron Infection" else variant_label}', ax=ax)
+
+                immunity = (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
+                immunity.plot(label=f'Immunity vs {"Infection" if immunity_label == "Prior Omicron Infection" else variant_label}', ax=ax)
+
+        ax.legend(loc='best')
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.grid(color='lightgray')
+        ax.set_xlabel(f'Days Since {immunity_label}')
+        ax.set_ylim((0, 1))
+        ax.set_xticks(np.arange(0, 365, 30))
+        ax.set_xlim((30, 360))
+
+    fig.tight_layout()
     plt.show()
