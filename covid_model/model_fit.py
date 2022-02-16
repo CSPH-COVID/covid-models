@@ -48,7 +48,6 @@ class CovidModelFit:
             def func(trange, *test_tc):
                 combined_tc = fixed_tc + list(test_tc)
                 model.apply_tc(combined_tc)
-                model.rebuild_ode_with_new_tc()
                 model.solve_seir()
                 return model.solution_sum('seir')['Ih']
             fitted_tc, fitted_tc_cov = spo.curve_fit(
@@ -98,9 +97,6 @@ class CovidModelFit:
             model.nonlinear_matrices = {t: m for t, m in base_model.nonlinear_matrices.items() if t in model.trange}
             model.constant_vector = {t: m for t, m in base_model.constant_vector.items() if t in model.trange}
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
-            model.rebuild_ode_with_new_tc()
-            print(model.nonlinear_multiplier)
-            # model.build_ode()
 
             fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc

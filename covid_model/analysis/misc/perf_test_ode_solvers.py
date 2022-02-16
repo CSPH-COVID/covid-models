@@ -19,10 +19,10 @@ if __name__ == '__main__':
     engine = db_engine()
 
     # model = CovidModelWithVariants()
-    model = CovidModelWithVariants(end_date=dt.date(2022, 3, 1))
+    model = CovidModel(end_date=dt.date(2022, 3, 1))
 
     print('Prepping model...')
-    print(timeit("model.prep(797, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
+    print(timeit("model.prep(797, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json', timeseries_effect_multipliers='input/timeseries_effects/multipliers.json', variant_prevalence='input/timeseries_effects/variant_prevalence.csv')", number=1, globals=globals()), 'seconds to prep model.')
     # print(timeit("model.prep(551, engine=engine, params='input/params.json', attribute_multipliers='input/old_attribute_multipliers.json')", number=1, globals=globals()), 'seconds to prep model.')
     print(timeit('model.solve_seir()', number=1, globals=globals()), 'seconds to run model.')
 

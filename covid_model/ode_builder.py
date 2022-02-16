@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pandas as pd
 from collections import OrderedDict, defaultdict
@@ -31,6 +33,9 @@ class ODEFlowTerm:
 
     def add_to_nonlinear_matrices(self, matrices, t_int):
         pass
+
+    def deepcopy(self):
+        self.build(**{k: copy.deepcopy(v) for k, v in self.__dict__.items()})
 
     @classmethod
     def build(cls, from_cmpt_idx, to_cmpt_idx, coef_by_t=None, scale_by_cmpts_idxs=None, scale_by_cmpts_coef_by_t=None, constant_by_t=None):
@@ -125,29 +130,13 @@ class ODEBuilder:
         Note that you should provide an OrderedDict here, since the order
         of the compartment tuples is dependent on the order of the keys.
 
-    params : dict
-        Parameter lookup dictionary of the form...
-            {
-                t0: {
-                    cmpt0: {param0: val000, param1: val001, ...},
-                    cmpt1: {param0: val010, param1: val011, ...},
-                    ...
-                },
-                t1: {
-                    cmpt0: {param0: val100, param1: val101, ...},
-                    cmpt1: {param0: val110, param1: val111, ...},
-                    ...
-                },
-                ...
-            }
-
     param_attr_names : array-like
         The attribute levels by which paramaters will be allowed to vary.
         The compartment definitions in params should match the attribute
         levels in param_attr_levels.
 
     """
-    def __init__(self, trange, attributes: OrderedDict, params=None, param_attr_names=None):
+    def __init__(self, trange, attributes: OrderedDict, param_attr_names=None):
         self.trange = trange
 
         self.attributes = attributes
@@ -161,37 +150,59 @@ class ODEBuilder:
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
         self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
-        self.terms = []
 
-        self.linear_matrix = {t: spsp.lil_matrix((self.length, self.length)) for t in self.trange}
-        self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.length, self.length))) for t in self.trange}
-        self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
-
-        self.nonlinear_multiplier = {}
+        # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
+        self.terms = None
+        self.linear_matrix = None
+        self.nonlinear_matrices = None
+        self.constant_vector = None
+        self.nonlinear_multiplier = None
+        self.reset_ode()
 
         self.solution = None
         self.solution_y = None
         self.solution_ydf = None
 
+    # copy the ODE, including the pre-built matrices; does not copy the solution
+    def deepcopy(self, new_trange=None):
+        new_ode_builder = ODEBuilder(trange=new_trange if new_trange is not None else self.trange.copy(),
+                                     attributes=self.attributes.copy(),
+                                     param_attr_names=self.param_attr_names.copy())
+
+        new_ode_builder.params = new_ode_builder
+
+        new_ode_builder.linear_matrix = {t: copy.deepcopy(m) for t, m in self.linear_matrix.items() if t in new_ode_builder.trange}
+        new_ode_builder.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in self.nonlinear_matrices.items() if t in new_ode_builder.trange}
+        new_ode_builder.constant_vector = {t: copy.deepcopy(m) for t, m in self.constant_vector.items() if t in new_ode_builder.trange}
+        new_ode_builder.nonlinear_multiplier = copy.deepcopy(self.nonlinear_multiplier)
+
+    # return the parameters as a dataframe with t and compartments as index and parameters as columns
     @property
     def params_as_df(self):
         return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
 
+    # get the level associated with a given attribute name
+    # e.g. if attributes are ['seir', 'age', 'variant'], the level of 'age' is 1 and the level of 'variant' is 2
     def attr_level(self, attr_name):
         return self.attr_names.index(attr_name)
 
-    def attr_param_level(self, attr_name):
+    # get the level associated with a param attribute
+    def param_attr_level(self, attr_name):
         return self.param_attr_names.index(attr_name)
 
+    # check if a cmpt matches a dictionary of attributes
     def does_cmpt_have_attrs(self, cmpt, attrs, is_param_cmpts=False):
-        return all(cmpt[self.attr_param_level(attr_name) if is_param_cmpts else self.attr_level(attr_name)] == attr_val for attr_name, attr_val in attrs.items())
+        return all(cmpt[self.param_attr_level(attr_name) if is_param_cmpts else self.attr_level(attr_name)] == attr_val for attr_name, attr_val in attrs.items())
 
+    # return compartments that match a dictionary of attributes
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
+    # return the "first" compartment that matches a dictionary of attributes, with "first" determined by attribute order
     def get_default_cmpt_by_attrs(self, attrs):
         return tuple(attrs[attr_name] if attr_name in attrs.keys() else attr_list[0] for attr_name, attr_list in self.attributes.items())
 
+    # set a parameter (if val is provided; otherwise apply a multiplier or exponent)
     def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None, except_attrs=None):
         if val is not None:
             def apply(t, cmpt, param):
@@ -221,11 +232,14 @@ class ODEBuilder:
             for t in actual_trange:
                 apply(t, cmpt, param)
 
+    # set the "non-linear multiplier" which is a scalar (for each t value) that will scale all non-linear flows
+    # used for changing TC without rebuilding all the matrices
     def set_nonlinear_multiplier(self, mult, trange=None):
         trange = trange if trange is not None else self.trange
         for t in trange:
             self.nonlinear_multiplier[t] = mult
 
+    # takes a symbolic equation, and looks up variable names in params to provide a computed output for each t in trange
     def calc_coef_by_t(self, coef, cmpt, other_cmpts=None, trange=None):
 
         trange = trange if trange is not None else self.trange
@@ -257,22 +271,32 @@ class ODEBuilder:
         else:
             return {t: coef for t in trange}
 
+    # assign default values to matrices
     def reset_ode(self):
         self.terms = []
+        self.linear_matrix = {t: spsp.lil_matrix((self.length, self.length)) for t in self.trange}
+        self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.length, self.length))) for t in self.trange}
+        self.constant_vector = {t: np.zeros(self.length) for t in self.trange}
+        self.nonlinear_multiplier = {}
 
+    # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
         return [term for term in self.terms if term.from_cmpt_idx == self.cmpt_idx_lookup[from_cmpt] and term.to_cmpt_idx == self.cmpt_idx_lookup[to_cmpt]]
 
+    # get the indices of all terms that refer to flow from one specific compartment to another
     def get_term_indices_by_attr(self, from_attrs, to_attrs):
         return [i for i, term in enumerate(self.terms) if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs)]
 
+    # get the terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
     def get_terms_by_attr(self, from_attrs, to_attrs):
         return [self.terms[i] for i in self.get_term_indices_by_attr(from_attrs, to_attrs)]
 
+    # remove terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
     def reset_terms(self, from_attrs, to_attrs):
         for i in sorted(self.get_term_indices_by_attr(from_attrs, to_attrs), reverse=True):
             del self.terms[i]
 
+    # add a flow term, and add new flow to ODE matrices
     def add_flow(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         if len(from_cmpt) < len(self.attributes.keys()):
             raise ValueError(f'Origin compartment `{from_cmpt}` does not have the right number of attributes.')
@@ -308,6 +332,8 @@ class ODEBuilder:
             term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
             term.add_to_constant_vector(self.constant_vector[t], t)
 
+    # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
+    # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
     def add_flows_by_attr(self, from_attrs, to_attrs, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
         for from_cmpt in from_cmpts:
@@ -318,30 +344,39 @@ class ODEBuilder:
             self.add_flow(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
                           scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant)
 
+    # convert ODE matrices to CSR format, to (massively) improve performance
     def compile(self):
         for t in self.trange:
             self.linear_matrix[t] = self.linear_matrix[t].tocsr()
             for k, v in self.nonlinear_matrices[t].items():
                 self.nonlinear_matrices[t][k] = v.tocsr()
 
+    # create a y0 vector with all values as 0, except those designated in y0_dict
     def y0_from_dict(self, y0_dict):
         y0 = [0]*self.length
         for cmpt, n in y0_dict.items():
             y0[self.cmpt_idx_lookup[cmpt]] = n
         return y0
 
+    # ODE step forward
     def ode(self, t, y):
         dy = [0] * self.length
         t_int = min(math.floor(t), len(self.trange) - 1)
 
+        # apply linear terms
         dy += (self.linear_matrix[t_int]).dot(y)
+
+        # apply non-linear terms
         for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
             dy += self.nonlinear_multiplier[t_int] * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * (matrix).dot(y)
 
+        # apply constant terms
         dy += self.constant_vector[t_int]
 
         return dy
 
+    # solve ODE using scipy.solve_ivp, and put solution in solution_y and solution_ydf
+    # TODO: try Julia ODE package, to improve performance
     def solve_ode(self, y0_dict, method='RK45'):
         self.solution = spi.solve_ivp(
             fun=self.ode,
@@ -354,9 +389,10 @@ class ODEBuilder:
         self.solution_y = np.transpose(self.solution.y)
         self.solution_ydf = pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
+    # convert y-array to series with compartment attributes as multiindex
     def y_to_series(self, y):
         return pd.Series(index=self.compartments_as_index, data=y)
 
-    def solution_sum(self, group_by_attr_levels=None):
-        if group_by_attr_levels:
-            return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
+    # return solution grouped by group_by_attr_levels
+    def solution_sum(self, group_by_attr_levels):
+        return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
