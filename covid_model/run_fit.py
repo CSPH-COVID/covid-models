@@ -63,8 +63,7 @@ def run():
     # parser.add_argument("-rv", "--refresh_vacc", type=bool, help="1 if you want to pull new vacc. data from the database, otherwise 0; default 0")
     parser.add_argument("-ahs", "--actual_hosp_sql", type=str, help="path for file containing sql query that fetches actual hospitalization data")
     parser.add_argument("-rv", "--refresh_vacc", action="store_true", help="1 if you want to pull new vacc. data from the database, otherwise 0; default 0")
-    parser.add_argument("-om", "--model_with_omicron", action="store_true")
-    parser.set_defaults(refresh_vacc=False, model_with_omicron=False)
+    parser.set_defaults(refresh_vacc=False )
     fit_params = parser.parse_args()
     look_back = fit_params.look_back
     # look_back_date = dt.datetime.strptime(fit_params.look_back_date, '%Y-%m-%d') if fit_params.look_back_date else None
@@ -96,16 +95,14 @@ def run():
             timeseries_effect_multipliers='input/timeseries_effects/multipliers.json',
             variant_prevalence='input/timeseries_effects/variant_prevalence.csv',
             mab_prevalence='input/timeseries_effects/mab_prevalence.csv',
-            model_class=CovidModelWithVariants if fit_params.model_with_omicron else CovidModel,
-            attribute_multipliers='input/attribute_multipliers.json' if fit_params.model_with_omicron else None)
+            model_class=CovidModel,
+            attribute_multipliers='input/attribute_multipliers.json')
 
     # fit.fitted_specs.write_to_db(engine)
     print(fit.fitted_model.specifications.tslices)
     print(fit.fitted_tc)
 
     fit.fitted_model.specifications.tags['run_type'] = 'fit'
-    if fit_params.model_with_omicron:
-        fit.fitted_model.specifications.tags['model_type'] = 'with omicron'
 
     fit.fitted_model.specifications.write_to_db(engine)
     # fit.fitted_model.write_to_db(engine)

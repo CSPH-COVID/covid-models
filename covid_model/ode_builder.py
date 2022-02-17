@@ -35,7 +35,7 @@ class ODEFlowTerm:
         pass
 
     def deepcopy(self):
-        self.build(**{k: copy.deepcopy(v) for k, v in self.__dict__.items()})
+        return self.build(**{k: copy.deepcopy(v) for k, v in self.__dict__.items()})
 
     @classmethod
     def build(cls, from_cmpt_idx, to_cmpt_idx, coef_by_t=None, scale_by_cmpts_idxs=None, scale_by_cmpts_coef_by_t=None, constant_by_t=None):
@@ -170,6 +170,8 @@ class ODEBuilder:
                                      param_attr_names=self.param_attr_names.copy())
 
         new_ode_builder.params = new_ode_builder
+
+        new_ode_builder.terms = {term.deepcopy() for term in self.terms}
 
         new_ode_builder.linear_matrix = {t: copy.deepcopy(m) for t, m in self.linear_matrix.items() if t in new_ode_builder.trange}
         new_ode_builder.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in self.nonlinear_matrices.items() if t in new_ode_builder.trange}

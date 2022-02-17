@@ -253,10 +253,10 @@ class CovidModelSpecifications:
         vacc_rates = self.get_vacc_rates()
         populations = pd.Series(self.model_params['group_pop'], name='population').rename_axis(index='age')
         cumu_vacc = vacc_rates.groupby('age').cumsum()
-        by_last_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
-        by_last_shot['none'] = by_last_shot.join(populations)['population'] - by_last_shot.sum(axis=1)
-        by_last_shot = by_last_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
-        available_for_vacc = by_last_shot.shift(1, axis=1).drop(columns='none')
+        cumu_vacc_final_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
+        cumu_vacc_final_shot['none'] = cumu_vacc_final_shot.join(populations)['population'] - cumu_vacc_final_shot.sum(axis=1)
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
 
         return (vacc_rates / available_for_vacc).fillna(0)
 

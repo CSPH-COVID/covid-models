@@ -13,7 +13,7 @@ import argparse
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 # from covid_model.model_with_omicron import CovidModelWithVariants
-from covid_model.model_with_immunity_rework import CovidModelWithVariants
+# from covid_model.model_with_immunity_rework import CovidModelWithVariants
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.run_model_scenarios import build_legacy_output_df
 
@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     print('Prepping model...')
     engine = db_engine()
-    model = CovidModelWithVariants(end_date=dt.date(2022, 10, 31))
+    model = CovidModel(end_date=dt.date(2022, 10, 31))
     model.prep(run_args.spec_id, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json',
                timeseries_effect_multipliers='input/timeseries_effects/multipliers.json', variant_prevalence='input/timeseries_effects/variant_prevalence.csv')
     model.apply_tc(tc=model.specifications.tc + [1.0], tslices=model.specifications.tslices + [850])

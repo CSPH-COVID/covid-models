@@ -162,7 +162,8 @@ class CovidModel(ODEBuilder):
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
             self.specifications.tslices = [tslice for tslice in self.specifications.tslices if tslice < tslices[0]] + tslices
-            self.specifications.tc += [self.specifications.tc[-1]] * (1 + len(self.specifications.tslices) - len(self.specifications.tc))
+            self.specifications.tc = self.specifications.tc[:-(len(self.specifications.tslices) + 1)]  # truncate tc if longer than tslices
+            self.specifications.tc += [self.specifications.tc[-1]] * (1 + len(self.specifications.tslices) - len(self.specifications.tc))  # extend tc if shorter than tslices
 
         # if tc is provided, replace the
         if tc is not None:
@@ -183,11 +184,12 @@ class CovidModel(ODEBuilder):
             for tmin, tmax, tc in zip([self.tmin] + self.specifications.tslices, self.specifications.tslices + [self.tmax], self.specifications.tc):
                 self.set_nonlinear_multiplier(1 - tc, trange=range(tmin, tmax))
 
-        print(self.nonlinear_multiplier)
-
     # build ODE
     def build_ode(self):
         self.reset_ode()
+
+        # tc
+        self.apply_tc()
 
         # vaccination
         # first shot
