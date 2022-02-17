@@ -14,8 +14,7 @@ def build_default_model():
     parser.set_defaults(days=180)
     clargs = parser.parse_args()
 
-    arbitrary_start_date = dt.date(1970, 1, 1)
-    model = CovidModelWithVariants(end_date=CovidModelWithVariants.default_start_date + clargs.)
+    model = CovidModelWithVariants(end_date=CovidModelWithVariants.default_start_date + dt.timedelta(clargs.days=10))
     model.set_specifications(702, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
     model.apply_specifications(apply_vaccines=False)
     model.set_param('shot1_per_available', 0)
