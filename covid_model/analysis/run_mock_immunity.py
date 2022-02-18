@@ -2,11 +2,10 @@ import numpy as np
 import datetime as dt
 from matplotlib import pyplot as plt, ticker as mtick
 from cycler import cycler
-import argparse
 
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
-from covid_model.cli_specs import ModelSpecsCliParser
+from covid_model.cli_specs import ModelSpecsArgumentParser
 
 
 def build_default_model(days):
@@ -22,7 +21,7 @@ def build_default_model(days):
 
 
 if __name__ == '__main__':
-    argparser = ModelSpecsCliParser()
+    argparser = ModelSpecsArgumentParser()
     argparser.add_argument("-d", "--days", type=int, help="the number of days of immunity to plot")
     argparser.set_defaults(days=180)
 

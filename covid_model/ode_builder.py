@@ -1,20 +1,13 @@
-import copy
-
 import numpy as np
 import pandas as pd
 from collections import OrderedDict, defaultdict
 import sympy as sym
 from sympy.parsing.sympy_parser import parse_expr
-from time import perf_counter
 import scipy.integrate as spi
 import scipy.sparse as spsp
-# from blist import blist
 from operator import itemgetter
-from itertools import count
 import math
-import numbers
-from operator import mul
-from functools import reduce
+import copy
 
 
 class ODEFlowTerm:

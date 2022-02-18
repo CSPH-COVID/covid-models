@@ -12,14 +12,14 @@ import argparse
 
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
-from covid_model.cli_specs import ModelSpecsCliParser
+from covid_model.cli_specs import ModelSpecsArgumentParser
 # from covid_model.model_with_omicron import CovidModelWithVariants
 # from covid_model.model_with_immunity_rework import CovidModelWithVariants
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.run_model_scenarios import build_legacy_output_df
 
 if __name__ == '__main__':
-    parser = ModelSpecsCliParser()
+    parser = ModelSpecsArgumentParser()
 
     print('Prepping model...')
     engine = db_engine()

@@ -1,16 +1,14 @@
-import json
+import matplotlib.pyplot as plt
 
 from db import db_engine
-from model import CovidModel
 from model_fit import CovidModelFit
 from analysis.charts import actual_hosps, modeled
-import matplotlib.pyplot as plt
-from covid_model.cli_specs import ModelSpecsCliParser
+from covid_model.cli_specs import ModelSpecsArgumentParser
 
 
 def run():
     # get fit params
-    parser = ModelSpecsCliParser()
+    parser = ModelSpecsArgumentParser()
     parser.add_argument("-lb", "--look_back", type=int, help="the number of (default 14-day) windows to look back and refit; default to 3")
     parser.add_argument("-bs", "--batch_size", type=int, help="the number of (default 14-day) windows to fit in each batch; default to running everything in one batch")
     parser.add_argument("-is", "--increment_size", type=int, help="the number of windows to shift forward for each subsequent fit; default to 1")

@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 
 
-class ModelSpecsCliParser(ArgumentParser):
+class ModelSpecsArgumentParser(ArgumentParser):
     def __init__(self):
         super().__init__()
         self.add_argument('-sid', '--specs', type=int)
