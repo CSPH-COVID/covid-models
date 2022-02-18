@@ -209,8 +209,9 @@ class CovidModel(ODEBuilder):
         return y0d
 
     # override solve_ode to use default y0_dict
-    def solve_seir(self, method='RK45'):
-        self.solve_ode(y0_dict=self.y0_dict, method=method)
+    def solve_seir(self, method='RK45', y0_dict=None):
+        y0_dict = y0_dict if y0_dict is not None else self.y0_dict
+        self.solve_ode(y0_dict=y0_dict, method=method)
 
     # count the total hosps by t as the sum of Ih and Ic
     def total_hosps(self):

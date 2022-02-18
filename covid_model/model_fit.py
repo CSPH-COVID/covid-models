@@ -33,14 +33,15 @@ class CovidModelFit:
             hosps_by_zip = pd.read_csv(hosps_by_zip_fpath, parse_dates=['dates'], index_col=['dates']).unstack().rename_axis(index=['zip', 'measure_date']).rename('currently_hospitalized  ')
             zip_county_mapping = pd.read_csv('input/regional/zip_to_county_mapping.csv', dtype={'zip': str, 'county_id': str}).set_index(['zip', 'county_id'])#['share_of_zip_in_county']
 
-    def single_fit(self, model: CovidModel, look_back, method='curve_fit'):
+    def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
+        # define initial states
         fitted_tc, fitted_tc_cov = (None, None)
         fixed_tc = model.specifications.tc[:-look_back]
         if method == 'curve_fit':
             def func(trange, *test_tc):
                 combined_tc = fixed_tc + list(test_tc)
                 model.apply_tc(combined_tc)
-                model.solve_seir()
+                model.solve_seir(y0_dict=y0d)
                 return model.solution_sum('seir')['Ih']
             fitted_tc, fitted_tc_cov = spo.curve_fit(
                 f=func
@@ -53,8 +54,8 @@ class CovidModelFit:
 
     # run an optimization to minimize the cost function using scipy.optimize.minimize()
     # method = 'curve_fit' or 'minimize'
-    def run(self, engine, method='curve_fit', window_size=14, look_back=3, last_window_min_size=21, batch_size=None, increment_size=1):
-
+    def run(self, engine, method='curve_fit', window_size=14, look_back=None,
+            last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, **spec_args):
         # get the end date from actual hosps
         end_t = self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)
@@ -86,12 +87,21 @@ class CovidModelFit:
             model = CovidModel(base_model=base_model, end_date=this_end_date)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
 
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
+            # Initial infectious based on hospitalizations and assumed hosp rate
+            hosp_rate = model.get_param('hosp', {'age': '40-64', 'vacc': 'unvacc'}, trange=[0])[0][1][0]  # Take first compartment's hosp rate
+            I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
+            y0d = model.y0_dict
+            y0d[model.get_default_cmpt_by_attrs({'seir': 'I', 'age': '40-64', 'vacc': 'unvacc'})] = I0
+            y0d[model.get_default_cmpt_by_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'unvacc'})] -= I0
+
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method, y0d=y0d)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
-            model.specifications.write_to_db(engine)
             print(f'Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds.')
+            if write_batch_output:
+                model.specifications.tags['run_type'] = 'intermediate-fit'
+                model.specifications.write_to_db(engine)
 
         self.fitted_tc = tc
         self.fitted_tc_cov = fitted_tc_cov
