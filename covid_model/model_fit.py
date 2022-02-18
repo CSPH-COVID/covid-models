@@ -32,9 +32,6 @@ class CovidModelFit:
         else:
             hosps_by_zip = pd.read_csv(hosps_by_zip_fpath, parse_dates=['dates'], index_col=['dates']).unstack().rename_axis(index=['zip', 'measure_date']).rename('currently_hospitalized  ')
             zip_county_mapping = pd.read_csv('input/regional/zip_to_county_mapping.csv', dtype={'zip': str, 'county_id': str}).set_index(['zip', 'county_id'])#['share_of_zip_in_county']
-            # index = pd.MultiIndex.from_product([zip_county_mapping.index.unique('zip'), zip_county_mapping.index.unique('county_id'), hosps_by_zip.index.unique('measure_date')])
-            print(zip_county_mapping.join(hosps_by_zip, on='zip'))
-            # print(zip_county_mapping['share_of_zip_in_county'] * hosps_by_zip)
 
     def single_fit(self, model: CovidModel, look_back, method='curve_fit'):
         fitted_tc, fitted_tc_cov = (None, None)
