@@ -11,6 +11,9 @@ import argparse
 
 import matplotlib.pyplot as plt
 
+###################################################################################
+# TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
+###################################################################################
 
 def build_legacy_output_df(model: CovidModel):
     ydf = model.solution_sum(['seir', 'age']).stack(level='age')
