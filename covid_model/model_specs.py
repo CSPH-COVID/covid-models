@@ -1,9 +1,8 @@
-import copy
-
 import pandas as pd
 import numpy as np
 import datetime as dt
 import json
+import copy
 
 import scipy.stats as sps
 from sqlalchemy import MetaData
@@ -46,10 +45,12 @@ class CovidModelSpecifications:
         specs.timeseries_effects = self.timeseries_effects.copy()
         specs.base_spec_id = self.spec_id
 
+        # no need to deal with region here, it's already been integrated into model_params
         specs.build(specs=specs, tslices=self.tslices, tc=self.tc,
-                      params=self.model_params,
-                      vacc_proj_params=self.vacc_proj_params,
-                      attribute_multipliers=self.attribute_multipliers)
+                    params=self.model_params,
+                    vacc_proj_params=self.vacc_proj_params,
+                    attribute_multipliers=self.attribute_multipliers
+                    )
 
         return specs
 
@@ -81,7 +82,8 @@ class CovidModelSpecifications:
               tslices=None, tc=None, params=None,
               refresh_actual_vacc=False, vacc_proj_params=None,
               timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
-              attribute_multipliers=None):
+              attribute_multipliers=None,
+              regional_model_params=None, region=None):
 
         if specs is None:
             specs = CovidModelSpecifications(start_date=start_date, end_date=end_date)
@@ -91,7 +93,7 @@ class CovidModelSpecifications:
         if tslices or tc:
             specs.set_tc(tslices, tc)
         if params:
-            specs.set_model_params(params)
+            specs.set_model_params(params, regional_model_params, region)
         if refresh_actual_vacc:
             specs.set_actual_vacc(engine)
         if refresh_actual_vacc or vacc_proj_params:
@@ -153,8 +155,20 @@ class CovidModelSpecifications:
         self.tc = (self.tc if append else []) + list(tc)
         self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
 
-    def set_model_params(self, model_params):
-        self.model_params = copy.deepcopy(model_params) if type(model_params) == dict else json.load(open(model_params))
+    def set_model_params(self, model_params, region_model_params=None, region=None):
+        # model_params may be dictionary or path to json file which will be converted to json
+        # region_model_params is the same, but will only be used if region != None. Contains region specific modifications to parameters
+        # every key present in region_model_params will completely overwrite that entry in model_params
+        model_params = copy.deepcopy(model_params) if type(model_params) == dict else json.load(open(model_params))
+        if region is not None:
+            region_model_params = region_model_params if type(region_model_params) == dict else json.load(open(region_model_params))
+            model_params.update(region_model_params[region])
+            self.tags['region'] = region   # record which option we ran with
+            self.tags['county_fips'] = model_params['county_fips']
+            self.tags['county_names'] = model_params['county_names']
+            _ = model_params.pop('county_fips')   # remove from the parameters
+            _ = model_params.pop('county_names')   # remove from the parameters
+        self.model_params = model_params
         self.group_pops = self.model_params['group_pop']
 
     def set_vacc_proj(self, vacc_proj_params=None):
@@ -162,9 +176,9 @@ class CovidModelSpecifications:
             self.vacc_proj_params = copy.deepcopy(vacc_proj_params) if isinstance(vacc_proj_params, dict) else json.load(open(vacc_proj_params))
         self.proj_vacc_df = self.get_proj_vacc()
 
-    def set_actual_vacc(self, engine=None, actual_vacc_df=None):
+    def set_actual_vacc(self, engine, county_ids=None, actual_vacc_df=None):
         if engine is not None:
-            self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch()
+            self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids)
         if actual_vacc_df is not None:
             self.actual_vacc_df = actual_vacc_df.copy()
 
@@ -193,7 +207,6 @@ class CovidModelSpecifications:
             columns=params,
             data=1.0
         )
-
         multiplier_dict = {}
         for effect_type in self.timeseries_effects.keys():
             prevalence_df = pd.DataFrame(index=pd.date_range(self.start_date, self.end_date))
@@ -270,7 +283,6 @@ class CovidModelSpecifications:
                             projections.loc[(t, groups[i + 1])] += excess_rate
 
                     cumu_vacc += projections.loc[t]
-
             return projections
 
     def get_vacc_rates(self):

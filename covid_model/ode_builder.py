@@ -247,6 +247,14 @@ class ODEBuilder:
         for t in trange:
             self.nonlinear_multiplier[t] = mult
 
+    def get_param(self, param, attrs=None, trange=None):
+        if trange is None:
+            actual_trange = self.trange
+        else:
+            actual_trange = set(self.trange).intersection(trange)
+        cmpt_list = self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments
+        return [(cmpt, [self.params[t][cmpt][param] for t in actual_trange]) for cmpt in cmpt_list]
+
     # takes a symbolic equation, and looks up variable names in params to provide a computed output for each t in trange
     def calc_coef_by_t(self, coef, cmpt, other_cmpts=None, trange=None):
 
