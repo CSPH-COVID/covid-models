@@ -2,19 +2,16 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
-import seaborn as sns
 import datetime as dt
-import json
-from covid_model.analysis.charts import modeled, actual_hosps, mmwr_infections_growth_rate, re_estimates
-from timeit import timeit
+from covid_model.analysis.charts import modeled
 
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
-from covid_model.cli_specs import ModelSpecsCliParser
+from covid_model.cli_specs import ModelSpecsArgumentParser
 
 if __name__ == '__main__':
     engine = db_engine()
-    argparser = ModelSpecsCliParser()
+    argparser = ModelSpecsArgumentParser()
     argparser.add_argument('-fd', '--from_date', type=dt.date.fromisoformat, default=dt.date(2020, 3, 1), help='x-axis minimum date')
     argparser.add_argument('-td', '--to_date', type=dt.date.fromisoformat, default=dt.date.today(), help='x-axis maximum date')
     argparser.add_argument('-gba', '--group_by_attr_names', nargs='+', type=str,

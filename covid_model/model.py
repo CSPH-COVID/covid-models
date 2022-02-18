@@ -1,17 +1,9 @@
+import pandas as pd
 import json
-import math
 import datetime as dt
-import scipy.integrate as spi
-import scipy.optimize as spo
-import pyswarms as ps
-from sqlalchemy import MetaData
-from datetime import datetime
-import itertools
 from collections import OrderedDict
-from covid_model.data_imports import ExternalHosps, ExternalVaccWithProjections
 from covid_model.model_specs import CovidModelSpecifications
-from covid_model.utils import *
-from covid_model.ode_builder import *
+from covid_model.ode_builder import ODEBuilder
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
