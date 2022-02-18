@@ -20,9 +20,9 @@ class CovidModel(ODEBuilder):
     default_start_date = dt.date(2020, 1, 24)
     default_end_date = dt.date(2022, 5, 31)
 
-    def __init__(self, base_model=None, start_date=default_start_date, end_date=default_end_date):
-        self.start_date = start_date
-        self.end_date = end_date
+    def __init__(self, base_model=None, start_date=None, end_date=None):
+        self.start_date = start_date if start_date is not None else base_model.start_date if base_model is not None else self.default_start_date
+        self.end_date = end_date if end_date is not None else base_model.end_date if base_model is not None else self.default_end_date
 
         ODEBuilder.__init__(self, base_ode_builder=base_model, trange=range((self.end_date - self.start_date).days), attributes=self.attr, param_attr_names=self.param_attr_names)
 
