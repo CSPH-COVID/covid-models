@@ -139,8 +139,6 @@ class CovidModelSpecifications:
             attribute_multipliers=self.attribute_multipliers
         )
 
-        print(f'Attribute multipliers when writing to db: {self.attribute_multipliers}')
-
         conn = engine.connect()
         result = conn.execute(stmt)
 
