@@ -83,7 +83,7 @@ class CovidModelSpecifications:
               refresh_actual_vacc=False, vacc_proj_params=None,
               timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
               attribute_multipliers=None,
-              regional_model_params=None, region=None):
+              region_params=None, region=None):
 
         if specs is None:
             specs = CovidModelSpecifications(start_date=start_date, end_date=end_date)
@@ -93,9 +93,9 @@ class CovidModelSpecifications:
         if tslices or tc:
             specs.set_tc(tslices, tc)
         if params:
-            specs.set_model_params(params, regional_model_params, region)
+            specs.set_model_params(params, region_params, region)
         if refresh_actual_vacc:
-            specs.set_actual_vacc(engine)
+            specs.set_actual_vacc(engine, county_ids=specs.tags["county_fips"] if "county_fips" in specs.tags.keys() else None)
         if refresh_actual_vacc or vacc_proj_params:
             specs.set_vacc_proj(vacc_proj_params)
 

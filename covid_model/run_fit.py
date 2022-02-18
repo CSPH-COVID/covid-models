@@ -46,7 +46,7 @@ def run():
     parser.add_argument("-ahs", "--actual_hosp_sql", type=str, help="path for file containing sql query that fetches actual hospitalization data")
     parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
     parser.add_argument("-rg", "--region", choices=regions.keys(), required=False, help="Specify the region to be run, if not specified, just runs default parameters")
-    parser.add_argument("-hd", "--hosp_data", type=str, help="the path to the hospitalizations data for regions (temporary fix)")
+    parser.add_argument("-rh", "--hosp_data", type=str, help="the path to the hospitalizations data for regions (temporary fix)")
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
     parser.set_defaults(refresh_vacc=False)
     fit_params = parser.parse_args()
@@ -57,12 +57,11 @@ def run():
     region_params = fit_params.region_params
     region = fit_params.region
     write_batch_output = fit_params.write_batch_output
-    actual_hosp_sql = fit_params.actual_hosp_sql if fit_params.actual_hosp_sql is not None else 'sql/emresource_hospitalizations.sql'
 
     # run fit
     engine = db_engine()
 
-    fit = CovidModelFit(engine=engine, **parser.specs_args_as_dict())
+    fit = CovidModelFit(engine=engine, region_params=fit_params.region_params, region=fit_params.region, **parser.specs_args_as_dict())
 
     ####################################################################################################################
     # temporary code, currently loads region hospitalizations from  local files
