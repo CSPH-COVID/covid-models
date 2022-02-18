@@ -14,13 +14,8 @@ from model_specs import CovidModelSpecifications
 
 class CovidModelFit:
 
-    def __init__(self, base_specs, engine=None, tc_0=0.75, tc_min=0, tc_max=0.99, new_end_date=dt.date(2022, 5, 31)):
-        if isinstance(base_specs, CovidModelSpecifications):
-            self.base_specs = base_specs
-        elif isinstance(base_specs, int):
-            self.base_specs = CovidModelSpecifications.from_db(engine, base_specs, new_end_date=new_end_date)
-        else:
-            raise TypeError(f'Invalid type for base_specs: {type(base_specs)}')
+    def __init__(self, tc_0=0.75, tc_min=0, tc_max=0.99, **specs_build_args):
+        self.base_specs = CovidModelSpecifications.build(**specs_build_args)
 
         self.tc_0 = tc_0
         self.tc_min = tc_min
@@ -61,7 +56,7 @@ class CovidModelFit:
 
     # run an optimization to minimize the cost function using scipy.optimize.minimize()
     # method = 'curve_fit' or 'minimize'
-    def run(self, engine, model_class=CovidModel, method='curve_fit', window_size=14, look_back=3, last_window_min_size=21, batch_size=None, increment_size=1, **spec_args):
+    def run(self, engine, method='curve_fit', window_size=14, look_back=3, last_window_min_size=21, batch_size=None, increment_size=1):
 
         # get the end date from actual hosps
         end_t = self.actual_hosp.index.max() + 1
@@ -69,8 +64,8 @@ class CovidModelFit:
 
         # prep model (we only do this once to save time)
         t0 = perf_counter()
-        base_model = model_class(start_date=self.base_specs.start_date, end_date=end_date)
-        base_model.prep(self.base_specs, engine=engine, **spec_args)
+        base_model = CovidModel(start_date=self.base_specs.start_date, end_date=end_date)
+        base_model.prep(self.base_specs)
         t1 = perf_counter()
         print(f'Model prepped for fitting in {t1-t0} seconds.')
 
@@ -90,12 +85,8 @@ class CovidModelFit:
             t0 = perf_counter()
             this_end_t = tslices[-trim_off_end] if trim_off_end > 0 else end_t
             this_end_date = self.base_specs.start_date + dt.timedelta(days=this_end_t)
-            model = model_class(start_date=self.base_specs.start_date, end_date=this_end_date)
-            model.specifications = self.base_specs.copy(this_end_date)
-            model.params = base_model.params
-            model.linear_matrix = {t: m for t, m in base_model.linear_matrix.items() if t in model.trange}
-            model.nonlinear_matrices = {t: m for t, m in base_model.nonlinear_matrices.items() if t in model.trange}
-            model.constant_vector = {t: m for t, m in base_model.constant_vector.items() if t in model.trange}
+
+            model = CovidModel(base_model=base_model, end_date=this_end_date)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
 
             fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)

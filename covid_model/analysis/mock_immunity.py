@@ -1,21 +1,17 @@
+import numpy as np
 import datetime as dt
 from matplotlib import pyplot as plt, ticker as mtick
 from cycler import cycler
 import argparse
 
 from covid_model.db import db_engine
-from covid_model.ode_builder import *
-from model_with_immunity_rework import CovidModelWithVariants
+from covid_model.model import CovidModel
+from covid_model.cli_specs import ModelSpecsCliParser
 
 
-def build_default_model():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--days", type=int, help="the number of days of immunity to plot")
-    parser.set_defaults(days=180)
-    clargs = parser.parse_args()
-
-    model = CovidModelWithVariants(end_date=CovidModelWithVariants.default_start_date + dt.timedelta(clargs.days=10))
-    model.set_specifications(702, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+def build_default_model(days):
+    model = CovidModel(end_date=CovidModel.default_start_date + dt.timedelta(days=days))
+    model.set_specifications(engine=engine, **argparser.specs_args_as_dict())
     model.apply_specifications(apply_vaccines=False)
     model.set_param('shot1_per_available', 0)
     model.set_param('shot2_per_available', 0)
@@ -26,7 +22,12 @@ def build_default_model():
 
 
 if __name__ == '__main__':
+    argparser = ModelSpecsCliParser()
+    argparser.add_argument("-d", "--days", type=int, help="the number of days of immunity to plot")
+    argparser.set_defaults(days=180)
+
     engine = db_engine()
+    days = argparser.parse_args().days
 
     variants = {
         'Non-Omicron': 'none',
@@ -47,7 +48,7 @@ if __name__ == '__main__':
         ax.set_title(f'Immunity from {immunity_label}')
 
         print(f'Prepping and running model for {immunity_label} immunity...')
-        model = build_default_model()
+        model = build_default_model(days)
         for k, v in immunity_specs['params'].items():
             model.set_param(k, v)
         model.build_ode()
@@ -73,8 +74,8 @@ if __name__ == '__main__':
         ax.grid(color='lightgray')
         ax.set_xlabel(f'Days Since {immunity_label}')
         ax.set_ylim((0, 1))
-        ax.set_xticks(np.arange(0, 365, 30))
-        ax.set_xlim((30, 360))
+        ax.set_xticks(np.arange(0, days+1, 30))
+        ax.set_xlim((30, days))
 
     fig.tight_layout()
     plt.show()

@@ -67,31 +67,31 @@ class ScaledODEFlowTerm(ODEFlowTerm):
     def __init__(self, from_cmpt_idx, to_cmpt_idx, coef_by_t, scale_by_cmpts_idxs):
         ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx)
         self.coef_by_t = coef_by_t
-        self.scale_by_cmpt_idxs = sorted(scale_by_cmpts_idxs)
+        self.scale_by_cmpts_idxs = sorted(scale_by_cmpts_idxs)
 
     def flow_val(self, t_int, y):
-        return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(itemgetter(*self.scale_by_cmpt_idxs)(y))
+        return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(itemgetter(*self.scale_by_cmpts_idxs)(y))
 
     def add_to_nonlinear_matrices(self, matrices, t_int):
         if self.coef_by_t[t_int] != 0:
-            matrices[tuple(self.scale_by_cmpt_idxs)][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
-            matrices[tuple(self.scale_by_cmpt_idxs)][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
+            matrices[tuple(self.scale_by_cmpts_idxs)][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int]
+            matrices[tuple(self.scale_by_cmpts_idxs)][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int]
 
 
 class WeightedScaledODEFlowTerm(ODEFlowTerm):
     def __init__(self, from_cmpt_idx, to_cmpt_idx, coef_by_t, scale_by_cmpts_idxs, scale_by_cmpts_coef_by_t=None):
         ODEFlowTerm.__init__(self, from_cmpt_idx=from_cmpt_idx, to_cmpt_idx=to_cmpt_idx)
         self.coef_by_t = coef_by_t
-        self.scale_by_cmpt_idxs = scale_by_cmpts_idxs
+        self.scale_by_cmpts_idxs = scale_by_cmpts_idxs
         self.scale_by_cmpts_coef_by_t = scale_by_cmpts_coef_by_t
 
     def flow_val(self, t_int, y):
         return y[self.from_cmpt_idx] * self.coef_by_t[t_int] * sum(
-            a * b for a, b in zip(itemgetter(*self.scale_by_cmpt_idxs)(y), self.scale_by_cmpts_coef_by_t[t_int]))
+            a * b for a, b in zip(itemgetter(*self.scale_by_cmpts_idxs)(y), self.scale_by_cmpts_coef_by_t[t_int]))
 
     def add_to_nonlinear_matrices(self, matrices, t_int):
-        scale_by_cmpts_coef_by_t = self.scale_by_cmpts_coef_by_t[t_int] if self.scale_by_cmpts_coef_by_t else [1] * len(self.scale_by_cmpt_idxs)
-        for scale_by_cmpt_idx, scale_by_cmpt_coef in zip(self.scale_by_cmpt_idxs, scale_by_cmpts_coef_by_t):
+        scale_by_cmpts_coef_by_t = self.scale_by_cmpts_coef_by_t[t_int] if self.scale_by_cmpts_coef_by_t else [1] * len(self.scale_by_cmpts_idxs)
+        for scale_by_cmpt_idx, scale_by_cmpt_coef in zip(self.scale_by_cmpts_idxs, scale_by_cmpts_coef_by_t):
             matrices[scale_by_cmpt_idx][self.from_cmpt_idx, self.from_cmpt_idx] -= self.coef_by_t[t_int] * scale_by_cmpt_coef
             matrices[scale_by_cmpt_idx][self.to_cmpt_idx, self.from_cmpt_idx] += self.coef_by_t[t_int] * scale_by_cmpt_coef
 
@@ -136,32 +136,43 @@ class ODEBuilder:
         levels in param_attr_levels.
 
     """
-    def __init__(self, trange, attributes: OrderedDict, param_attr_names=None):
-        self.trange = trange
+    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None):
+        # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
 
-        self.attributes = attributes
+        self.trange = trange if trange is not None else base_ode_builder.trange
+        self.attributes = attributes if attributes is not None else base_ode_builder.attributes
+        self.param_attr_names = param_attr_names if param_attr_names is not None else attributes.keys() if attributes is not None else base_ode_builder.param_attr_names
+
         self.attr_names = list(self.attributes.keys())
         self.compartments_as_index = pd.MultiIndex.from_product(attributes.values(), names=attributes.keys())
         self.compartments = list(self.compartments_as_index)
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
         self.length = len(self.cmpt_idx_lookup)
-
-        self.param_attr_names = list(param_attr_names if param_attr_names is not None else self.attr_names)
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
-        self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
-
-        # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
+        self.params = None
         self.terms = None
         self.linear_matrix = None
         self.nonlinear_matrices = None
         self.constant_vector = None
         self.nonlinear_multiplier = None
-        self.reset_ode()
 
         self.solution = None
         self.solution_y = None
         self.solution_ydf = None
+
+        if base_ode_builder is not None:
+            self.params = copy.deepcopy(base_ode_builder.params)
+            self.terms = {term.deepcopy() for term in base_ode_builder.terms}
+            self.linear_matrix = {t: copy.deepcopy(m) for t, m in base_ode_builder.linear_matrix.items() if t in self.trange}
+            self.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in base_ode_builder.nonlinear_matrices.items() if t in self.trange}
+            self.constant_vector = {t: copy.deepcopy(m) for t, m in base_ode_builder.constant_vector.items() if t in self.trange}
+            self.nonlinear_multiplier = copy.deepcopy(base_ode_builder.nonlinear_multiplier)
+        else:
+            self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
+            self.reset_ode()
+
+
 
     # copy the ODE, including the pre-built matrices; does not copy the solution
     def deepcopy(self, new_trange=None):
@@ -177,6 +188,8 @@ class ODEBuilder:
         new_ode_builder.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in self.nonlinear_matrices.items() if t in new_ode_builder.trange}
         new_ode_builder.constant_vector = {t: copy.deepcopy(m) for t, m in self.constant_vector.items() if t in new_ode_builder.trange}
         new_ode_builder.nonlinear_multiplier = copy.deepcopy(self.nonlinear_multiplier)
+
+        return new_ode_builder
 
     # return the parameters as a dataframe with t and compartments as index and parameters as columns
     @property
