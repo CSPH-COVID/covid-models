@@ -25,61 +25,31 @@ class CovidModel(ODEBuilder):
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
-    default_start_date = dt.datetime(2020, 1, 24)
+    default_start_date = dt.date(2020, 1, 24)
+    default_end_date = dt.date(2022, 5, 31)
 
-    def __init__(self, start_date=dt.date(2020, 1, 24), end_date=dt.date(2022, 5, 31), **ode_builder_args):
+    def __init__(self, base_model=None, start_date=default_start_date, end_date=default_end_date):
         self.start_date = start_date
         self.end_date = end_date
 
-        ODEBuilder.__init__(self, trange=range((self.end_date - self.start_date).days), attributes=self.attr, param_attr_names=self.param_attr_names)
+        ODEBuilder.__init__(self, base_ode_builder=base_model, trange=range((self.end_date - self.start_date).days), attributes=self.attr, param_attr_names=self.param_attr_names)
 
-        self.specifications = None
+        if base_model is not None:
+            self.specifications = base_model.specifications.copy()
+        else:
+            self.specifications = None
 
         # the var values for the solution; these get populated when self.solve_seir is run
         self.solution = None
         self.solution_y = None
         self.solution_ydf_full = None
 
-    def set_specifications(self, specs=None, engine=None,
-                           tslices=None, tc=None, params=None,
-                           refresh_actual_vacc=False, vacc_proj_params=None, vacc_immun_params=None,
-                           timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
-                           attribute_multipliers=None):
-
-        if specs is not None:
-            if not isinstance(specs, (int, np.int64)):
-                self.specifications = specs
-            else:
-                self.specifications = CovidModelSpecifications.from_db(engine, specs, new_end_date=self.end_date)
-
-        if self.specifications is None:
-            self.specifications = CovidModelSpecifications(start_date=self.start_date, end_date=self.end_date)
-
-        if tslices or tc:
-            self.specifications.set_tc(tslices, tc)
-        if params:
-            self.specifications.set_model_params(params)
-        if refresh_actual_vacc:
-            self.specifications.set_actual_vacc(engine)
-        if refresh_actual_vacc or vacc_proj_params:
-            self.specifications.set_vacc_proj(vacc_proj_params)
-        if vacc_immun_params:
-            self.specifications.set_vacc_immun(vacc_immun_params)
-
-        # TODO: make add_timeseries_effect use existing prevalence and existing multipliers if new prevalence or mults are not provided
-        # if variant_prevalence or param_multipliers:
-        if variant_prevalence:
-            self.specifications.add_timeseries_effect('variant', prevalence_data=variant_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
-        # if mab_prevalence or param_multipliers:
-        if mab_prevalence:
-            self.specifications.add_timeseries_effect('mab', prevalence_data=mab_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
-
-        if attribute_multipliers:
-            self.specifications.set_attr_mults(attribute_multipliers)
+    def set_specifications(self, **specs_build_args):
+        self.specifications = CovidModelSpecifications.build(start_date=self.start_date, end_date=self.end_date, **specs_build_args)
 
     # a model must be prepped before it can be run; if any params EXCEPT the efs (i.e. TC) change, it must be re-prepped
-    def prep(self, specs=None, **specs_args):
-        self.set_specifications(specs=specs, **specs_args)
+    def prep(self, specs=None, **specs_build_args):
+        self.set_specifications(specs=specs, **specs_build_args)
         self.apply_specifications()
         self.build_ode()
         self.compile()
@@ -123,8 +93,8 @@ class CovidModel(ODEBuilder):
                     self.set_param(param, mult=mult, trange=[t])
 
         # alter parameters based on attribute multipliers
-        if self.specifications.attr_mults:
-            for attr_mult_specs in self.specifications.attr_mults:
+        if self.specifications.attribute_multipliers:
+            for attr_mult_specs in self.specifications.attribute_multipliers:
                 self.set_param(**attr_mult_specs)
 
     # handy properties for the beginning t, end t, and the full range of t values
@@ -162,7 +132,7 @@ class CovidModel(ODEBuilder):
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
             self.specifications.tslices = [tslice for tslice in self.specifications.tslices if tslice < tslices[0]] + tslices
-            self.specifications.tc = self.specifications.tc[:-(len(self.specifications.tslices) + 1)]  # truncate tc if longer than tslices
+            self.specifications.tc = self.specifications.tc[:len(self.specifications.tslices) + 1]  # truncate tc if longer than tslices
             self.specifications.tc += [self.specifications.tc[-1]] * (1 + len(self.specifications.tslices) - len(self.specifications.tc))  # extend tc if shorter than tslices
 
         # if tc is provided, replace the
