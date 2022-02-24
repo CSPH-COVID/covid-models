@@ -11,6 +11,9 @@ import argparse
 
 import matplotlib.pyplot as plt
 
+###################################################################################
+# TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
+###################################################################################
 
 def build_legacy_output_df(model: CovidModel):
     ydf = model.solution_sum(['seir', 'age']).stack(level='age')
@@ -22,11 +25,11 @@ def build_legacy_output_df(model: CovidModel):
     params_df = model.params_as_df
 
     totals = model.solution_sum('seir')
-    by_age = model.solution_sum(['seir', 'age'])
-    by_age_by_vacc = model.solution_sum(['seir', 'age', 'vacc'])
+    totals_by_priorinf = model.solution_sum(['seir', 'priorinf'])
+    print(totals_by_priorinf)
     df['Iht'] = totals['Ih']
     df['Dt'] = totals['D']
-    df['Rt'] = totals['R']
+    df['Rt'] = totals_by_priorinf[('S', 'none')]
     df['Itotal'] = totals['I'] + totals['A']
     df['Etotal'] = totals['E']
     df['Einc'] = df['Etotal'] / model.specifications.model_params['alpha']
