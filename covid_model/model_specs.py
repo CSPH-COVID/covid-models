@@ -29,28 +29,30 @@ class CovidModelSpecifications:
 
         self.model_params = None
         self.group_pops = None
-        self.vacc_immun_params = None
         self.vacc_proj_params = None
         self.timeseries_effects = {}
-        self.attr_mults = None
+        self.attribute_multipliers = None
 
         self.actual_vacc_df = None
-        self.proj_vacc_df = None  # the combined vacc rate df, including proj, is saved to avoid unnecessary processing
+        self.proj_vacc_df = None  # the combined vacc rate df (including proj) is saved to avoid unnecessary processing
 
-    def set_all(self, spec_id, tslices, tc, tc_cov, model_params, actual_vacc_df, vacc_proj_params, vacc_immun_params, timeseries_effects, base_spec_id=None, tags={}, region_model_params=None, region=None):
-        self.spec_id = spec_id
-        self.base_spec_id = base_spec_id
-        self.tags = tags
+    def copy(self, new_end_date=None):
+        specs = CovidModelSpecifications(self.start_date, new_end_date if new_end_date is not None else self.end_date)
 
-        self.set_tc(tslices, tc)
-        self.set_model_params(model_params, region_model_params, region)
-        self.tc_cov = tc_cov
+        specs.tags = self.tags.copy()
+        specs.tc_cov = self.tc_cov.copy()
+        specs.actual_vacc_df = self.actual_vacc_df.copy()
+        specs.timeseries_effects = self.timeseries_effects.copy()
+        specs.base_spec_id = self.spec_id
 
-        self.actual_vacc_df = actual_vacc_df
-        self.set_vacc_proj(vacc_proj_params)
-        self.set_vacc_immun(vacc_immun_params)
+        # no need to deal with region here, it's already been integrated into model_params
+        specs.build(specs=specs, tslices=self.tslices, tc=self.tc,
+                    params=self.model_params,
+                    vacc_proj_params=self.vacc_proj_params,
+                    attribute_multipliers=self.attribute_multipliers
+                    )
 
-        self.timeseries_effects = timeseries_effects
+        return specs
 
     @classmethod
     def from_db(cls, engine, spec_id, new_end_date=None):
@@ -66,23 +68,51 @@ class CovidModelSpecifications:
         specs.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=row['tc_cov'])
         specs.set_model_params(row['model_params'])
 
-        # specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v) for k, v in row['vacc_actual'].items()}, axis=0).unstack(0).stack(0).rename_axis(index=['t', 'age'])
         specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in row['vacc_actual'].items()}, axis=1).rename_axis(index=['t', 'age'])
         specs.set_vacc_proj(row['vacc_proj_params'])
-        specs.set_vacc_immun(row['vacc_immun_params'])
 
         specs.timeseries_effects = row['timeseries_effects']
+        specs.attribute_multipliers = row['attribute_multipliers']
 
         return specs
 
-    def copy(self, new_end_date=None):
-        specs = CovidModelSpecifications(self.start_date, new_end_date if new_end_date is not None else self.end_date)
+    @classmethod
+    def build(cls, specs=None, engine=None,
+              start_date=None, end_date=None,
+              tslices=None, tc=None, params=None,
+              refresh_actual_vacc=False, vacc_proj_params=None,
+              timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
+              attribute_multipliers=None,
+              region_params=None, region=None):
 
-        # no need to deal with region here, it's already been integrated into model_params
-        specs.set_all(spec_id=None, base_spec_id=self.spec_id, tags=self.tags, tslices=self.tslices, tc=self.tc, tc_cov=self.tc_cov,
-                      model_params=self.model_params, actual_vacc_df=self.actual_vacc_df,
-                      vacc_proj_params=self.vacc_proj_params,
-                      vacc_immun_params=self.vacc_immun_params, timeseries_effects=self.timeseries_effects)
+        if specs is None:
+            specs = CovidModelSpecifications(start_date=start_date, end_date=end_date)
+        elif isinstance(specs, (int, np.int64)):
+            specs = CovidModelSpecifications.from_db(engine, specs, new_end_date=end_date)
+
+        if tslices or tc:
+            specs.set_tc(tslices, tc)
+        if params:
+            specs.set_model_params(params, region_params, region)
+        if refresh_actual_vacc:
+            specs.set_actual_vacc(engine, county_ids=specs.tags["county_fips"] if "county_fips" in specs.tags.keys() else None)
+        if refresh_actual_vacc or vacc_proj_params:
+            specs.set_vacc_proj(vacc_proj_params)
+
+        # TODO: make add_timeseries_effect use existing prevalence and existing multipliers if new prevalence or mults are not provided
+        # if variant_prevalence or param_multipliers:
+        if variant_prevalence:
+            specs.add_timeseries_effect('variant', prevalence_data=variant_prevalence,
+                                                      param_multipliers=timeseries_effect_multipliers,
+                                                      fill_forward=True)
+        # if mab_prevalence or param_multipliers:
+        if mab_prevalence:
+            specs.add_timeseries_effect('mab', prevalence_data=mab_prevalence,
+                                                      param_multipliers=timeseries_effect_multipliers,
+                                                      fill_forward=True)
+
+        if attribute_multipliers:
+            specs.set_attr_mults(attribute_multipliers)
 
         return specs
 
@@ -107,19 +137,14 @@ class CovidModelSpecifications:
             vacc_actual={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()},
             vacc_proj_params=self.vacc_proj_params,
             vacc_proj={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None,
-            vacc_immun_params=self.vacc_immun_params,
             timeseries_effects=self.timeseries_effects,
+            attribute_multipliers=self.attribute_multipliers
         )
 
         conn = engine.connect()
         result = conn.execute(stmt)
 
         self.spec_id = result.inserted_primary_key[0]
-
-        # if self.model is not None:
-        #     self.model.fit_id = result.inserted_primary_key[0]
-
-        # return result.inserted_primary_key[0]
 
     @property
     def days(self):
@@ -148,19 +173,17 @@ class CovidModelSpecifications:
 
     def set_vacc_proj(self, vacc_proj_params=None):
         if vacc_proj_params is not None:
-            self.vacc_proj_params = vacc_proj_params if isinstance(vacc_proj_params, dict) else json.load(open(vacc_proj_params))
+            self.vacc_proj_params = copy.deepcopy(vacc_proj_params) if isinstance(vacc_proj_params, dict) else json.load(open(vacc_proj_params))
         self.proj_vacc_df = self.get_proj_vacc()
 
-    def set_actual_vacc(self, engine, county_ids=None):
-        # vacc_rate_df = ExternalVaccWithProjections(engine, t0_date=self.start_date, fill_to_date=self.end_date).fetch(proj_params=self.vacc_proj_params, group_pop=self.model_params['group_pop'])
-        self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids)
-        # self.actual_vacc_df = ExternalVacc(engine).fetch()
-
-    def set_vacc_immun(self, vacc_immun_params):
-        self.vacc_immun_params = vacc_immun_params if isinstance(vacc_immun_params, dict) else json.load(open(vacc_immun_params))
+    def set_actual_vacc(self, engine, county_ids=None, actual_vacc_df=None):
+        if engine is not None:
+            self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids)
+        if actual_vacc_df is not None:
+            self.actual_vacc_df = actual_vacc_df.copy()
 
     def set_attr_mults(self, attr_mults):
-        self.attr_mults = attr_mults if isinstance(attr_mults, dict) else json.load(open(attr_mults))
+        self.attribute_multipliers = copy.deepcopy(attr_mults) if isinstance(attr_mults, list) else json.load(open(attr_mults))
 
     def add_timeseries_effect(self, effect_type_name, prevalence_data, param_multipliers, fill_forward=False):
         # build prevalence and multiplier dataframes from inputs
@@ -169,10 +192,8 @@ class CovidModelSpecifications:
         if fill_forward and self.end_date > prevalence_df.index.max().date():
             projections = pd.DataFrame.from_dict({date: prevalence_df.iloc[-1] for date in pd.date_range(prevalence_df.index.max() + dt.timedelta(days=1), self.end_date)}, orient='index')
             prevalence_df = pd.concat([prevalence_df, projections]).sort_index()
-        # prevalence_df.index = (prevalence_df.index.to_series() - self.min_date).dt.days
 
-        multiplier_dict = json.load(open(param_multipliers)) if isinstance(param_multipliers, str) else param_multipliers
-        # multiplier_df = pd.DataFrame.from_dict(multiplier_dict, orient='index').rename_axis(index='effect').fillna(1)
+        multiplier_dict = json.load(open(param_multipliers)) if isinstance(param_multipliers, str) else copy.deepcopy(param_multipliers)
 
         self.timeseries_effects[effect_type_name] = []
         for effect_name in prevalence_df.columns:
@@ -195,26 +216,24 @@ class CovidModelSpecifications:
                     effect_specs['start_date'] = '20' + effect_specs['start_date']
                 start_date = dt.datetime.strptime(effect_specs['start_date'], '%Y-%m-%d').date()
                 end_date = self.end_date
-                if start_date > end_date:
-                    continue
-                # end_date = start_date + dt.timedelta(days=len(effect_specs['prevalence']) - 1)
 
-                prevalence = effect_specs['prevalence']
-                prevalence = prevalence[:(end_date - start_date).days]
-                while len(prevalence) < (end_date - start_date).days:
-                    prevalence.append(prevalence[-1])
+                if start_date < end_date:
+                    prevalence = effect_specs['prevalence']
+                    prevalence = prevalence[:(end_date - start_date).days]
+                    while len(prevalence) < (end_date - start_date).days:
+                        prevalence.append(prevalence[-1])
 
-                prevalence_df[effect_specs['effect_name']] = 0
-                prevalence_df.loc[start_date:(end_date - dt.timedelta(days=1)), effect_specs['effect_name']] = prevalence
-                multiplier_dict[effect_specs['effect_name']] = {**{param: 1.0 for param in params}, **effect_specs['multipliers']}
+                    prevalence_df[effect_specs['effect_name']] = 0
+                    prevalence_df.loc[start_date:(end_date - dt.timedelta(days=1)), effect_specs['effect_name']] = prevalence
+                    multiplier_dict[effect_specs['effect_name']] = {**{param: 1.0 for param in params}, **effect_specs['multipliers']}
 
-            prevalence_df = prevalence_df.sort_index()
-            multiplier_df = pd.DataFrame.from_dict(multiplier_dict, orient='index').rename_axis(index='effect').fillna(1)
+            if len(multiplier_dict) > 0:
+                prevalence_df = prevalence_df.sort_index()
+                multiplier_df = pd.DataFrame.from_dict(multiplier_dict, orient='index').rename_axis(index='effect').fillna(1)
 
-            prevalence = prevalence_df.stack().rename_axis(index=['t', 'effect'])
-            remainder = 1 - prevalence.groupby('t').sum()
+                prevalence = prevalence_df.stack().rename_axis(index=['t', 'effect'])
+                remainder = 1 - prevalence.groupby('t').sum()
 
-            if len(multiplier_df) > 0:
                 multipliers_for_this_effect_type = multiplier_df.multiply(prevalence, axis=0).groupby('t').sum().add(remainder, axis=0)
                 multipliers = multipliers.multiply(multipliers_for_this_effect_type)
 
@@ -270,48 +289,13 @@ class CovidModelSpecifications:
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
         return df
 
-    def get_vacc_rate_per_unvacc(self):
-        # calculate the vaccination rate per unvaccinated
-        vacc_df = self.get_vacc_rates()
-        cumu = vacc_df.groupby('age').cumsum()
-        age_group_pop = vacc_df.index.get_level_values('age').to_series(index=vacc_df.index).replace(self.group_pops)
-        unvacc = cumu.groupby('age').shift(1).fillna(0).apply(lambda s: age_group_pop - s)
-        return vacc_df / unvacc
+    def get_vacc_per_available(self):
+        vacc_rates = self.get_vacc_rates()
+        populations = pd.Series(self.model_params['group_pop'], name='population').rename_axis(index='age')
+        cumu_vacc = vacc_rates.groupby('age').cumsum()
+        cumu_vacc_final_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
+        cumu_vacc_final_shot['none'] = cumu_vacc_final_shot.join(populations)['population'] - cumu_vacc_final_shot.sum(axis=1)
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
 
-    def get_vacc_fail_per_vacc(self):
-        return {k: v['fail_rate'] for k, v in self.vacc_immun_params.items()}
-
-    def get_vacc_fail_reduction_per_vacc_fail(self, delay=7):
-        vacc_fail_per_vacc_df = pd.DataFrame.from_dict(self.get_vacc_fail_per_vacc()).rename_axis(index='age')
-
-        rate = self.get_vacc_rates().groupby(['age']).shift(delay).fillna(0)
-        fail_increase = rate['shot1'] * vacc_fail_per_vacc_df['shot1']
-        fail_reduction_per_vacc = vacc_fail_per_vacc_df.shift(1, axis=1) - vacc_fail_per_vacc_df
-        fail_reduction = (rate * fail_reduction_per_vacc.fillna(0)).sum(axis=1)
-        fail_cumu = (fail_increase - fail_reduction).groupby('age').cumsum()
-        return (fail_reduction / fail_cumu).fillna(0)
-
-    @classmethod
-    def vacc_eff_decay_mult(cls, days_ago, delay, k):
-        return (1.0718 * (1 - np.exp(-(days_ago + delay) / 7)) * np.exp(-days_ago / 540)) ** k
-
-    def get_vacc_mean_efficacy(self, delay=7, k=1):
-        if isinstance(k, str):
-            k = self.model_params[k]
-
-        vacc_df = self.get_vacc_rates()
-        shots = list(vacc_df.columns)
-        rate = vacc_df.groupby(['age']).shift(delay).fillna(0)
-        cumu = rate.groupby(['age']).cumsum()
-        vacc_effs = {k: v['eff'] for k, v in self.vacc_immun_params.items()}
-
-        terminal_cumu_eff = pd.DataFrame(index=rate.index, columns=shots, data=0)
-        for shot, next_shot in zip(shots, shots[1:] + [None]):
-            nonzero_ts = rate[shot][rate[shot] > 0].index.get_level_values('t')
-            if len(nonzero_ts) > 0:
-                days_ago_range = range(nonzero_ts.max() - nonzero_ts.min() + 1)
-                for days_ago in days_ago_range:
-                    terminal_rate = np.minimum(rate[shot], (cumu[shot] - cumu.groupby('age').shift(-days_ago)[next_shot]).clip(lower=0)) if next_shot is not None else rate[shot]
-                    terminal_cumu_eff[shot] += vacc_effs[shot] * self.vacc_eff_decay_mult(days_ago, delay, k) * terminal_rate.groupby(['age']).shift(days_ago).fillna(0)
-
-        return (terminal_cumu_eff.sum(axis=1) / cumu[shots[0]]).fillna(0)
+        return (vacc_rates / available_for_vacc).fillna(0)
