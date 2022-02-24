@@ -14,13 +14,8 @@ from model_specs import CovidModelSpecifications
 
 class CovidModelFit:
 
-    def __init__(self, base_specs, engine=None, tc_0=0.75, tc_min=0, tc_max=0.99, new_end_date=dt.date(2022, 5, 31)):
-        if isinstance(base_specs, CovidModelSpecifications):
-            self.base_specs = base_specs
-        elif isinstance(base_specs, int):
-            self.base_specs = CovidModelSpecifications.from_db(engine, base_specs, new_end_date=new_end_date)
-        else:
-            raise TypeError(f'Invalid type for base_specs: {type(base_specs)}')
+    def __init__(self, tc_0=0.75, tc_min=0, tc_max=0.99, **specs_build_args):
+        self.base_specs = CovidModelSpecifications.build(**specs_build_args)
 
         self.tc_0 = tc_0
         self.tc_min = tc_min
@@ -37,9 +32,6 @@ class CovidModelFit:
         else:
             hosps_by_zip = pd.read_csv(hosps_by_zip_fpath, parse_dates=['dates'], index_col=['dates']).unstack().rename_axis(index=['zip', 'measure_date']).rename('currently_hospitalized  ')
             zip_county_mapping = pd.read_csv('input/regional/zip_to_county_mapping.csv', dtype={'zip': str, 'county_id': str}).set_index(['zip', 'county_id'])#['share_of_zip_in_county']
-            # index = pd.MultiIndex.from_product([zip_county_mapping.index.unique('zip'), zip_county_mapping.index.unique('county_id'), hosps_by_zip.index.unique('measure_date')])
-            print(zip_county_mapping.join(hosps_by_zip, on='zip'))
-            # print(zip_county_mapping['share_of_zip_in_county'] * hosps_by_zip)
 
     def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
         # define initial states
@@ -62,7 +54,7 @@ class CovidModelFit:
 
     # run an optimization to minimize the cost function using scipy.optimize.minimize()
     # method = 'curve_fit' or 'minimize'
-    def run(self, engine, model_class=CovidModel, method='curve_fit', window_size=14, look_back=None,
+    def run(self, engine, method='curve_fit', window_size=14, look_back=None,
             last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, **spec_args):
         # get the end date from actual hosps
         end_t = self.actual_hosp.index.max() + 1
@@ -70,8 +62,8 @@ class CovidModelFit:
 
         # prep model (we only do this once to save time)
         t0 = perf_counter()
-        base_model = model_class(start_date=self.base_specs.start_date, end_date=end_date)
-        base_model.prep(self.base_specs, engine=engine, **spec_args)
+        base_model = CovidModel(start_date=self.base_specs.start_date, end_date=end_date)
+        base_model.prep(self.base_specs)
         t1 = perf_counter()
         print(f'Model prepped for fitting in {t1-t0} seconds.')
 
@@ -85,23 +77,23 @@ class CovidModelFit:
         # if there's no batch size, set the batch size to be the total number of windows to be fit
         if batch_size is None:
             batch_size = look_back
+
         trim_off_end_list = list(range(look_back - batch_size, 0, -increment_size)) + [0]
         for i, trim_off_end in enumerate(trim_off_end_list):
             t0 = perf_counter()
             this_end_t = tslices[-trim_off_end] if trim_off_end > 0 else end_t
             this_end_date = self.base_specs.start_date + dt.timedelta(days=this_end_t)
-            model = model_class(start_date=self.base_specs.start_date, end_date=this_end_date)
-            model.specifications = self.base_specs.copy(this_end_date)
-            model.params = base_model.params
+
+            model = CovidModel(base_model=base_model, start_date=base_model.start_date, end_date=this_end_date)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
-            model.build_ode()
 
             # Initial infectious based on hospitalizations and assumed hosp rate
-            hosp_rate = model.get_param('hosp', {'age': '40-64', 'vacc': 'unvacc'}, trange=[0])[0][1][0]  # Take first compartment's hosp rate
+            infection_seed_cmpt_attrs = {'age': '40-64', 'immun': 'none'}
+            hosp_rate = model.get_param('hosp', infection_seed_cmpt_attrs, trange=[0])[0][1][0]  # Take first compartment's hosp rate
             I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
             y0d = model.y0_dict
-            y0d[model.get_default_cmpt_by_attrs({'seir': 'I', 'age': '40-64', 'vacc': 'unvacc'})] = I0
-            y0d[model.get_default_cmpt_by_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'unvacc'})] -= I0
+            y0d[model.get_default_cmpt_by_attrs({'seir': 'I', **infection_seed_cmpt_attrs})] = I0
+            y0d[model.get_default_cmpt_by_attrs({'seir': 'S', **infection_seed_cmpt_attrs})] -= I0
 
             fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method, y0d=y0d)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
