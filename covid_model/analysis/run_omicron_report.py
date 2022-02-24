@@ -12,7 +12,9 @@ import argparse
 
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
-from covid_model.model_with_omicron import CovidModelWithVariants
+from covid_model.cli_specs import ModelSpecsArgumentParser
+# from covid_model.model_with_omicron import CovidModelWithVariants
+# from covid_model.model_with_immunity_rework import CovidModelWithVariants
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.run_model_scenarios import build_legacy_output_df
 
@@ -24,8 +26,7 @@ plot_opts = {
 }
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--spec_id", type=int, required=True, help="the ID for the desired specifications")
+    parser = ModelSpecsArgumentParser()
     parser.add_argument("--plot", action="append", choices=plot_opts.keys(), required=False,
                         help="add a plot to the output figure, default: Prevalence, Hospitalizations, Variant Share, "
                              "and Percent Immune")
@@ -37,8 +38,9 @@ if __name__ == '__main__':
 
     print('Prepping model...')
     engine = db_engine()
-    model = CovidModelWithVariants()
-    model.prep(run_args.spec_id, engine=engine, params='input/params.json', attribute_multipliers='input/attribute_multipliers.json')
+    model = CovidModel(end_date=dt.date(2022, 10, 31))
+    model.prep(engine=engine, **parser.specs_args_as_dict())
+    model.apply_tc(tc=model.specifications.tc + [1.0], tslices=model.specifications.tslices + [850])
 
     print('Running model...')
     model.solve_seir()
@@ -83,7 +85,17 @@ if __name__ == '__main__':
             ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
             ax.plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs non-Omicron (Vaccine-only)', color='gold')
             ax.plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Omicron (Vaccine-only)', color='darkorange')
-            ax.plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Omicron Hospitalization', color='black')
+            ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+            ax.set_ylim(0, 1)
+            ax.set_ylabel('Percent Immune')
+            ax.legend(loc='best')
+            ax.set_xlim(dt.date(2020, 4, 1), dt.date(2022, 3, 31))
+        if plot == "sevimm":
+            # immunity
+            ax.plot(model.daterange, model.immunity('none'), label='Immunity vs Severe non-Omicron', color='cyan')
+            ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Severe Omicron', color='darkcyan')
+            ax.plot(model.daterange, model.immunity('none', vacc_only=True), label='Immunity vs Severe non-Omicron (Vaccine-only)', color='gold')
+            ax.plot(model.daterange, model.immunity('omicron', vacc_only=True), label='Immunity vs Severe Omicron (Vaccine-only)', color='darkorange')
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylim(0, 1)
             ax.set_ylabel('Percent Immune')
@@ -97,7 +109,8 @@ if __name__ == '__main__':
         if "hosp" in plots:
             hosps_df = pd.DataFrame(index=model.trange)
         for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
-            start_t = 725
+            # TODO: Make the start date for TC shifts dynamic and/or configurable
+            start_t = 749
             future_tslices = list(range(start_t, start_t + tc_shift_days))
             future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
             model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
@@ -118,6 +131,7 @@ if __name__ == '__main__':
         ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 2, 28))
         ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
+        ax.legend(loc='best')
 
     fig.tight_layout()
     fig.savefig('output/omicron_report.png')

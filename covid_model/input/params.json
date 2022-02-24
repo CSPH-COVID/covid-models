@@ -52,15 +52,15 @@
       "65+": [10.53665902, 8.136581647, 8.136581647]
     }
   },
-  "vacc_eff": 1,
-  "vacc_fail_rate": {"0-19": 0.03, "20-39": 0.03, "40-64": 0.03, "65+": 0.14},
   "immune_rate_I": 0.925,
-  "immune_rate_A": 0.85,
-  "immune_decay_days_1": 400,
-  "immune_decay_days_2": 400,
-  "nondelta_prevalence": 1,
+  "immune_rate_A": 0.925,
+  "imm3_decay_days": 90,
+  "imm2_decay_days": 270,
+  "imm1_decay_days": 270,
   "om_seed": {"tslices": [662, 687], "value": [0, 1, 0]},
-  "omicron_acq_immune_escape": 0.5,
-  "delta_vacc_eff_k": 1.6,
-  "omicron_vacc_eff_k": 4.5
+  "immunity": 0,
+  "severe_immunity": 0,
+  "shot1_fail_rate": {"0-19": 0.02, "20-39": 0.02, "40-64": 0.02, "65+": 0.06},
+  "shot2_fail_rate": {"0-19": 0.02, "20-39": 0.02, "40-64": 0.02, "65+": 0.06},
+  "shot3_fail_rate": {"0-19": 0.01, "20-39": 0.01, "40-64": 0.01, "65+": 0.03}
 }
