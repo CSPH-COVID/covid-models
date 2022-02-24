@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 import json
 
 
-def db_engine(db_name_env=None, db_user_env=None, db_host_env=None, db_credentials_env=None, env_prefix='', db_type='postgres'):
+def db_engine(db_name_env=None, db_user_env=None, db_host_env=None, db_credentials_env=None, env_prefix='', db_type='bigquery'):
     if db_type == 'postgres':
         db_name = os.environ[db_name_env if db_name_env is not None else (env_prefix+'db_name')]
         db_user = os.environ[db_user_env if db_user_env is not None else (env_prefix+'db_user')]

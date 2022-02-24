@@ -65,14 +65,14 @@ class CovidModelSpecifications:
         specs.spec_id = row['spec_id']
         specs.base_spec_id = row['base_spec_id']
 
-        specs.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=row['tc_cov'])
-        specs.set_model_params(row['model_params'])
+        specs.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=json.loads(row['tc_cov'].replace('{', '[').replace('}', ']')))
+        specs.set_model_params(json.loads(row['model_params']))
 
-        specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in row['vacc_actual'].items()}, axis=1).rename_axis(index=['t', 'age'])
-        specs.set_vacc_proj(row['vacc_proj_params'])
+        specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in json.loads(row['vacc_actual']).items()}, axis=1).rename_axis(index=['t', 'age'])
+        specs.set_vacc_proj(json.loads(row['vacc_proj_params']))
 
-        specs.timeseries_effects = row['timeseries_effects']
-        specs.attribute_multipliers = row['attribute_multipliers']
+        specs.timeseries_effects = json.loads(row['timeseries_effects'])
+        specs.attribute_multipliers = json.loads(row['attribute_multipliers'])
 
         return specs
 
