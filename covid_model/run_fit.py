@@ -97,7 +97,7 @@ def run():
     fit.fitted_model.specifications.write_to_db(engine)
 
     if fit_params.plot:
-        actual_hosps(engine)
+        actual_hosps(engine, county_ids=county_ids)
         modeled(fit.fitted_model, 'Ih')
         plt.show()
 
