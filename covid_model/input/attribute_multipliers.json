@@ -1,4 +1,9 @@
 [
+  {"attrs": {"variant": "delta"}, "param": "betta", "mult": 2.25},
+  {"attrs": {"variant": "delta"}, "param": "hosp", "mult": 2.38},
+  {"attrs": {"variant": "delta"}, "param": "dh", "mult": 1.3225},
+  {"attrs": {"variant": "delta"}, "param": "dnh", "mult": 3.28},
+
   {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 2.6667},
   {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 0.1},
   {"attrs": {"variant": "omicron"}, "param": "dnh", "mult": 0.1},

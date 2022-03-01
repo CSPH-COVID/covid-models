@@ -26,7 +26,6 @@ def build_legacy_output_df(model: CovidModel):
 
     totals = model.solution_sum('seir')
     totals_by_priorinf = model.solution_sum(['seir', 'priorinf'])
-    print(totals_by_priorinf)
     df['Iht'] = totals['Ih']
     df['Dt'] = totals['D']
     df['Rt'] = totals_by_priorinf[('S', 'none')]
