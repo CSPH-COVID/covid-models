@@ -12,7 +12,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'omicron'],
+                        'variant': ['none', 'delta', 'omicron'],
                         'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
@@ -157,7 +157,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                 else:
                     self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available')
 
-        # seed omicron
+        # seed variants
+        self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'delta'}, constant='delta_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
 
         # exposure
