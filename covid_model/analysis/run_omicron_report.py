@@ -41,10 +41,13 @@ if __name__ == '__main__':
     print("Will produce these plots:" + ", ".join([plot_opts[plot] for plot in plots]))
 
     print('Prepping model...')
+    t0 = perf_counter()
     engine = db_engine()
     model = CovidModel(end_date=to_date, engine=engine, **parser.specs_args_as_dict())
     model.prep()
     model.apply_tc(tc=model.tc + [1.0], tslices=model.tslices + [850])
+    t1 = perf_counter()
+    print(f'Model prepped in {t1-t0} seconds.')
 
     print('Running model...')
     model.solve_seir()

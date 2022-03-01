@@ -1,4 +1,9 @@
 [
+  {"attrs": {"variant": "alpha"}, "param": "betta", "mult": 2.25},
+  {"attrs": {"variant": "alpha"}, "param": "hosp", "mult": 1.40},
+  {"attrs": {"variant": "alpha"}, "param": "dh", "mult": 1.15},
+  {"attrs": {"variant": "alpha"}, "param": "dnh", "mult": 1.60},
+
   {"attrs": {"variant": "delta"}, "param": "betta", "mult": 2.25},
   {"attrs": {"variant": "delta"}, "param": "hosp", "mult": 2.38},
   {"attrs": {"variant": "delta"}, "param": "dh", "mult": 1.3225},
