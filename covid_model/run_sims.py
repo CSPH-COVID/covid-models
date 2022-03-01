@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     end_date = dt.date(2022, 5, 31)
 
-    specs = CovidModelSpecifications.from_db(engine, run_params.spec_id, new_end_date=end_date)
+    specs = CovidModelSpecifications(engine=engine, spec_id=run_params.spec_id, new_end_date=end_date)
     specs.spec_id = None
     specs.tags['run_type'] = 'sim'
 

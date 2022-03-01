@@ -90,11 +90,11 @@ def run():
             region_params=region_params, region=region,
             write_batch_output=write_batch_output)
 
-    print(fit.fitted_model.specifications.tslices)
+    print(fit.fitted_model.tslices)
     print(fit.fitted_tc)
 
-    fit.fitted_model.specifications.tags['run_type'] = 'fit'
-    fit.fitted_model.specifications.write_to_db(engine)
+    fit.fitted_model.tags['run_type'] = 'fit'
+    fit.fitted_model.write_to_db(engine)
 
     if fit_params.plot:
         actual_hosps(engine, county_ids=county_ids)
