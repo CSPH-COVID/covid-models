@@ -38,9 +38,9 @@ if __name__ == '__main__':
 
     print('Prepping model...')
     engine = db_engine()
-    model = CovidModel(end_date=dt.date(2022, 10, 31))
-    model.prep(engine=engine, **parser.specs_args_as_dict())
-    model.apply_tc(tc=model.specifications.tc + [1.0], tslices=model.specifications.tslices + [850])
+    model = CovidModel(end_date=dt.date(2022, 10, 31), engine=engine, **parser.specs_args_as_dict())
+    model.prep()
+    model.apply_tc(tc=model.tc + [1.0], tslices=model.tslices + [850])
 
     print('Running model...')
     model.solve_seir()
@@ -104,8 +104,8 @@ if __name__ == '__main__':
 
     if ("prev" in plots) or ("hosp" in plots):
         # tc shift scenarios
-        base_tslices = model.specifications.tslices.copy()
-        base_tc = model.specifications.tc.copy()
+        base_tslices = model.tslices.copy()
+        base_tc = model.tc.copy()
         if "hosp" in plots:
             hosps_df = pd.DataFrame(index=model.trange)
         for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:

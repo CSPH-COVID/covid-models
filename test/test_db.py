@@ -14,5 +14,5 @@ class Test(TestCase):
 
     def test_specifications_write_to_db(self):
         engine = db_engine()
-        specs = CovidModelSpecifications.from_db(engine, 870)
+        specs = CovidModelSpecifications(engine=engine, from_specs=870)
         specs.write_to_db(engine)
