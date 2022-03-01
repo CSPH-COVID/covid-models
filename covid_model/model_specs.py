@@ -68,7 +68,7 @@ class CovidModelSpecifications:
                 self.timeseries_effects = copy.deepcopy(from_specs.timeseries_effects)
                 self.base_spec_id = from_specs.spec_id if from_specs.spec_id is not None else from_specs.base_spec_id
                 self.update_specs(
-                    end_date=from_specs.end_date,
+                    end_date=end_date if end_date is not None else from_specs.end_date,
                     tslices=copy.deepcopy(from_specs.tslices), tc=copy.deepcopy(from_specs.tc),
                     params=copy.deepcopy(from_specs.model_params),
                     vacc_proj_params=copy.deepcopy(from_specs.vacc_proj_params),
