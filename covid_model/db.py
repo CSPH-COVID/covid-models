@@ -26,6 +26,5 @@ def get_sqa_table(engine, schema, table):
         return Table(f'{schema}.{table}', MetaData(bind=engine), autoload=True)
     else:
         metadata = MetaData(schema=schema)
-        metadata.reflect(engine)
         metadata.reflect(engine, only=['specifications'])
         return metadata.tables[f'{schema}.{table}']
