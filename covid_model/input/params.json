@@ -58,6 +58,7 @@
   "imm2_decay_days": 180,
   "imm1_decay_days": 270,
   "imm_decay_days": 360,
+  "initial_seed": {"tslices": [1], "value": [2.2, 0]},
   "alpha_seed": {"tslices": [290, 315], "value": [0, 1, 0]},
   "delta_seed": {"tslices": [408, 443], "value": [0, 1, 0]},
   "om_seed": {"tslices": [662, 687], "value": [0, 1, 0]},
