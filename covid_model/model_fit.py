@@ -26,12 +26,8 @@ class CovidModelFit:
         self.fitted_tc = None
         self.fitted_tc_cov = None
 
-    def set_actual_hosp(self, engine=None, hosps_by_zip_fpath=None, actual_hosp_sql='sql/emresource_hospitalizations.sql', county_ids=None):
-        if hosps_by_zip_fpath is None:
-            self.actual_hosp = ExternalData(engine, t0_date=self.base_specs.start_date).fetch(sql=open(actual_hosp_sql, 'r').read(), parse_dates=['measure_date'])['currently_hospitalized']
-        else:
-            hosps_by_zip = pd.read_csv(hosps_by_zip_fpath, parse_dates=['dates'], index_col=['dates']).unstack().rename_axis(index=['zip', 'measure_date']).rename('currently_hospitalized  ')
-            zip_county_mapping = pd.read_csv('input/regional/zip_to_county_mapping.csv', dtype={'zip': str, 'county_id': str}).set_index(['zip', 'county_id'])#['share_of_zip_in_county']
+    def set_actual_hosp(self, engine=None, county_ids=None):
+        self.actual_hosp = ExternalHosps(engine, t0_date=self.base_specs.start_date).fetch(county_ids=county_ids)['currently_hospitalized']
 
     def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
         # define initial states

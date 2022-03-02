@@ -15,9 +15,11 @@ import arch
 import json
 from time import perf_counter
 
+from covid_model.data_imports import ExternalHosps
 
-def actual_hosps(engine, **plot_params):
-    hosps = get_hosps_df(engine)
+
+def actual_hosps(engine, county_ids=None, **plot_params):
+    hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
     hosps.plot(**{'color': 'red', 'label': 'Actual Hosps.', **plot_params})
 
 

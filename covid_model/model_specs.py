@@ -5,9 +5,10 @@ import json
 import copy
 
 import scipy.stats as sps
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, func
+from sqlalchemy.orm import Session
 
-from covid_model.db import db_engine
+from covid_model.db import db_engine, get_sqa_table
 from covid_model.data_imports import ExternalVaccWithProjections, ExternalVacc
 from covid_model.utils import get_params
 
@@ -65,14 +66,14 @@ class CovidModelSpecifications:
         specs.spec_id = row['spec_id']
         specs.base_spec_id = row['base_spec_id']
 
-        specs.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=row['tc_cov'])
-        specs.set_model_params(row['model_params'])
+        specs.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=json.loads(row['tc_cov'].replace('{', '[').replace('}', ']')))
+        specs.set_model_params(json.loads(row['model_params']))
 
-        specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in row['vacc_actual'].items()}, axis=1).rename_axis(index=['t', 'age'])
-        specs.set_vacc_proj(row['vacc_proj_params'])
+        specs.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in json.loads(row['vacc_actual']).items()}, axis=1).rename_axis(index=['t', 'age'])
+        specs.set_vacc_proj(json.loads(row['vacc_proj_params']))
 
-        specs.timeseries_effects = row['timeseries_effects']
-        specs.attribute_multipliers = row['attribute_multipliers']
+        specs.timeseries_effects = json.loads(row['timeseries_effects'])
+        specs.attribute_multipliers = json.loads(row['attribute_multipliers'])
 
         return specs
 
@@ -117,34 +118,37 @@ class CovidModelSpecifications:
         return specs
 
     def write_to_db(self, engine, schema='covid_model', table='specifications', tags=None):
-        metadata = MetaData(schema=schema)
-        metadata.reflect(engine, only=['specifications'])
-        specs_table = metadata.tables[f'{schema}.{table}']
+        specs_table = get_sqa_table(engine, schema=schema, table=table)
 
         if tags is not None:
             self.tags.update(tags)
 
-        stmt = specs_table.insert().values(
-            created_at=dt.datetime.now(),
-            base_spec_id=int(self.base_spec_id),
-            tags=self.tags,
-            start_date=self.start_date,
-            end_date=self.end_date,
-            tslices=self.tslices,
-            tc=self.tc,
-            tc_cov=self.tc_cov,
-            model_params=self.model_params,
-            vacc_actual={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()},
-            vacc_proj_params=self.vacc_proj_params,
-            vacc_proj={dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None,
-            timeseries_effects=self.timeseries_effects,
-            attribute_multipliers=self.attribute_multipliers
-        )
+        with Session(engine) as session:
+            max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
+            self.spec_id = max_spec_id + 1
 
-        conn = engine.connect()
-        result = conn.execute(stmt)
-
-        self.spec_id = result.inserted_primary_key[0]
+            stmt = specs_table.insert().values(
+                spec_id=self.spec_id,
+                created_at=dt.datetime.now(),
+                base_spec_id=int(self.base_spec_id),
+                tags=json.dumps(self.tags),
+                start_date=self.start_date,
+                end_date=self.end_date,
+                tslices=self.tslices,
+                tc=self.tc,
+                tc_cov=json.dumps(self.tc_cov),
+                model_params=json.dumps(self.model_params),
+                vacc_actual=json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in
+                                        self.actual_vacc_df.to_dict(orient='series').items()}),
+                vacc_proj_params=json.dumps(self.vacc_proj_params),
+                vacc_proj=json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in
+                                      self.proj_vacc_df.to_dict(
+                                          orient='series').items()} if self.proj_vacc_df is not None else None),
+                timeseries_effects=json.dumps(self.timeseries_effects),
+                attribute_multipliers=json.dumps(self.attribute_multipliers)
+            )
+            session.execute(stmt)
+            session.commit()
 
     @property
     def days(self):
