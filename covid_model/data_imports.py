@@ -47,8 +47,13 @@ class ExternalData:
 
 
 class ExternalHosps(ExternalData):
-    def fetch_from_db(self):
-        return pd.read_sql('select * from cdphe.emresource_hospitalizations', self.engine, parse_dates=['measure_date'])
+    def fetch_from_db(self, county_ids):
+        if county_ids is None:
+            sql = open('sql/emresource_hospitalizations.sql', 'r').read()
+            return pd.read_sql(sql, self.engine, index_col=['measure_date'])
+        else:
+            sql = open('sql/hospitalized_county_subset.sql', 'r').read()
+            return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
 
 
 class ExternalVacc(ExternalData):
