@@ -159,6 +159,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                     self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available')
 
         # seed variants
+        self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'none'}, constant='initial_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'alpha'}, constant='alpha_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'delta'}, constant='delta_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
@@ -198,8 +199,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     @property
     def y0_dict(self):
         y0d = {('S', age, 'none', 'none', 'none', 'none'): n for age, n in self.group_pops.items()}
-        y0d[('S', '40-64', 'none', 'none', 'none', 'none')] -= 2.2
-        y0d[('I', '40-64', 'none', 'none', 'none', 'none')] = 2.2
         return y0d
 
     # override solve_ode to use default y0_dict
