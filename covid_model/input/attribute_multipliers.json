@@ -1,5 +1,5 @@
 [
-  {"attrs": {"variant": "alpha"}, "param": "betta", "mult": 2.25},
+  {"attrs": {"variant": "alpha"}, "param": "betta", "mult": 1.50},
   {"attrs": {"variant": "alpha"}, "param": "hosp", "mult": 1.40},
   {"attrs": {"variant": "alpha"}, "param": "dh", "mult": 1.15},
   {"attrs": {"variant": "alpha"}, "param": "dnh", "mult": 1.60},
@@ -9,26 +9,31 @@
   {"attrs": {"variant": "delta"}, "param": "dh", "mult": 1.3225},
   {"attrs": {"variant": "delta"}, "param": "dnh", "mult": 3.28},
 
-  {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 2.6667},
-  {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 0.1},
-  {"attrs": {"variant": "omicron"}, "param": "dnh", "mult": 0.1},
+  {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 6},
+  {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 0.238},
+  {"attrs": {"variant": "omicron"}, "param": "dh", "mult": 1.3225},
+  {"attrs": {"variant": "omicron"}, "param": "dnh", "mult": 0.13225},
   {"attrs": {"variant": "omicron"}, "param": "hlos", "mult": 0.6},
   {"attrs": {"variant": "omicron"}, "param": "alpha", "mult": 0.6},
   {"attrs": {"variant": "omicron"}, "param": "gamm", "mult": 1.66667},
 
-  {"attrs": {"immun": "imm3"}, "param": "immunity", "val": 1},
-  {"attrs": {"immun": "imm2"}, "param": "immunity", "val": 1},
-  {"attrs": {"immun": "imm1"}, "param": "immunity", "val": 0.75},
-  {"attrs": {"immun": "imm0"}, "param": "immunity", "val": 0.5},
+  {"attrs": {"vacc": "shot3"}, "param": "imm_decay_days", "mult": 1.25},
+
+  {"attrs": {"immun": "strong"}, "param": "immunity", "val": 1},
+  {"attrs": {"immun": "weak"}, "param": "immunity", "val": 0.8},
   {"attrs": {"immun": "none"}, "param": "immunity", "val": 0},
 
+  {"attrs": {"variant": "delta", "immun": "strong", "priorinf": "none"}, "param": "immunity", "mult": 0.95},
+  {"attrs": {"variant": "delta", "immun": "weak", "priorinf": "none"}, "param": "immunity", "mult": 0.75},
+  {"attrs": {"variant": "omicron", "immun": "strong", "vacc": "none", "priorinf": "non-omicron"}, "param": "immunity", "mult": 0.8},
+  {"attrs": {"variant": "omicron", "immun": "weak", "vacc": "none", "priorinf": "non-omicron"}, "param": "immunity", "mult": 0.1},
+  {"attrs": {"variant": "omicron", "immun": "strong"}, "except_attrs": [{"priorinf": "omicron"}, {"vacc": "none"}], "param": "immunity", "mult": 0.9},
+  {"attrs": {"variant": "omicron", "immun": "weak"}, "except_attrs": [{"priorinf": "omicron"}, {"vacc": "none"}], "param": "immunity", "mult": 0.2},
+
   {"attrs": {}, "except_attrs": {"immun": "none"}, "param": "severe_immunity", "val": 0.975},
-  {"attrs": {"vacc": "none"}, "except_attrs": {"immun": "none"}, "param": "severe_immunity", "val": 0.8},
+  {"attrs": {"vacc": "none"}, "except_attrs": {"immun": "none"}, "param": "severe_immunity", "val": 0.5},
 
-  {"attrs": {"variant": "omicron", "immun": "imm0"}, "except_attrs": [{"priorinf": "omicron"}, {"vacc": "shot3"}], "param": "severe_immunity", "mult": 0.5},
-
-  {"attrs": {"variant": "omicron", "priorinf": "non-omicron", "vacc": "none"}, "param": "immunity", "mult": 0.2},
-  {"attrs": {"variant": "omicron", "immun": "imm0"}, "except_attrs": [{"priorinf": "omicron"}],"param": "immunity", "mult": 0},
-  {"attrs": {"variant": "omicron", "immun": "imm1", "priorinf": "none"}, "except_attrs": [{"vacc": "shot3"}], "param": "immunity", "mult": 0.9}
+  {"attrs": {"variant": "delta"}, "param": "severe_immunity", "mult": 0.9},
+  {"attrs": {"variant": "omicron"}, "param": "severe_immunity", "mult": 0.6}
 
 ]

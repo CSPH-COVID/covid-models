@@ -13,7 +13,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
                         'variant': ['none', 'alpha', 'delta', 'omicron'],
-                        'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
+                        # 'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
+                        'immun': ['none', 'weak', 'strong']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
@@ -145,17 +146,17 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # vaccination
         # first shot
-        self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'imm1'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
+        self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
         self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, coef=f'shot1_per_available * shot1_fail_rate')
         # second and third shot
         for i in [2, 3]:
             for immun in self.attributes['immun']:
                 # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
                 if immun == 'none':
-                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i-1}_fail_rate)')
+                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i-1}_fail_rate)')
                     self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i-1}_fail_rate)')
                 else:
-                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'imm{i}'}, coef=f'shot{i}_per_available')
+                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available')
 
         # seed variants
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'alpha'}, constant='alpha_seed')
@@ -167,8 +168,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         for variant in self.attributes['variant']:
             sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
             asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})
-            self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-            self.add_flows_by_attr({'seir': 'S'}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
 
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
@@ -178,19 +179,20 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # disease termination
         for variant in self.attributes['variant']:
             priorinf = 'omicron' if variant == 'omicron' else 'non-omicron'
-            self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'imm2'}, coef='gamm * (1 - hosp - dnh) * immune_rate_I')
+            self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * immune_rate_I')
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * (1 - immune_rate_I)')
-            self.add_flows_by_attr({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'imm2'}, coef='gamm * immune_rate_A')
+            self.add_flows_by_attr({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * immune_rate_A')
             self.add_flows_by_attr({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * (1 - immune_rate_A)')
-            self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'imm2'}, coef='1 / hlos * (1 - dh) * immune_rate_I')
+            self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / hlos * (1 - dh) * immune_rate_I')
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * (1 - dh) * (1 - immune_rate_I)')
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * dnh * (1 - severe_immunity)')
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
 
         # immunity decay
-        self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / imm3_decay_days')
-        self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / imm2_decay_days')
-        self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / imm1_decay_days')
+        # self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / imm3_decay_days')
+        # self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / imm2_decay_days')
+        # self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / imm1_decay_days')
+        self.add_flows_by_attr({'immun': 'strong'}, {'immun': 'weak'}, coef='1 / imm_decay_days')
 
     # define initial state y0
     @property
