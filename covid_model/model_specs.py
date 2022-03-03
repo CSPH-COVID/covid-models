@@ -17,7 +17,7 @@ class CovidModelSpecifications:
 
     def __init__(self, start_date=None, end_date=None, engine=None, from_specs=None, **spec_args):
 
-        self.start_date = start_date
+        self.start_date = None
         self.end_date = None
 
         self.spec_id = None
