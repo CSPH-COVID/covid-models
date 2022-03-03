@@ -7,7 +7,7 @@ from covid_model.ode_builder import ODEBuilder
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
-class CovidModel(ODEBuilder):
+class CovidModel(ODEBuilder, CovidModelSpecifications):
     attr = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
@@ -17,44 +17,34 @@ class CovidModel(ODEBuilder):
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
-    default_start_date = dt.date(2020, 1, 24)
     default_end_date = dt.date(2022, 5, 31)
 
-    def __init__(self, base_model=None, start_date=None, end_date=None):
-        self.start_date = start_date if start_date is not None else base_model.start_date if base_model is not None else self.default_start_date
-        self.end_date = end_date if end_date is not None else base_model.end_date if base_model is not None else self.default_end_date
+    def __init__(self, base_model=None, **spec_args):
 
-        ODEBuilder.__init__(self, base_ode_builder=base_model, trange=range((self.end_date - self.start_date).days), attributes=self.attr, param_attr_names=self.param_attr_names)
-
+        # if a base model is provided, use its specifications
         if base_model is not None:
-            self.specifications = base_model.specifications.copy()
-        else:
-            self.specifications = None
+            spec_args['from_specs'] = base_model
 
+        # initiate the parent classes; dates will be set in CovidModelSpecifications.__init__
+        CovidModelSpecifications.__init__(self, **spec_args)
+        ODEBuilder.__init__(self, base_ode_builder=base_model, trange=range((self.end_date - self.start_date).days), attributes=self.attr, param_attr_names=self.param_attr_names)
         # the var values for the solution; these get populated when self.solve_seir is run
         self.solution = None
         self.solution_y = None
         self.solution_ydf_full = None
 
-    def set_specifications(self, **specs_build_args):
-        self.specifications = CovidModelSpecifications.build(start_date=self.start_date, end_date=self.end_date, **specs_build_args)
-
     # a model must be prepped before it can be run; if any params EXCEPT the efs (i.e. TC) change, it must be re-prepped
-    def prep(self, specs=None, **specs_build_args):
-        self.set_specifications(specs=specs, **specs_build_args)
-        self.apply_specifications()
+    def prep(self):
+        self.build_param_lookups()
         self.build_ode()
         self.compile()
 
-    def apply_specifications(self, specs: CovidModelSpecifications = None, apply_vaccines=True):
-        if specs is not None:
-            self.specifications = specs
-
+    def build_param_lookups(self, apply_vaccines=True):
         # set TC
         self.apply_tc()
 
         # prep general parameters
-        for name, val in self.specifications.model_params.items():
+        for name, val in self.model_params.items():
             if not isinstance(val, dict) or 'tslices' not in val.keys():
                 self.set_param_using_age_dict(name, val)
             else:
@@ -63,7 +53,7 @@ class CovidModel(ODEBuilder):
                     self.set_param_using_age_dict(name, v, trange=range(tmin, tmax))
 
         if apply_vaccines:
-            vacc_per_available = self.specifications.get_vacc_per_available()
+            vacc_per_available = self.get_vacc_per_available()
 
             # convert to dictionaries for performance lookup
             vacc_per_available_dict = vacc_per_available.to_dict()
@@ -78,15 +68,15 @@ class CovidModel(ODEBuilder):
                                        {'age': age}, trange=[t])
 
         # alter parameters based on timeseries effects
-        multipliers = self.specifications.get_timeseries_effect_multipliers()
+        multipliers = self.get_timeseries_effect_multipliers()
         for param, mult_by_t in multipliers.to_dict().items():
             for t, mult in mult_by_t.items():
                 if t in self.trange:
                     self.set_param(param, mult=mult, trange=[t])
 
         # alter parameters based on attribute multipliers
-        if self.specifications.attribute_multipliers:
-            for attr_mult_specs in self.specifications.attribute_multipliers:
+        if self.attribute_multipliers:
+            for attr_mult_specs in self.attribute_multipliers:
                 self.set_param(**attr_mult_specs)
 
     # handy properties for the beginning t, end t, and the full range of t values
@@ -102,12 +92,12 @@ class CovidModel(ODEBuilder):
     # new exposures by day by group
     @property
     def new_infections(self):
-        return self.solution_sum('seir')['E'] / self.specifications.model_params['alpha']
+        return self.solution_sum('seir')['E'] / self.model_params['alpha']
 
     # estimated reproduction number (length of infection * new_exposures / current_infections
     @property
     def re_estimates(self):
-        infect_duration = 1 / self.specifications.model_params['gamm']
+        infect_duration = 1 / self.model_params['gamm']
         infected = (self.solution_sum('seir')['I'].shift(3) + self.solution_sum('seir')['A'].shift(3))
         return infect_duration * self.new_infections.groupby('t').sum() / infected
 
@@ -123,27 +113,27 @@ class CovidModel(ODEBuilder):
     def apply_tc(self, tc=None, tslices=None, suppress_ode_rebuild=False):
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
-            self.specifications.tslices = [tslice for tslice in self.specifications.tslices if tslice < tslices[0]] + tslices
-            self.specifications.tc = self.specifications.tc[:len(self.specifications.tslices) + 1]  # truncate tc if longer than tslices
-            self.specifications.tc += [self.specifications.tc[-1]] * (1 + len(self.specifications.tslices) - len(self.specifications.tc))  # extend tc if shorter than tslices
+            self.tslices = [tslice for tslice in self.tslices if tslice < tslices[0]] + tslices
+            self.tc = self.tc[:len(self.tslices) + 1]  # truncate tc if longer than tslices
+            self.tc += [self.tc[-1]] * (1 + len(self.tslices) - len(self.tc))  # extend tc if shorter than tslices
 
         # if tc is provided, replace the
         if tc is not None:
-            self.specifications.tc = self.specifications.tc[:-len(tc)] + tc
+            self.tc = self.tc[:-len(tc)] + tc
 
         # if the lengths do not match, raise an error
-        if len(self.specifications.tc) != len(self.specifications.tslices) + 1:
-            raise ValueError(f'The length of tc ({len(self.specifications.tc)}) must be equal to the length of tslices ({len(self.specifications.tslices)}) + 1.')
+        if len(self.tc) != len(self.tslices) + 1:
+            raise ValueError(f'The length of tc ({len(self.tc)}) must be equal to the length of tslices ({len(self.tslices)}) + 1.')
 
         # apply to the ef parameter
         # TODO: the ODE is no longer using this (uses non-linear multiplier instead), so we should check if this is used and get rid of it
-        for tmin, tmax, tc in zip([self.tmin] + self.specifications.tslices, self.specifications.tslices + [self.tmax], self.specifications.tc):
+        for tmin, tmax, tc in zip([self.tmin] + self.tslices, self.tslices + [self.tmax], self.tc):
             self.set_param('ef', tc, trange=range(tmin, tmax))
 
         # apply the new TC values to the non-linear multiplier to update the ODE
         # TODO: only update the nonlinear multipliers for TCs that have been changed
         if not suppress_ode_rebuild:
-            for tmin, tmax, tc in zip([self.tmin] + self.specifications.tslices, self.specifications.tslices + [self.tmax], self.specifications.tc):
+            for tmin, tmax, tc in zip([self.tmin] + self.tslices, self.tslices + [self.tmax], self.tc):
                 self.set_nonlinear_multiplier(1 - tc, trange=range(tmin, tmax))
 
     # build ODE
@@ -203,7 +193,7 @@ class CovidModel(ODEBuilder):
     # define initial state y0
     @property
     def y0_dict(self):
-        y0d = {('S', age, 'none', 'none', 'none', 'none'): n for age, n in self.specifications.group_pops.items()}
+        y0d = {('S', age, 'none', 'none', 'none', 'none'): n for age, n in self.group_pops.items()}
         y0d[('S', '40-64', 'none', 'none', 'none', 'none')] -= 2.2
         y0d[('I', '40-64', 'none', 'none', 'none', 'none')] = 2.2
         return y0d
@@ -220,7 +210,7 @@ class CovidModel(ODEBuilder):
     # count the new exposed individuals by day
     def new_exposed(self):
         sum_df = self.solution_sum('seir')
-        return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.specifications.model_params['alpha']
+        return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.model_params['alpha']
 
     # immunity
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False):
@@ -239,12 +229,12 @@ class CovidModel(ODEBuilder):
         else:
             return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
-    # write to covid_model.results in Postgres
-    def write_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
+    # write to covid_model.results
+    def write_results_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
 
         # if there's no existing fit assigned, create a new fit and assign that one
-        if self.specifications.spec_id is None or new_spec:
-            self.specifications.write_to_db(engine)
+        if self.spec_id is None or new_spec:
+            self.write_to_db(engine)
 
         # build data frame with index of (t, age, vacc) and one column per seir cmpt
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
@@ -271,7 +261,7 @@ class CovidModel(ODEBuilder):
         # if a sim_id is provided, insert it as a simulation result; some fields are different
         if sim_id is None:
             table = 'results_v2'
-            df['spec_id'] = self.specifications.spec_id
+            df['spec_id'] = self.spec_id
             df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
             df['created_at'] = dt.datetime.now()
             df['params'] = unique_params_df.apply(lambda x: json.dumps(x.to_dict(), ensure_ascii=False), axis=1)

@@ -9,9 +9,9 @@ from covid_model.cli_specs import ModelSpecsArgumentParser
 
 
 def build_default_model(days):
-    model = CovidModel(end_date=CovidModel.default_start_date + dt.timedelta(days=days))
-    model.set_specifications(engine=engine, **argparser.specs_args_as_dict())
-    model.apply_specifications(apply_vaccines=False)
+    model = CovidModel(engine=engine, **argparser.specs_args_as_dict())
+    model.update_specs(end_date=model.start_date + dt.timedelta(days=days))
+    model.build_param_lookups(apply_vaccines=False)
     model.set_param('shot1_per_available', 0)
     model.set_param('shot2_per_available', 0)
     model.set_param('shot3_per_available', 0)
@@ -52,7 +52,7 @@ if __name__ == '__main__':
             model.set_param(k, v)
         model.build_ode()
         model.compile()
-        model.solve_ode({model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.specifications.group_pops.items()})
+        model.solve_ode({model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.group_pops.items()})
 
         params = model.params_as_df
         group_by_attr_names = ['seir'] + [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']
