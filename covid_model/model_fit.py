@@ -105,10 +105,3 @@ class CovidModelFit:
         self.fitted_tc = tc
         self.fitted_tc_cov = fitted_tc_cov
         self.fitted_model = model
-        self.fitted_specs = model
-        self.fitted_specs.set_tc(tc=tc, tslices=tslices, tc_cov=fitted_tc_cov)
-
-
-
-
-

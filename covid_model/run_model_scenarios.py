@@ -112,10 +112,10 @@ def main():
         specs.set_vacc_proj(vacc_proj_dict[vacc_scen])
         model.prep(specs=specs)
         print(f'Running scenarios...')
-        model.tags.update_specs({'run_type': 'Vaccination Scenario', 'vacc_cap': vacc_scen, 'tc_shift': 'no shift', 'tc_shift_date': 'no_shift'})
+        model.tags.update({'run_type': 'Vaccination Scenario', 'vacc_cap': vacc_scen, 'tc_shift': 'no shift', 'tc_shift_date': 'no_shift'})
         run_model(model, engine, legacy_output_dict=legacy_outputs)
         if vacc_scen == primary_vacc_scen:
-            model.tags.update_specs({'run_type': 'Current', 'vacc_cap': vacc_scen})
+            model.tags.update({'run_type': 'Current', 'vacc_cap': vacc_scen})
             run_model(model, engine, legacy_output_dict=legacy_outputs)
             build_legacy_output_df(model).to_csv('output/out2.csv')
 
@@ -124,7 +124,7 @@ def main():
             tc_shift_t = (tc_shift_date - model.start_date).days
             model.apply_tc(tc=base_tc + list(np.linspace(base_tc[-1], base_tc[-1] + tcs, tc_shift_days)),
                            tslices=base_tslices +  list(range(tc_shift_t, tc_shift_t + tc_shift_days)))
-            model.tags.update_specs({'run_type': 'TC Shift Projection', 'tc_shift': f'{int(100 * tcs)}%', 'tc_shift_date': tc_shift_date.strftime("%b %#d")})
+            model.tags.update({'run_type': 'TC Shift Projection', 'tc_shift': f'{int(100 * tcs)}%', 'tc_shift_date': tc_shift_date.strftime("%b %#d")})
             run_model(model, engine, legacy_output_dict=legacy_outputs)
 
     df = pd.concat(legacy_outputs)

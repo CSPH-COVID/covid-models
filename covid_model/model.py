@@ -232,7 +232,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         else:
             return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
-    # write to covid_model.results in Postgres
+    # write to covid_model.results
     def write_results_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
 
         # if there's no existing fit assigned, create a new fit and assign that one
