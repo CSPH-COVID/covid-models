@@ -6,6 +6,7 @@ from cycler import cycler
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
+from covid_model.analysis.charts import modeled
 
 
 def build_default_model(days):
@@ -16,6 +17,10 @@ def build_default_model(days):
     model.set_param('shot2_per_available', 0)
     model.set_param('shot3_per_available', 0)
     model.set_param('betta', 0)
+    model.set_param('initial_seed', 0)
+    model.set_param('alpha_seed', 0)
+    model.set_param('delta_seed', 0)
+    model.set_param('omicron_seed', 0)
 
     return model
 
@@ -36,7 +41,7 @@ if __name__ == '__main__':
     immunities = {
         'Dose-2': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2]}},
         'Booster': {'initial_attrs': {'seir': 'S'}, 'params': {f'shot{i}_per_available': 1 for i in [1, 2, 3]}},
-        'Prior Delta Infection': {'initial_attrs': {'seir': 'E', 'variant': 'none'}, 'params': {}},
+        'Prior Delta Infection': {'initial_attrs': {'seir': 'E', 'variant': 'delta'}, 'params': {}},
         'Prior Omicron Infection': {'initial_attrs': {'seir': 'E', 'variant': 'omicron'}, 'params': {}}
     }
 
@@ -52,7 +57,7 @@ if __name__ == '__main__':
             model.set_param(k, v)
         model.build_ode()
         model.compile()
-        model.solve_ode({model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.group_pops.items()})
+        model.solve_ode(y0_dict={model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.group_pops.items()})
 
         params = model.params_as_df
         group_by_attr_names = ['seir'] + [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']

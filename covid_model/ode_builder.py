@@ -129,7 +129,7 @@ class ODEBuilder:
         levels in param_attr_levels.
 
     """
-    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None):
+    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None, deepcopy_params=True):
         # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
 
         self.trange = trange if trange is not None else base_ode_builder.trange
@@ -155,12 +155,15 @@ class ODEBuilder:
         self.solution_ydf = None
 
         if base_ode_builder is not None:
-            self.params = {t: params_by_cmpt.copy() for t, params_by_cmpt in base_ode_builder.params.items() for t in self.trange}
+            if deepcopy_params:
+                self.params = {t: {cmpt: params.copy() for cmpt, params in params_by_cmpt.items()} for t, params_by_cmpt in base_ode_builder.params.items() for t in self.trange}
+            else:
+                self.params = {t: params_by_cmpt for t, params_by_cmpt in base_ode_builder.params.items() for t in self.trange}
             self.terms = {term.deepcopy() for term in base_ode_builder.terms}
-            self.linear_matrix = {t: copy.deepcopy(m) for t, m in base_ode_builder.linear_matrix.items() if t in self.trange}
-            self.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in base_ode_builder.nonlinear_matrices.items() if t in self.trange}
-            self.constant_vector = {t: copy.deepcopy(m) for t, m in base_ode_builder.constant_vector.items() if t in self.trange}
-            self.nonlinear_multiplier = copy.deepcopy(base_ode_builder.nonlinear_multiplier)
+            self.linear_matrix = {t: m.copy() for t, m in base_ode_builder.linear_matrix.items() if t in self.trange}
+            self.nonlinear_matrices = {t: m.copy() for t, m in base_ode_builder.nonlinear_matrices.items() if t in self.trange}
+            self.constant_vector = {t: m.copy() for t, m in base_ode_builder.constant_vector.items() if t in self.trange}
+            self.nonlinear_multiplier = base_ode_builder.nonlinear_multiplier.copy()
         else:
             self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
             self.reset_ode()

@@ -87,8 +87,11 @@ class CovidModelFit:
             this_end_t = tslices[-trim_off_end] if trim_off_end > 0 else end_t
             this_end_date = self.base_specs.start_date + dt.timedelta(days=this_end_t)
 
-            model = CovidModel(base_model=base_model, end_date=this_end_date)
+            t01 = perf_counter()
+            model = CovidModel(base_model=base_model, end_date=this_end_date, deepcopy_params=False)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
+            t02 = perf_counter()
+            print(f'Model copied in {t02-t01} seconds.')
 
             fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
