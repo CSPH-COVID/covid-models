@@ -56,14 +56,14 @@ def forecast_timeseries(data, horizon=1, sims=10, arima_order='auto', use_garch=
 
 class CovidModelSimulation:
     def __init__(self, specs, engine, end_date=None):
-        self.model = CovidModel(end_date=end_date)
-        self.model.prep(specs=specs, engine=engine)
-        self.base_tc = self.model.specifications.tc.copy()
+        self.model = CovidModel(end_date=end_date, from_specs=specs, engine=engine)
+        self.model.prep()
+        self.base_tc = self.model.tc.copy()
 
-        self.window_size = self.model.specifications.tslices[-1] - self.model.specifications.tslices[-2]
-        self.simulation_horizon = int(np.ceil((self.model.tmax - self.model.specifications.tslices[-1]) / self.window_size)) - 1
+        self.window_size = self.model.tslices[-1] - self.model.tslices[-2]
+        self.simulation_horizon = int(np.ceil((self.model.tmax - self.model.tslices[-1]) / self.window_size)) - 1
 
-        tslices = self.model.specifications.tslices + list(range(self.model.specifications.tslices[-1] + self.window_size, self.model.tmax, self.window_size))
+        tslices = self.model.tslices + list(range(self.model.tslices[-1] + self.window_size, self.model.tmax, self.window_size))
         tc = self.base_tc + [self.base_tc[-1]] * (len(tslices) - len(self.base_tc) + 1)
         self.model.apply_tc(tslices=tslices, tc=tc)
 
@@ -97,7 +97,7 @@ class CovidModelSimulation:
 
         stmt = self.table.insert().values(
             created_at=dt.datetime.now(),
-            spec_id=int(self.model.specifications.spec_id),
+            spec_id=int(self.model.spec_id),
             start_date=self.model.start_date,
             end_date=self.model.end_date,
         )
@@ -111,17 +111,17 @@ class CovidModelSimulation:
     def run_base_result(self):
         self.model.solve_seir()
         self.base_results = self.model.solution_ydf.stack(level=self.model.param_attr_names)
-        self.model.write_to_db(self.engine)
+        self.model.write_results_to_db(self.engine)
 
     def sample_fitted_tcs(self, sample_n=1):
-        fitted_count = len(self.model.specifications.tc_cov)
-        fitted_efs_dist = sps.multivariate_normal(mean=self.base_tc[-fitted_count:], cov=[[float(x) for x in a] for a in self.model.specifications.tc_cov])
+        fitted_count = len(self.model.tc_cov)
+        fitted_efs_dist = sps.multivariate_normal(mean=self.base_tc[-fitted_count:], cov=[[float(x) for x in a] for a in self.model.tc_cov])
         fitted_efs_samples = fitted_efs_dist.rvs(sample_n)
 
         return [list(self.base_tc[:-fitted_count]) + list(sample if hasattr(sample, '__iter__') else [sample]) for sample in (fitted_efs_samples if sample_n > 1 else [fitted_efs_samples])]
 
     def sample_simulated_tcs(self, sample_n=1, sims_per_fitted_sample=5, arima_order='auto', skip_early_tcs=8):
-        if len(np.unique(np.diff(self.model.specifications.tslices[skip_early_tcs-1:]))) > 1:
+        if len(np.unique(np.diff(self.model.tslices[skip_early_tcs-1:]))) > 1:
             raise ValueError('Window-sizes for TCs used for prediction must be evenly spaced.')
 
         simulated_tcs = []
@@ -145,14 +145,14 @@ class CovidModelSimulation:
             self.results.append(self.model.solution_ydf.stack(level=self.model.param_attr_names))
             self.results_hosps.append(self.model.solution_sum('seir')['Ih'])
             t1 = perf_counter()
-            self.model.write_to_db(self.engine, sim_id=self.sim_id, sim_result_id=i, cmpts_json_attrs=tuple())
+            self.model.write_results_to_db(self.engine, sim_id=self.sim_id, sim_result_id=i, cmpts_json_attrs=tuple())
             t2 = perf_counter()
             print(f'Simulation {i+1}/{len(simulated_tcs)} completed in {round(t2-t0, 4)} sec, including {round(t2-t1, 4)} sec to write to database.')
 
         results_hosps_df = pd.DataFrame({i: hosps for i, hosps in enumerate(self.results_hosps)})
         hosp_percentiles = {int(100*qt): list(results_hosps_df.quantile(0.05, axis=1).values) for qt in [0.05, 0.10, 0.25, 0.5, 0.75, 0.90, 0.95]}
 
-        stmt = self.table.update().where(self.table.c.sim_id == self.sim_id).values(
+        stmt = self.table.update_specs().where(self.table.c.sim_id == self.sim_id).values(
             sim_count=len(self.results_hosps),
             hospitalized_percentiles=hosp_percentiles
         )

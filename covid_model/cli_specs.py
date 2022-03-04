@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 class ModelSpecsArgumentParser(ArgumentParser):
     def __init__(self):
         super().__init__()
-        self.add_argument('-sid', '--specs', type=int)
+        self.add_argument('-sid', '--from_specs', type=int)
         self.add_argument('-tsl', '--tslices', nargs='+', type=int)
         self.add_argument('-tc', '--tc', nargs='+', type=float)
         self.add_argument('-p', '--params', type=str)

@@ -32,7 +32,7 @@ def run_sensitivity_tests(fit_id, alternate_params, refit_from_date=dt.datetime(
         print(immun_params)
         fit_ids[label], fits[label] = run_fit(engine, fit_id, batch_size=batch_size, look_back_date=refit_from_date, params=params, vacc_immun_params=immun_params
                                               , tags={'run_type': 'Sensitivity Test', 'batch': batch, 'test_scen': label, 'alt_params': json.dumps(scens[label])})
-        fits[label].model.write_to_db()
+        fits[label].model.write_results_to_db()
         modeled(fits[label].model, compartments=[plot_compartment], label=label)
 
     pd.DataFrame.from_dict(fit_ids, orient='index').to_csv('output/sensitivity_tests_fit_ids.csv', header=False)
