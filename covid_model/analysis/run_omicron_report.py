@@ -30,17 +30,24 @@ if __name__ == '__main__':
     parser.add_argument("--plot", action="append", choices=plot_opts.keys(), required=False,
                         help="add a plot to the output figure, default: Prevalence, Hospitalizations, Variant Share, "
                              "and Percent Immune")
+    parser.add_argument("-fd", "--from_date", default='2021-07-01', type=str, help="min date for plots")
+    parser.add_argument("-td", "--to_date", default='2022-05-31', type=str, help="max date for plots")
     run_args = parser.parse_args()
+    from_date = dt.date.fromisoformat(run_args.from_date)
+    to_date = dt.date.fromisoformat(run_args.to_date)
 
     run_args.plot = ['prev', 'hosp', 'var', 'imm'] if run_args.plot is None else run_args.plot
     plots = [plot for plot in run_args.plot if plot in plot_opts.keys()]
     print("Will produce these plots:" + ", ".join([plot_opts[plot] for plot in plots]))
 
     print('Prepping model...')
+    t0 = perf_counter()
     engine = db_engine()
-    model = CovidModel(end_date=dt.date(2022, 10, 31))
-    model.prep(engine=engine, **parser.specs_args_as_dict())
-    model.apply_tc(tc=model.specifications.tc + [1.0], tslices=model.specifications.tslices + [850])
+    model = CovidModel(end_date=to_date, engine=engine, **parser.specs_args_as_dict())
+    model.prep()
+    model.apply_tc(tc=model.tc + [1.0], tslices=model.tslices + [850])
+    t1 = perf_counter()
+    print(f'Model prepped in {t1-t0} seconds.')
 
     print('Running model...')
     model.solve_seir()
@@ -77,7 +84,7 @@ if __name__ == '__main__':
             modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=ax)
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylabel('Variant Share of Infections')
-            ax.lines.pop(0)
+            # ax.lines.pop(0)
             ax.legend(loc='best')
         if plot == "imm":
             # immunity
@@ -89,7 +96,7 @@ if __name__ == '__main__':
             ax.set_ylim(0, 1)
             ax.set_ylabel('Percent Immune')
             ax.legend(loc='best')
-            ax.set_xlim(dt.date(2020, 4, 1), dt.date(2022, 3, 31))
+            ax.set_xlim(from_date, to_date)
         if plot == "sevimm":
             # immunity
             ax.plot(model.daterange, model.immunity('none'), label='Immunity vs Severe non-Omicron', color='cyan')
@@ -100,12 +107,12 @@ if __name__ == '__main__':
             ax.set_ylim(0, 1)
             ax.set_ylabel('Percent Immune')
             ax.legend(loc='best')
-            ax.set_xlim(dt.date(2020, 4, 1), dt.date(2022, 3, 31))
+            ax.set_xlim(from_date, to_date)
 
     if ("prev" in plots) or ("hosp" in plots):
         # tc shift scenarios
-        base_tslices = model.specifications.tslices.copy()
-        base_tc = model.specifications.tc.copy()
+        base_tslices = model.tslices.copy()
+        base_tc = model.tc.copy()
         if "hosp" in plots:
             hosps_df = pd.DataFrame(index=model.trange)
         for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
@@ -128,7 +135,7 @@ if __name__ == '__main__':
     # formatting
     for ax in axs:
         format_date_axis(ax)
-        ax.set_xlim(dt.date(2021, 7, 1), dt.date(2022, 2, 28))
+        ax.set_xlim(from_date, to_date)
         ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
         ax.legend(loc='best')

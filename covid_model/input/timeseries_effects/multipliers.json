@@ -1,18 +1,12 @@
 {
   "b117": {
-    "hosp": 1.40,
-    "dh": 1.15,
-    "dnh": 1.60,
-    "betta": 1.50
+    "hosp": 1
   },
   "cali": {
-    "betta": 1.20
+    "betta": 1
   },
   "delta": {
-    "hosp": 2.38,
-    "dh": 1.3225,
-    "dnh": 3.28,
-    "betta": 2.25
+    "hosp": 1
   },
   "treatment_mab": {
     "hosp": 0.21,

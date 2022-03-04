@@ -129,7 +129,7 @@ class ODEBuilder:
         levels in param_attr_levels.
 
     """
-    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None):
+    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None, deepcopy_params=True):
         # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
 
         self.trange = trange if trange is not None else base_ode_builder.trange
@@ -155,34 +155,18 @@ class ODEBuilder:
         self.solution_ydf = None
 
         if base_ode_builder is not None:
-            self.params = copy.deepcopy(base_ode_builder.params)
+            if deepcopy_params:
+                self.params = {t: {cmpt: params.copy() for cmpt, params in params_by_cmpt.items()} for t, params_by_cmpt in base_ode_builder.params.items() for t in self.trange}
+            else:
+                self.params = {t: params_by_cmpt for t, params_by_cmpt in base_ode_builder.params.items() for t in self.trange}
             self.terms = {term.deepcopy() for term in base_ode_builder.terms}
-            self.linear_matrix = {t: copy.deepcopy(m) for t, m in base_ode_builder.linear_matrix.items() if t in self.trange}
-            self.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in base_ode_builder.nonlinear_matrices.items() if t in self.trange}
-            self.constant_vector = {t: copy.deepcopy(m) for t, m in base_ode_builder.constant_vector.items() if t in self.trange}
-            self.nonlinear_multiplier = copy.deepcopy(base_ode_builder.nonlinear_multiplier)
+            self.linear_matrix = {t: m.copy() for t, m in base_ode_builder.linear_matrix.items() if t in self.trange}
+            self.nonlinear_matrices = {t: m.copy() for t, m in base_ode_builder.nonlinear_matrices.items() if t in self.trange}
+            self.constant_vector = {t: m.copy() for t, m in base_ode_builder.constant_vector.items() if t in self.trange}
+            self.nonlinear_multiplier = base_ode_builder.nonlinear_multiplier.copy()
         else:
             self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
             self.reset_ode()
-
-
-
-    # copy the ODE, including the pre-built matrices; does not copy the solution
-    def deepcopy(self, new_trange=None):
-        new_ode_builder = ODEBuilder(trange=new_trange if new_trange is not None else self.trange.copy(),
-                                     attributes=self.attributes.copy(),
-                                     param_attr_names=self.param_attr_names.copy())
-
-        new_ode_builder.params = new_ode_builder
-
-        new_ode_builder.terms = {term.deepcopy() for term in self.terms}
-
-        new_ode_builder.linear_matrix = {t: copy.deepcopy(m) for t, m in self.linear_matrix.items() if t in new_ode_builder.trange}
-        new_ode_builder.nonlinear_matrices = {t: copy.deepcopy(m) for t, m in self.nonlinear_matrices.items() if t in new_ode_builder.trange}
-        new_ode_builder.constant_vector = {t: copy.deepcopy(m) for t, m in self.constant_vector.items() if t in new_ode_builder.trange}
-        new_ode_builder.nonlinear_multiplier = copy.deepcopy(self.nonlinear_multiplier)
-
-        return new_ode_builder
 
     # return the parameters as a dataframe with t and compartments as index and parameters as columns
     @property
@@ -200,7 +184,10 @@ class ODEBuilder:
 
     # check if a cmpt matches a dictionary of attributes
     def does_cmpt_have_attrs(self, cmpt, attrs, is_param_cmpts=False):
-        return all(cmpt[self.param_attr_level(attr_name) if is_param_cmpts else self.attr_level(attr_name)] == attr_val for attr_name, attr_val in attrs.items())
+        return all(
+            cmpt[self.param_attr_level(attr_name) if is_param_cmpts else self.attr_level(attr_name)]
+            in ([attr_val] if isinstance(attr_val, str) else attr_val)
+            for attr_name, attr_val in attrs.items())
 
     # return compartments that match a dictionary of attributes
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
@@ -211,7 +198,7 @@ class ODEBuilder:
         return tuple(attrs[attr_name] if attr_name in attrs.keys() else attr_list[0] for attr_name, attr_list in self.attributes.items())
 
     # set a parameter (if val is provided; otherwise apply a multiplier or exponent)
-    def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None, except_attrs=None):
+    def set_param(self, param, val=None, attrs=None, trange=None, mult=None, pow=None, except_attrs=None, desc=None):
         if val is not None:
             def apply(t, cmpt, param):
                 self.params[t][cmpt][param] = val

@@ -26,13 +26,12 @@ def build_legacy_output_df(model: CovidModel):
 
     totals = model.solution_sum('seir')
     totals_by_priorinf = model.solution_sum(['seir', 'priorinf'])
-    print(totals_by_priorinf)
     df['Iht'] = totals['Ih']
     df['Dt'] = totals['D']
     df['Rt'] = totals_by_priorinf[('S', 'none')]
     df['Itotal'] = totals['I'] + totals['A']
     df['Etotal'] = totals['E']
-    df['Einc'] = df['Etotal'] / model.specifications.model_params['alpha']
+    df['Einc'] = df['Etotal'] / model.model_params['alpha']
     # for i, age in enumerate(model.attr['age']):
     #     df[f'Vt{i+1}'] = (model.solution_ydf[('S', age, 'vacc')] + model.solution_ydf[('R', age, 'vacc')]) * params_df.xs((age, 'vacc'), level=('age', 'vacc'))['vacc_eff']
     #     df[f'immune{i+1}'] = by_age[('R', age)] + by_age_by_vacc[('S', age, 'vacc')] * params_df.xs((age, 'vacc'), level=('age', 'vacc'))['vacc_eff']
@@ -41,8 +40,8 @@ def build_legacy_output_df(model: CovidModel):
     df['date'] = model.daterange
     df['Ilag'] = totals['I'].shift(3)
     df['Re'] = model.re_estimates
-    df['prev'] = 100000.0 * df['Itotal'] / model.specifications.model_params['total_pop']
-    df['oneinX'] = model.specifications.model_params['total_pop'] / df['Itotal']
+    df['prev'] = 100000.0 * df['Itotal'] / model.model_params['total_pop']
+    df['oneinX'] = model.model_params['total_pop'] / df['Itotal']
     df['Exposed'] = 100.0 * df['Einc'].cumsum()
 
     df.index.names = ['t']
@@ -67,11 +66,11 @@ def tags_to_scen_label(tags):
 
 
 def run_model(model, engine, legacy_output_dict=None):
-    print('Scenario tags: ', model.specifications.tags)
+    print('Scenario tags: ', model.tags)
     model.solve_seir()
-    model.write_to_db(engine, new_spec=True)
+    model.write_results_to_db(engine, new_spec=True)
     if legacy_output_dict is not None:
-        legacy_output_dict[tags_to_scen_label(model.specifications.tags)] = build_legacy_output_df(model)
+        legacy_output_dict[tags_to_scen_label(model.tags)] = build_legacy_output_df(model)
 
 
 def main():
@@ -104,7 +103,7 @@ def main():
 
     # create models for low- and high-vaccine-uptake scenarios
     model = CovidModel(end_date=(CovidModel.default_start_date + dt.timedelta(days=tmax)).date())
-    specs = CovidModelSpecifications.from_db(engine, current_fit_id, new_end_date=model.end_date)
+    specs = CovidModelSpecifications(engine=engine, from_specs=current_fit_id, new_end_date=model.end_date)
     specs.base_spec_id = current_fit_id
     specs.tags = {'batch': batch}
     vacc_proj_dict = json.load(open('input/vacc_proj_params.json'))
@@ -113,19 +112,19 @@ def main():
         specs.set_vacc_proj(vacc_proj_dict[vacc_scen])
         model.prep(specs=specs)
         print(f'Running scenarios...')
-        model.specifications.tags.update({'run_type': 'Vaccination Scenario', 'vacc_cap': vacc_scen, 'tc_shift': 'no shift', 'tc_shift_date': 'no_shift'})
+        model.tags.update({'run_type': 'Vaccination Scenario', 'vacc_cap': vacc_scen, 'tc_shift': 'no shift', 'tc_shift_date': 'no_shift'})
         run_model(model, engine, legacy_output_dict=legacy_outputs)
         if vacc_scen == primary_vacc_scen:
-            model.specifications.tags.update({'run_type': 'Current', 'vacc_cap': vacc_scen})
+            model.tags.update({'run_type': 'Current', 'vacc_cap': vacc_scen})
             run_model(model, engine, legacy_output_dict=legacy_outputs)
             build_legacy_output_df(model).to_csv('output/out2.csv')
 
-        base_tslices, base_tc = (model.specifications.tslices, model.specifications.tc)
+        base_tslices, base_tc = (model.tslices, model.tc)
         for tcs in tc_shifts:
             tc_shift_t = (tc_shift_date - model.start_date).days
             model.apply_tc(tc=base_tc + list(np.linspace(base_tc[-1], base_tc[-1] + tcs, tc_shift_days)),
                            tslices=base_tslices +  list(range(tc_shift_t, tc_shift_t + tc_shift_days)))
-            model.specifications.tags.update({'run_type': 'TC Shift Projection', 'tc_shift': f'{int(100 * tcs)}%', 'tc_shift_date': tc_shift_date.strftime("%b %#d")})
+            model.tags.update({'run_type': 'TC Shift Projection', 'tc_shift': f'{int(100 * tcs)}%', 'tc_shift_date': tc_shift_date.strftime("%b %#d")})
             run_model(model, engine, legacy_output_dict=legacy_outputs)
 
     df = pd.concat(legacy_outputs)
