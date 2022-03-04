@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import datetime as dt
 
+from covid_model.model import CovidModel
 from db import db_engine
 from model_fit import CovidModelFit
 from analysis.charts import actual_hosps, modeled

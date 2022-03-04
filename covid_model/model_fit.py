@@ -56,9 +56,16 @@ class CovidModelFit:
         end_t = self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)
 
+        # create base model
+        base_model = CovidModel(from_specs=self.base_specs, end_date=end_date)
+
+        # calculate and set new I0
+        hosp_rate = base_model.model_params['hosp']['value']['40-64'][0]  # Take first compartment's hosp rate
+        I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
+        base_model.model_params['initial_seed']['value'][0] = I0
+
         # prep model (we only do this once to save time)
         t0 = perf_counter()
-        base_model = CovidModel(from_specs=self.base_specs, end_date=end_date)
         base_model.prep()
         t1 = perf_counter()
         print(f'Model prepped for fitting in {t1-t0} seconds.')
@@ -80,18 +87,13 @@ class CovidModelFit:
             this_end_t = tslices[-trim_off_end] if trim_off_end > 0 else end_t
             this_end_date = self.base_specs.start_date + dt.timedelta(days=this_end_t)
 
-            model = CovidModel(base_model=base_model, end_date=this_end_date)
+            t01 = perf_counter()
+            model = CovidModel(base_model=base_model, end_date=this_end_date, deepcopy_params=False)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
+            t02 = perf_counter()
+            print(f'Model copied in {t02-t01} seconds.')
 
-            # Initial infectious based on hospitalizations and assumed hosp rate
-            infection_seed_cmpt_attrs = {'age': '40-64', 'immun': 'none'}
-            hosp_rate = model.get_param('hosp', infection_seed_cmpt_attrs, trange=[0])[0][1][0]  # Take first compartment's hosp rate
-            I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
-            y0d = model.y0_dict
-            y0d[model.get_default_cmpt_by_attrs({'seir': 'I', **infection_seed_cmpt_attrs})] = I0
-            y0d[model.get_default_cmpt_by_attrs({'seir': 'S', **infection_seed_cmpt_attrs})] -= I0
-
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method, y0d=y0d)
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()

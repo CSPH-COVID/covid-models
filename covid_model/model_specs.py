@@ -83,24 +83,6 @@ class CovidModelSpecifications:
 
         self.update_specs(**spec_args)
 
-    # def copy(self, new_end_date=None):
-    #     specs = CovidModelSpecifications(
-    #         start_date=self.start_date,
-    #         end_date=new_end_date if new_end_date is not None else self.end_date,
-    #         tslices=self.tslices, tc=self.tc,
-    #         params=self.model_params,
-    #         vacc_proj_params=self.vacc_proj_params,
-    #         attribute_multipliers=self.attribute_multipliers
-    #     )
-    #
-    #     specs.tags = self.tags.copy()
-    #     specs.tc_cov = self.tc_cov.copy()
-    #     specs.actual_vacc_df = self.actual_vacc_df.copy()
-    #     specs.timeseries_effects = self.timeseries_effects.copy()
-    #     specs.base_spec_id = self.spec_id
-    #
-    #     return specs
-
     def update_specs(self, engine=None, end_date=None,
                      tslices=None, tc=None, params=None,
                      refresh_actual_vacc=False, vacc_proj_params=None,
