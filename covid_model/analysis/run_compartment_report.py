@@ -16,11 +16,11 @@ if __name__ == '__main__':
     argparser.add_argument('-td', '--to_date', type=dt.date.fromisoformat, default=dt.date.today(), help='x-axis maximum date')
     argparser.add_argument('-gba', '--group_by_attr_names', nargs='+', type=str,
                            choices=CovidModel.attr.keys(), default=['age', 'vacc', 'priorinf'],
-                           help=f'list of attributs name to split charts by')
+                           help=f'list of attributes name to split charts by')
 
     args = argparser.parse_args()
-    model = CovidModel(end_date=args.to_date)
-    model.prep(engine=engine, **argparser.specs_args_as_dict())
+    model = CovidModel(end_date=args.to_date, engine=engine, **argparser.specs_args_as_dict())
+    model.prep()
     model.solve_seir()
 
     seir = {'susceptible': 'S', 'infected': ['I', 'A'], 'hospitalized': 'Ih'}
