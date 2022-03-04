@@ -98,16 +98,8 @@ def run():
     fit.fitted_model.write_to_db(engine)
 
     if fit_params.plot:
-        # fit.fitted_model.solve_seir()
         actual_hosps(engine, county_ids=county_ids)
         modeled(fit.fitted_model, 'Ih')
-        plt.show()
-
-        model = CovidModel(base_model=fit.fitted_model)
-        model.solve_seir()
-        actual_hosps(engine, county_ids=model.tags['county_ids'] if 'county_ids' in model.tags.keys() else None)
-        modeled(model, 'Ih')
-        model.write_to_db(engine)
         plt.show()
 
 
