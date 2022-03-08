@@ -19,7 +19,7 @@ class RegionalCovidModel(CovidModel):
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
     @classmethod
-    def construct_region_contact_matrix(cls, regions: OrderedDict, fpath=None):
+    def construct_region_contact_matrices(cls, regions: OrderedDict, fpath=None):
         df = get_region_mobility_from_file(fpath) if fpath else get_region_mobility_from_db(db_engine())
 
         # add regions to dataframe
@@ -32,28 +32,23 @@ class RegionalCovidModel(CovidModel):
             .groupby(['measure_date', 'origin_region', 'destination_region'])\
             .aggregate(total_dwell_duration_hrs=('total_dwell_duration_hrs', 'sum'))
 
-        # compute dwell share between regions
-        df_origin = df.groupby(['measure_date', 'origin_region']).aggregate(origin_grand_total_dwell_duration_hrs=('total_dwell_duration_hrs', 'sum'))
-        df = df.join(df_origin, on=['measure_date', 'origin_region'])
-        df['share_total_dwell_hrs'] = df['total_dwell_duration_hrs'] / df['origin_grand_total_dwell_duration_hrs']
-        df = df.drop(['total_dwell_duration_hrs', 'origin_grand_total_dwell_duration_hrs'], axis=1)
-
         # Create dictionaries of matrices, both D and M.
         dates = df.index.get_level_values('measure_date')
         region_idx = {region: i for i, region in enumerate(regions.keys())}
-        Ds = {}
+        dwell_matrices = {}
+
         for date in dates:
             dfsub = df.loc[df.index.get_level_values('measure_date') == date].reset_index('measure_date', drop=True).reset_index()
             idx_i = [region_idx[region] for region in dfsub['origin_region']]
             idx_j = [region_idx[region] for region in dfsub['destination_region']]
-            vals  = dfsub['share_total_dwell_hrs']
-            Ds[date] = sparse.coo_array((vals, (idx_i, idx_j)), shape=(len(regions), len(regions))).todense()
-            Ds[date][np.isnan(Ds[date])] = 0
-        Ms = {}
-        for date, D in Ds.items():
-            Ms[date] = np.dot(D, np.transpose(D))
+            vals  = dfsub['total_dwell_duration_hrs']
+            dwell = sparse.coo_array((vals, (idx_i, idx_j)), shape=(len(regions), len(regions))).todense()
+            dwell[np.isnan(dwell)] = 0
+            dwell_rownorm = dwell / dwell.sum(axis=1)[:, np.newaxis]
+            dwell_colnorm = dwell / dwell.sum(axis=0)[np.newaxis, :]
+            dwell_matrices[date] = {"dwell": dwell, "dwell_rownorm": dwell_rownorm, "dwell_colnorm": dwell_colnorm}
 
-        return {"regions": regions, "df": df, "D": Ds, "M": Ms}
+        return {"regions": regions, "df": df, "dwell_matrices": dwell_matrices}
 
 
 
