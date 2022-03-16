@@ -179,7 +179,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # disease termination
         for variant in self.attributes['variant']:
-            priorinf = 'omicron' if variant == 'omicron' else 'non-omicron'
+            # TODO: Rename "non-omicron" to "other"; will need to make the change in attribute_multipliers, which will break old specifications
+            priorinf = variant if variant != 'none' and variant in self.attributes['priorinf'] else 'non-omicron'
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
             self.add_flows_by_attr({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - priorinf_fail_rate)')
