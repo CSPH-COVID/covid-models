@@ -59,6 +59,7 @@ class CovidModelSpecifications:
                 self.set_vacc_proj(json.loads(row['vacc_proj_params']))
                 self.timeseries_effects = json.loads(row['timeseries_effects'])
                 self.attribute_multipliers = json.loads(row['attribute_multipliers'])
+                self.tags = json.loads(row['tags'])
             # if from_specs is an existing specification, do a deep copy
             elif isinstance(from_specs, CovidModelSpecifications):
                 self.start_date = from_specs.start_date
