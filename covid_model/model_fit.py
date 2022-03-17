@@ -4,12 +4,14 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 from time import perf_counter
+from matplotlib import pyplot as plt
 
 import scipy.optimize as spo
 
-from covid_model.data_imports import ExternalHosps, ExternalData
-from covid_model.model import CovidModel
+from covid_model.data_imports import ExternalHosps
+from covid_model import CovidModel
 from covid_model.model_specs import CovidModelSpecifications
+from charts import transmission_control, modeled
 
 
 class CovidModelFit:
@@ -43,7 +45,7 @@ class CovidModelFit:
                 f=func
                 , xdata=model.trange
                 , ydata=self.actual_hosp[:len(model.trange)]
-                , p0=model.tc[-look_back:]
+                , p0=model.tc[-(look_back-1):] + [self.tc_0]
                 , bounds=([self.tc_min] * look_back, [self.tc_max] * look_back))
 
         return fitted_tc, fitted_tc_cov
@@ -51,13 +53,14 @@ class CovidModelFit:
     # run an optimization to minimize the cost function using scipy.optimize.minimize()
     # method = 'curve_fit' or 'minimize'
     def run(self, engine, method='curve_fit', window_size=14, look_back=None,
-            last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, **spec_args):
+            last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, model_class=CovidModel,
+            model_args=dict(), forward_sim_each_batch=False, **spec_args):
         # get the end date from actual hosps
         end_t = self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)
 
         # create base model
-        base_model = CovidModel(from_specs=self.base_specs, end_date=end_date)
+        base_model = model_class(from_specs=self.base_specs, end_date=end_date, **model_args)
 
         # calculate and set new I0
         hosp_rate = base_model.model_params['hosp']['value']['40-64'][0]  # Take first compartment's hosp rate
@@ -88,7 +91,7 @@ class CovidModelFit:
             this_end_date = self.base_specs.start_date + dt.timedelta(days=this_end_t)
 
             t01 = perf_counter()
-            model = CovidModel(base_model=base_model, end_date=this_end_date, deepcopy_params=False)
+            model = model_class(base_model=base_model, end_date=this_end_date, deepcopy_params=False, **model_args)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
             t02 = perf_counter()
             print(f'Model copied in {t02-t01} seconds.')
@@ -101,6 +104,21 @@ class CovidModelFit:
             if write_batch_output:
                 model.tags['run_type'] = 'intermediate-fit'
                 model.write_to_db(engine)
+
+            # simulate the model and save a picture of the output
+            if forward_sim_each_batch:
+                # solved tc's get applied during model fitting
+                model.solve_seir()
+                fig = plt.figure(figsize=(10, 10), dpi=300)
+                ax = fig.add_subplot(211)
+                hosps_df = self.actual_hosp[:len(model.daterange)]
+                hosps_df.index = model.daterange
+                hosps_df.plot(**{'color': 'red', 'label': 'Actual Hosps.'})
+                modeled(model, compartments='Ih', c='blue', ax=ax)
+                ax = fig.add_subplot(212)
+                transmission_control(model, ax=ax)
+                plt.savefig(f'output/{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_forward_sim_{i}.png')
+                plt.close()
 
         self.fitted_tc = tc
         self.fitted_tc_cov = fitted_tc_cov
