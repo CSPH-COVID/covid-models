@@ -41,8 +41,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.compile()
 
     def build_param_lookups(self, apply_vaccines=True):
-        # set TC
-        self.apply_tc()
 
         # prep general parameters
         for name, val in self.model_params.items():
@@ -50,6 +48,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                 self.set_param_using_age_dict(name, val)
             else:
                 for i, (tmin, tmax) in enumerate(zip([self.tmin] + val['tslices'], val['tslices'] + [self.tmax])):
+                    tmin = (dt.datetime.strptime(tmin, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmin, str) else tmin
+                    tmax = (dt.datetime.strptime(tmax, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmax, str) else tmax
                     v = {a: av[i] for a, av in val['value'].items()} if isinstance(val['value'], dict) else val['value'][i]
                     self.set_param_using_age_dict(name, v, trange=range(tmin, tmax))
 
@@ -125,11 +125,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # if the lengths do not match, raise an error
         if len(self.tc) != len(self.tslices) + 1:
             raise ValueError(f'The length of tc ({len(self.tc)}) must be equal to the length of tslices ({len(self.tslices)}) + 1.')
-
-        # apply to the ef parameter
-        # TODO: the ODE is no longer using this (uses non-linear multiplier instead), so we should check if this is used and get rid of it
-        for tmin, tmax, tc in zip([self.tmin] + self.tslices, self.tslices + [self.tmax], self.tc):
-            self.set_param('ef', tc, trange=range(tmin, tmax))
 
         # apply the new TC values to the non-linear multiplier to update the ODE
         # TODO: only update the nonlinear multipliers for TCs that have been changed
