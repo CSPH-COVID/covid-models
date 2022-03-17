@@ -5,36 +5,10 @@ import datetime as dt
 
 from db import db_engine
 import covid_model
+from covid_model import all_regions_and_counties
 from model_fit import CovidModelFit
 from analysis.charts import actual_hosps, modeled
 from covid_model.cli_specs import ModelSpecsArgumentParser
-
-
-regions = {
-  "ad": "Adams County",
-  "ar": "Arapahoe County",
-  "bo": "Boulder County",
-  "brm": "Broomfield County",
-  "den": "Denver County",
-  "doug": "Douglas County",
-  "ep": "El Paso County",
-  "jeff": "Jefferson County",
-  "lar": "Larimer County",
-  "mesa": "Mesa County",
-  "pueb": "Pueblo County",
-  "weld": "Weld County",
-  "cent": "Central",
-  "cm": "Central Mountains",
-  "met": "Metro",
-  "ms": "Metro South",
-  "ne": "Northeast",
-  "nw": "Northwest",
-  "slv": "San Luis Valley",
-  "sc": "South Central",
-  "sec": "Southeast Central",
-  "sw": "Southwest",
-  "wcp": "West Central Partnership"
-}
 
 
 def run():
@@ -47,7 +21,7 @@ def run():
     parser.add_argument("-tmn", "--tc_min", type=float, default=0, help="The lowest tc to allow")
     parser.add_argument("-tmx", "--tc_max", type=float, default=0.99, help="The lowest tc to allow")
     parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
-    parser.add_argument("-rg", "--region", choices=regions.keys(), required=False, help="Specify the region to be run, if not specified, just runs default parameters")
+    parser.add_argument("-rg", "--region", choices=all_regions_and_counties.keys(), required=False, help="Specify the region to be run, if not specified, just runs default parameters")
     parser.add_argument("-rh", "--hosp_data", type=str, help="the path to the hospitalizations data for regions (temporary fix)")
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
     parser.add_argument("-mc", "--model_class", default="CovidModel", help="Name of the class to use for the model (Defaults to CovidModel)")
