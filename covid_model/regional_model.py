@@ -14,9 +14,18 @@ class RegionalCovidModel(CovidModel):
                         'priorinf': ['none', 'non-omicron', 'omicron'],
                         'variant': ['none', 'alpha', 'delta', 'omicron'],
                         'immun': ['none', 'weak', 'strong'],
-                        'region': None})
+                        'region': ['']})
 
-    param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
+    param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun', 'region')
+
+    def __init__(self, region=None, *args, **kwargs):
+        self.attr['region'] = [region] if region is not None else None
+        super(RegionalCovidModel, self).__init__(*args, **kwargs)
+
+    @property
+    def y0_dict(self):
+        y0d = {('S', age, 'none', 'none', 'none', 'none', self.attr['region'][0]): n for age, n in self.group_pops.items()}
+        return y0d
 
     @classmethod
     def construct_region_contact_matrices(cls, regions: OrderedDict, fpath=None):
@@ -49,6 +58,9 @@ class RegionalCovidModel(CovidModel):
             dwell_matrices[date] = {"dwell": dwell, "dwell_rownorm": dwell_rownorm, "dwell_colnorm": dwell_colnorm}
 
         return {"regions": regions, "df": df, "dwell_matrices": dwell_matrices}
+
+    def read_results_from_db(self):
+        pass
 
 
 
