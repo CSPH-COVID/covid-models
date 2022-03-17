@@ -16,7 +16,6 @@ from covid_model.utils import get_params
 class CovidModelSpecifications:
 
     def __init__(self, start_date=None, end_date=None, engine=None, from_specs=None, **spec_args):
-
         self.start_date = None
         self.end_date = None
 
@@ -26,16 +25,27 @@ class CovidModelSpecifications:
 
         self.tslices = None
         self.tc = None
+        if 'tslices' in spec_args or 'tc' in spec_args:
+                self.tslices = spec_args['tslices']
+                self.tc = spec_args['tc']
         self.tc_cov = None
+        #TODO: set tc_cov?
 
         self.model_params = None
         self.group_pops = None
         self.vacc_proj_params = None
-        self.timeseries_effects = {}
         self.attribute_multipliers = None
+        for spec_attribute in ['vacc_proj_params', 'attribute_multipliers']:
+            if spec_attribute in spec_args and spec_args[spec_attribute] is not None:
+                with open(spec_args[spec_attribute], 'r') as f:
+                    setattr(self, spec_attribute, json.load(f))
+        self.timeseries_effects = {}
 
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df (including proj) is saved to avoid unnecessary processing
+
+        if start_date is not None and from_specs is not None:
+            raise NotImplementedError(f'Changing the start_date of an existing spec is not supported.')
 
         # base specs can be provided via a database spec_id or an CovidModelSpecifications object
         if from_specs is not None:
@@ -43,7 +53,6 @@ class CovidModelSpecifications:
             if isinstance(from_specs, int):
                 if engine is None:
                     raise ValueError(f'Database engine is required to fetch specification {from_specs} from db.')
-
                 df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {from_specs}", con=engine, coerce_float=True)
                 if len(df) == 0:
                     raise ValueError(f'{from_specs} is not a valid spec ID.')
@@ -59,6 +68,7 @@ class CovidModelSpecifications:
                 self.set_vacc_proj(json.loads(row['vacc_proj_params']))
                 self.timeseries_effects = json.loads(row['timeseries_effects'])
                 self.attribute_multipliers = json.loads(row['attribute_multipliers'])
+                self.update_specs(engine=engine, **spec_args)
             # if from_specs is an existing specification, do a deep copy
             elif isinstance(from_specs, CovidModelSpecifications):
                 self.start_date = from_specs.start_date
@@ -72,16 +82,18 @@ class CovidModelSpecifications:
                     tslices=copy.deepcopy(from_specs.tslices), tc=copy.deepcopy(from_specs.tc),
                     params=copy.deepcopy(from_specs.model_params),
                     vacc_proj_params=copy.deepcopy(from_specs.vacc_proj_params),
-                    attribute_multipliers=copy.deepcopy(from_specs.attribute_multipliers))
+                    attribute_multipliers=copy.deepcopy(from_specs.attribute_multipliers),
+                    **spec_args)
             else:
                 raise TypeError(f'from_specs must be an int or CovidModelSpecifications; not a {type(from_specs)}.')
 
-        if start_date is not None:
-            if self.start_date is not None and start_date != self.start_date:
-                raise NotImplementedError(f'Changing the start_date of an existing spec is not supported.')
-            self.start_date = start_date
+        else:
+            if start_date is None:
+                raise NotImplementedError(f'If not pulling from existing spec, must specify start_date')
+            self.start_date = dt.datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = dt.datetime.strptime(end_date, "%Y-%m-%d").date() if end_date is not None and type(end_date) == str else end_date
 
-        self.update_specs(**spec_args)
+            self.update_specs(engine=engine, end_date=end_date, **spec_args)
 
     def update_specs(self, engine=None, end_date=None,
                      tslices=None, tc=None, params=None,
