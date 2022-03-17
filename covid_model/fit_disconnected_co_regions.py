@@ -3,25 +3,11 @@ import json
 import datetime as dt
 
 from db import db_engine
-from covid_model import RegionalCovidModel
+from covid_model import RegionalCovidModel, all_regions
 from model_fit import CovidModelFit
 from analysis.charts import actual_hosps, modeled
 from covid_model.cli_specs import ModelSpecsArgumentParser
 from data_imports import ExternalHosps
-
-all_regions = {
-    "cent": "Central",
-    "cm": "Central Mountains",
-    "met": "Metro",
-    "ms": "Metro South",
-    "ne": "Northeast",
-    "nw": "Northwest",
-    "slv": "San Luis Valley",
-    "sc": "South Central",
-    "sec": "Southeast Central",
-    "sw": "Southwest",
-    "wcp": "West Central Partnership"
-}
 
 
 def run():
@@ -83,9 +69,9 @@ def run():
                 actual_hosps(engine, county_ids=region_county_ids)
                 modeled(fit.fitted_model, 'Ih')
                 plt.savefig('output/fitted_' + region + ".png", dpi=300)
-            print(f'{region} failed')
-        except RuntimeError:
             print(f'{region} succeeded')
+        except RuntimeError:
+            print(f'{region} failed')
 
 
 if __name__ == '__main__':
