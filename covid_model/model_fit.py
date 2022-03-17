@@ -31,7 +31,7 @@ class CovidModelFit:
     def set_actual_hosp(self, engine=None, county_ids=None):
         self.actual_hosp = ExternalHosps(engine, t0_date=self.base_specs.start_date).fetch(county_ids=county_ids)['currently_hospitalized']
 
-    def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
+    def single_fit(self, model: CovidModel, look_back, increment_size, method='curve_fit', y0d=None):
         # define initial states
         fitted_tc, fitted_tc_cov = (None, None)
         fixed_tc = model.tc[:-look_back]
@@ -45,7 +45,7 @@ class CovidModelFit:
                 f=func
                 , xdata=model.trange
                 , ydata=self.actual_hosp[:len(model.trange)]
-                , p0=model.tc[-(look_back-1):] + [self.tc_0]
+                , p0=model.tc[-(look_back-increment_size):] + [self.tc_0] * increment_size
                 , bounds=([self.tc_min] * look_back, [self.tc_max] * look_back))
 
         return fitted_tc, fitted_tc_cov
@@ -96,7 +96,7 @@ class CovidModelFit:
             t02 = perf_counter()
             print(f'Model copied in {t02-t01} seconds.')
 
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, increment_size=increment_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
