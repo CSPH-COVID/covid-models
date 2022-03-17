@@ -14,7 +14,9 @@ class ModelSpecsArgumentParser(ArgumentParser):
         self.add_argument('-vprev', '--variant_prevalence', type=str)
         self.add_argument('-mprev', '--mab_prevalence', type=str)
         self.add_argument('-am', '--attribute_multipliers', type=str)
-        self.set_defaults(refresh_actual_vacc=False)
+        self.add_argument('-sd', '--start_date', type=str, help="format: YYYY-MM-DD")
+        self.add_argument('-ed', '--end_date', type=str, help="format: YYYY-MM-DD")
+        self.set_defaults(refresh_actual_vacc=False, start_date=None)
 
         self.specs_args = self.parse_known_args()[0].__dict__.keys()
 
