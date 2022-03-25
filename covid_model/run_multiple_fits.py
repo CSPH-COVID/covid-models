@@ -96,10 +96,13 @@ def run():
             fit.set_actual_hosp(engine, county_ids=county_ids)
 
         # run fit
-        fit.run(engine, look_back=look_back, batch_size=batch_size,
-                increment_size=increment_size, window_size=window_size,
-                region_params=region_params, region=region,
-                write_batch_output=write_batch_output)
+        if look_back == 0:
+            fit.fitted_model = fit.base_specs
+        else:
+            fit.run(engine, look_back=look_back, batch_size=batch_size,
+                    increment_size=increment_size, window_size=window_size,
+                    region_params=region_params, region=region,
+                    write_batch_output=write_batch_output)
 
         print(fit.fitted_model.tslices)
         print(fit.fitted_tc)
