@@ -31,7 +31,7 @@ class CovidModelFit:
     def set_actual_hosp(self, engine=None, county_ids=None):
         self.actual_hosp = ExternalHosps(engine, t0_date=self.base_specs.start_date).fetch(county_ids=county_ids)['currently_hospitalized']
 
-    def single_fit(self, model: CovidModel, look_back, increment_size, method='curve_fit', y0d=None):
+    def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
         # define initial states
         fitted_tc, fitted_tc_cov = (None, None)
         fixed_tc = model.tc[:-look_back]
@@ -45,7 +45,7 @@ class CovidModelFit:
                 f=func
                 , xdata=model.trange
                 , ydata=self.actual_hosp[:len(model.trange)]
-                , p0=model.tc[-(look_back-increment_size):] + [self.tc_0] * increment_size
+                , p0=model.tc[-look_back:]
                 , bounds=([self.tc_min] * look_back, [self.tc_max] * look_back))
 
         return fitted_tc, fitted_tc_cov
@@ -54,18 +54,13 @@ class CovidModelFit:
     # method = 'curve_fit' or 'minimize'
     def run(self, engine, method='curve_fit', window_size=14, look_back=None,
             last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, model_class=CovidModel,
-            model_args=dict(), forward_sim_each_batch=False, **spec_args):
+            model_args=dict(), forward_sim_each_batch=False, use_base_specs_end_date=False, **spec_args):
         # get the end date from actual hosps
-        end_t = self.actual_hosp.index.max() + 1
+        end_t = (self.base_specs.end_date - self.base_specs.start_date).days if use_base_specs_end_date else self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)
 
         # create base model
         base_model = model_class(from_specs=self.base_specs, end_date=end_date, **model_args)
-
-        # calculate and set new I0
-        hosp_rate = base_model.model_params['hosp']['value']['40-64'][0]  # Take first compartment's hosp rate
-        I0 = max(2.2, self.actual_hosp[0] / hosp_rate)
-        base_model.model_params['initial_seed']['value'][0] = I0
 
         # prep model (we only do this once to save time)
         t0 = perf_counter()
@@ -96,7 +91,7 @@ class CovidModelFit:
             t02 = perf_counter()
             print(f'Model copied in {t02-t01} seconds.')
 
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, increment_size=increment_size, method=method)
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
