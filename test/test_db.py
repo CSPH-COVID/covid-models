@@ -1,9 +1,11 @@
 from unittest import TestCase
 from covid_model.db import db_engine, get_sqa_table
 from covid_model.model_specs import CovidModelSpecifications
+from covid_model.model import CovidModel
 from sqlalchemy import *
 from sqlalchemy.engine import create_engine
 from sqlalchemy.schema import *
+import datetime as dt
 
 
 class Test(TestCase):
@@ -14,5 +16,12 @@ class Test(TestCase):
 
     def test_specifications_write_to_db(self):
         engine = db_engine()
-        specs = CovidModelSpecifications(engine=engine, from_specs=870)
+        specs = CovidModelSpecifications(engine=engine, from_specs=1525)
         specs.write_to_db(engine)
+
+    def test_model_write_results_to_db(self):
+        engine = db_engine()
+        model = CovidModel(engine=engine, from_specs=1525, end_date=dt.date(2020, 1, 31))
+        model.prep()
+        model.solve_seir()
+        model.write_results_to_db(engine)

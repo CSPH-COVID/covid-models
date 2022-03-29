@@ -12,8 +12,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron'],
-                        # 'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
+                        'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
                         'immun': ['none', 'weak', 'strong']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
@@ -35,8 +34,9 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.solution_ydf_full = None
 
     # a model must be prepped before it can be run; if any params EXCEPT the efs (i.e. TC) change, it must be re-prepped
-    def prep(self):
-        self.build_param_lookups()
+    def prep(self, rebuild_param_lookups=True):
+        if rebuild_param_lookups:
+            self.build_param_lookups()
         self.build_ode()
         self.compile()
 
@@ -163,6 +163,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'alpha'}, constant='alpha_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'delta'}, constant='delta_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
+        self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2'}, constant='ba2_seed')
 
         # exposure
         asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
