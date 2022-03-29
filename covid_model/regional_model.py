@@ -28,7 +28,8 @@ class RegionalCovidModel(CovidModel):
         return y0d
 
     @classmethod
-    def construct_region_contact_matrices(cls, regions: OrderedDict, fpath=None):
+    def construct_region_contact_matrices(cls, regions: OrderedDict, region_params, fpath=None):
+        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_params.items() if key in regions.keys()])
         df = get_region_mobility_from_file(fpath) if fpath else get_region_mobility_from_db(db_engine())
 
         # add regions to dataframe
@@ -58,9 +59,3 @@ class RegionalCovidModel(CovidModel):
             dwell_matrices[date] = {"dwell": dwell, "dwell_rownorm": dwell_rownorm, "dwell_colnorm": dwell_colnorm}
 
         return {"regions": regions, "df": df, "dwell_matrices": dwell_matrices}
-
-    def read_results_from_db(self):
-        pass
-
-
-
