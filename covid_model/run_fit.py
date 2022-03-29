@@ -68,7 +68,7 @@ def run():
             region_params=region_params, region=region,
             write_batch_output=write_batch_output,
             model_class=model_class,
-            model_args={"region": region} if regions is not None else dict())
+            model_args={"region": region} if region is not None else dict())
 
     print(fit.fitted_model.tslices)
     print(fit.fitted_tc)
