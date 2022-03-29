@@ -24,6 +24,7 @@ if __name__ == '__main__':
     # parser = ModelSpecsArgumentParser()
     parser = argparse.ArgumentParser()
     parser.add_argument("-sids", "--spec_ids", type=int, nargs='+', help="specification IDs to compare")
+    parser.add_argument("-p", "--params", type=str, help="overwerite model params")
     parser.add_argument("-fd", "--from_date", default='2021-07-01', type=str, help="min date for plots")
     parser.add_argument("-td", "--to_date", default='2022-12-31', type=str, help="max date for plots")
     parser.add_argument("-ftc", "--future_tc", type=float, help="TC to converge to in the coming weeks")
@@ -38,14 +39,14 @@ if __name__ == '__main__':
     engine = db_engine()
 
     fig, ax = plt.subplots()
-    # actual_hosps(engine, ax=ax, color='black')
+    actual_hosps(engine, ax=ax, color='black')
 
     for spec_id in run_args.spec_ids:
         # create models
         models = dict()
-        models['no future variant'] = CovidModel(end_date=to_date, engine=engine, from_specs=spec_id)
+        models['no future variant'] = CovidModel(end_date=to_date, engine=engine, from_specs=spec_id, params=run_args.params)
         if future_variant_seed_date is not None:
-            models['w/ future variant'] = CovidModelWithFutureVariant(end_date=to_date, engine=engine, from_specs=spec_id, future_seed_date=future_variant_seed_date)
+            models['w/ future variant'] = CovidModelWithFutureVariant(end_date=to_date, engine=engine, from_specs=spec_id, future_seed_date=future_variant_seed_date, params=run_args.params)
             # add attribute multipliers for future variant
             if run_args.future_variant_attribute_multipliers is not None:
                 models['w/ future variant'].attribute_multipliers = [am for am in models['w/ future variant'].attribute_multipliers if 'variant' not in am['attrs'].keys() or am['attrs']['variant'] != 'future']  # remove attr mults for future variant
@@ -59,7 +60,7 @@ if __name__ == '__main__':
             # adjust TC to future TC over the next 8 weeks
             if run_args.future_tc is not None:
                 window_size = 14
-                change_over_n_windows = 4
+                change_over_n_windows = 6
                 future_tcs = list(np.linspace(model.tc[-1], run_args.future_tc, change_over_n_windows + 1))[1:]
                 future_tslices = list(range(model.tslices[-1], model.tslices[-1] + window_size*change_over_n_windows + 1, window_size))[1:]
                 model.apply_tc(tc=future_tcs, tslices=future_tslices)
@@ -84,9 +85,13 @@ if __name__ == '__main__':
                 print(model.tslices)
                 print(model.tc)
 
+            # make immunity last forever for vaccinated people
+            model.build_param_lookups()
+            model.set_param('imm_decay_days', 999999999999, trange=range(919, model.tmax), except_attrs={'vacc': 'none'})
+
             # prep model
-            model.prep()
-            # del model.params
+            model.prep(rebuild_param_lookups=False)
+
             t1 = perf_counter()
             print(f'Model prepped in {t1-t0} seconds.')
 
@@ -95,6 +100,6 @@ if __name__ == '__main__':
             label = (model.tags['scenario'] if 'scenario' in model.tags else 'unknown') + ', ' + sublabel
             modeled(model, 'Ih', ax=ax, label=label)
 
-
+    format_date_axis(ax)
     plt.legend(loc='best')
     plt.show()
