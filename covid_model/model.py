@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import json
 import datetime as dt
@@ -89,6 +90,9 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
     @property
     def daterange(self): return pd.date_range(self.start_date, periods=len(self.trange))
+
+    @property
+    def tslices_dates(self): return [self.start_date + dt.timedelta(days=ts) for ts in [0] + self.tslices]
 
     # new exposures by day by group
     @property
@@ -270,9 +274,10 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             df['tc'] = unique_params_df['ef']
 
         # write to database
+        chunksize = int(np.floor(10000.0 / df.shape[1]))
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
-                  , index=False, if_exists='append', method='multi', chunksize=1000000)
+                  , index=False, if_exists='append', method='multi', chunksize=chunksize)
 
     def write_gparams_lookup_to_csv(self, fname):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}
