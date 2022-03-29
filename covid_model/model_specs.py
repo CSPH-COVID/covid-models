@@ -3,6 +3,7 @@ import numpy as np
 import datetime as dt
 import json
 import copy
+from collections import OrderedDict
 
 import scipy.stats as sps
 from sqlalchemy import MetaData, func
@@ -159,6 +160,46 @@ class CovidModelSpecifications:
                                           orient='series').items()} if self.proj_vacc_df is not None else None),
                 timeseries_effects=json.dumps(self.timeseries_effects),
                 attribute_multipliers=json.dumps(self.attribute_multipliers)
+            )
+            session.execute(stmt)
+            session.commit()
+
+    def preform_write_query(self, tags=None):
+        # returns all the data you would need to write to the database but doesn't actually write to the database
+        if tags is not None:
+            self.tags.update(tags)
+
+        write_info = OrderedDict([
+            ("created_at", dt.datetime.now()),
+            ("base_spec_id", int(self.base_spec_id) if self.base_spec_id is not None else None),
+            ("tags", json.dumps(self.tags)),
+            ("start_date", self.start_date),
+            ("end_date", self.end_date),
+            ("tslices", self.tslices),
+            ("tc", self.tc),
+            ("tc_cov", json.dumps(self.tc_cov)),
+            ("model_params", json.dumps(self.model_params)),
+            ("vacc_actual", json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()})),
+            ("vacc_proj_params", json.dumps(self.vacc_proj_params)),
+            ("vacc_proj", json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None)),
+            ("timeseries_effects", json.dumps(self.timeseries_effects)),
+            ("attribute_multipliers", json.dumps(self.attribute_multipliers))
+        ])
+
+        return write_info
+
+    @classmethod
+    def write_preformed_to_db(cls, write_info, engine, schema='covid_model', table='specifications'):
+        # writes the given info to the db without needing an explicit instance
+        specs_table = get_sqa_table(engine, schema=schema, table=table)
+
+        with Session(engine) as session:
+            max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
+            spec_id = max_spec_id + 1
+
+            stmt = specs_table.insert().values(
+                spec_id=spec_id,
+                **write_info
             )
             session.execute(stmt)
             session.commit()
