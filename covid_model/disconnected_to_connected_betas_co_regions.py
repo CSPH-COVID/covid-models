@@ -8,6 +8,7 @@ import pickle as pkl
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 from db import db_engine
 from covid_model import RegionalCovidModel, all_regions
@@ -81,12 +82,11 @@ def run():
         cm = pkl.load(open(fname, 'rb'))
 
     ### Solve for connected betas, need to retrieve the correct mobility matrix for each model tslice date
-    # population attached beta
+    print(f'Solving for Connected Betas')
     mobility_dates = pd.Series(cm['dwell_matrices'].keys())
 
-    print(f'Creating Plots')
     betaps = []
-    betars = []
+    betals = []
     for i, date in enumerate(In_df.index):
         cm_i = cm['dwell_matrices'][mobility_dates[np.where(mobility_dates <= date)[0][-1]]]
         Dtilde = cm_i['dwell_rownorm']
@@ -94,80 +94,165 @@ def run():
         beta_i = np.squeeze(np.array(beta_df.loc[beta_df.index == date]))
         In_i = np.squeeze(np.array(In_df.loc[In_df.index == date]))
         betaps.append(beta_i * In_i / np.linalg.multi_dot([Dtilde, np.transpose(Dstar), In_i]))
-        betars.append(np.dot(np.linalg.inv(Dtilde), beta_i * In_i) / np.dot(np.transpose(Dstar), In_i))
+        betals.append(np.dot(np.linalg.inv(Dtilde), beta_i * In_i) / np.dot(np.transpose(Dstar), In_i))
 
     betap_df = pd.DataFrame(index=In_df.index, columns=In_df.columns, data=np.stack(betaps))
-    betar_df = pd.DataFrame(index=In_df.index, columns=In_df.columns, data=np.stack(betars))
+    betal_df = pd.DataFrame(index=In_df.index, columns=In_df.columns, data=np.stack(betals))
 
-    In_df.to_csv("output/connected_regional_model/In_df")
-    beta_df.to_csv("output/connected_regional_model/beta_df")
-    betap_df.to_csv("output/connected_regional_model/betap_df")
-    betar_df.to_csv("output/connected_regional_model/betar_df")
+    In_df.to_csv("output/connected_regional_model/In_df.csv")
+    beta_df.to_csv("output/connected_regional_model/beta_df.csv")
+    betap_df.to_csv("output/connected_regional_model/betap_df.csv")
+    betal_df.to_csv("output/connected_regional_model/betal_df.csv")
 
+    In_df.columns = [all_regions[reg] for reg in In_df.columns]
+
+    print(f'Creating Plots')
+    tstart = dt.datetime.strptime("2020-04-12", "%Y-%m-%d")
+    # create color map
+    colors = sns.color_palette("husl", 11)
+    colordict = dict(zip(In_df.columns, colors))
+
+    # plot the betas of all the regions together
     nr = int(np.ceil(np.sqrt(len(regions))))
     nc = int(np.ceil(len(regions)/nr))
     f, axs = plt.subplots(nr, nc, figsize=(5*nr, 5*nc), sharex=True, sharey=False)
     for i, region in enumerate(regions):
-        #axs.flat[i].step(beta_df.index, beta_df[region], where='post', color=(0.1, 0.1, 0.1))
-        beta_df[region].plot(ax=axs.flat[i], color=(0.1, 0.1, 0.1))
-        betap_df[region].plot(ax=axs.flat[i], color='b')
-        betar_df[region].plot(ax=axs.flat[i], color='r')
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=axs.flat[i], color=(0.1, 0.1, 0.1))
+        betap_df[region].loc[betap_df.index >= tstart].plot(ax=axs.flat[i], color='b', style='--')
+        betal_df[region].loc[betal_df.index >= tstart].plot(ax=axs.flat[i], color='r', style='--')
         axs.flat[i].set_title(all_regions[region])
-        axs.flat[i].legend(['Disconnected', 'Option 1', 'Option 2'])
+        axs.flat[i].legend(['Disconnected', 'Pop Attached', 'Loc Attached'])
     f.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig("output/connected_regional_model/betas_comparison.png")
+    plt.savefig("output/connected_regional_model/betas_comparison_both_options.png")
     plt.close()
 
-    # for each region, plot some details of its betas, and the contact with other regions
-    In_df.columns = [all_regions[reg] for reg in In_df.columns]
+    f, axs = plt.subplots(nr, nc, figsize=(5 * nr, 5 * nc), sharex=True, sharey=False)
     for i, region in enumerate(regions):
-        f, axs = plt.subplots(4, 1, figsize=(25, 20))
-        f.suptitle(all_regions[region])
-        axs.flat[0].set_title("Beta")
-        axs.flat[1].set_title("Infectius Contact With Other Regions")
-        axs.flat[2].set_title("Contact With Other Regions")
-        axs.flat[3].set_title("Percent Infectious of Other Regions")
-        # betas
-        beta_df[region].plot(ax=axs.flat[0], color=(0.1, 0.1, 0.1))
-        betap_df[region].plot(ax=axs.flat[0], color='b')
-        betar_df[region].plot(ax=axs.flat[0], color='r')
-        axs.flat[0].legend(['Disconnected', 'Option 1', 'Option 2'])
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=axs.flat[i], color=(0.1, 0.1, 0.1))
+        betap_df[region].loc[betap_df.index >= tstart].plot(ax=axs.flat[i], color='b', style='--')
+        axs.flat[i].set_title(all_regions[region])
+        axs.flat[i].legend(['Disconnected', 'Pop Attached', 'Loc Attached'])
+    f.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig("output/connected_regional_model/betas_comparison_option1.png")
+    plt.close()
 
-        # contact with infectious from other regions
+    f, axs = plt.subplots(nr, nc, figsize=(5 * nr, 5 * nc), sharex=True, sharey=False)
+    for i, region in enumerate(regions):
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=axs.flat[i], color=(0.1, 0.1, 0.1))
+        betal_df[region].loc[betal_df.index >= tstart].plot(ax=axs.flat[i], color='r', style='--')
+        axs.flat[i].set_title(all_regions[region])
+        axs.flat[i].legend(['Disconnected', 'Loc Attached'])
+    f.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig("output/connected_regional_model/betas_comparison_option2.png")
+    plt.close()
+
+    # plot prevalences for each year separately
+    for year in [2020, 2021, 2022]:
+        f = plt.figure(figsize=(15, 8), dpi=300)
+        ax = plt.gca()
+        plt.title("Prevalence of All Regions")
+        In_df.iloc[In_df.index.year == year].plot(ax=ax, color=[colordict[x] for x in In_df.columns])
+        f.tight_layout()
+        plt.savefig("output/connected_regional_model/prevalence_" + str(year))
+
+    # for each region, plot some details of its betas, and the contact with other regions
+    for i, region in enumerate(regions):
+        name_prefix = str(spec_id_dict[region]) + "_" + region
+        f, axs = plt.subplots(5, 1, figsize=(15, 40))
+        f.suptitle(all_regions[region])
+        axs.flat[0].set_title("Relative Prevalence To This Region")
+        axs.flat[1].set_title("Beta")
+        axs.flat[2].set_title("This Region's Contact With Other Regions (Anywhere)")
+        axs.flat[3].set_title("Fraction of Time Spent In This Region Done By People From Other Regions")
+        axs.flat[4].set_title("Fraction of Other Region's Time Spent In This Region")
+        In_df2 = In_df.loc[In_df.index >= tstart]
+        In_df2 = In_df2.div(In_df2[all_regions[region]], axis=0)
+
+        # prevalence
+        In_df2.plot(ax=axs.flat[0], color=[colordict[x] for x in In_df.columns])
+        # betas
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=axs.flat[1], color=(0.1, 0.1, 0.1))
+        betap_df[region].loc[betap_df.index >= tstart].plot(ax=axs.flat[1], color='b', style='--')
+        betal_df[region].loc[betal_df.index >= tstart].plot(ax=axs.flat[1], color='r', style='--')
+        axs.flat[1].legend(['Disconnected', 'Pop Attached', 'Loc Attached'])
+        # contact with other regions
         region_contact = []
-        region_In_contact = []
         for j, date in enumerate(In_df.index):
             cm_j = cm['dwell_matrices'][mobility_dates[np.where(mobility_dates <= date)[0][-1]]]
-            In_j = In_df.iloc[j]
             region_contact.append(np.dot(cm_j['dwell_rownorm'], np.transpose(cm_j['dwell_colnorm']))[i, :])
-            region_In_contact.append(region_contact[-1] * In_j)
         region_contact = pd.DataFrame(np.stack(region_contact), index=In_df.index, columns=In_df.columns)
-        region_In_contact = pd.DataFrame(np.stack(region_In_contact), index=In_df.index, columns=In_df.columns)
-
-        region_In_contact.drop(all_regions[region], axis=1).plot(ax=axs.flat[1])
-        region_contact.drop(all_regions[region], axis=1).plot(ax=axs.flat[2])
-        In_df.drop(all_regions[region], axis=1).plot(ax=axs.flat[3])
+        rc2 = region_contact.drop(all_regions[region], axis=1).loc[region_contact.index >= tstart]
+        rc2.plot(ax=axs.flat[2], color=[colordict[x] for x in rc2.columns])
+        # Plot the Ds
+        Dtildes = []
+        Dstars = []
+        for j, date in enumerate(In_df.index):
+            cm_j = cm['dwell_matrices'][mobility_dates[np.where(mobility_dates <= date)[0][-1]]]
+            Dtildes.append(cm_j['dwell_rownorm'][i, :])
+            Dstars.append(cm_j['dwell_colnorm'][i, :])
+        Dtildes = pd.DataFrame(np.stack(Dtildes), index=In_df.index, columns=In_df.columns)
+        Dstars = pd.DataFrame(np.stack(Dstars), index=In_df.index, columns=In_df.columns)
+        Dt2 = Dtildes.drop(all_regions[region], axis=1).loc[Dtildes.index >= tstart]
+        Ds2 = Dstars.drop(all_regions[region], axis=1).loc[Dstars.index >= tstart]
+        Dt2.plot(ax=axs.flat[3], color=[colordict[x] for x in Dt2.columns])
+        Ds2.plot(ax=axs.flat[4], color=[colordict[x] for x in Ds2.columns])
+        # save
         f.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig("output/connected_regional_model/mobility_detailed_" + region)
+        plt.savefig("output/connected_regional_model/" + name_prefix + "_mobility_detailed")
         plt.close()
 
         # plot disconnected vs Option 1 only
-        f = plt.figure(figsize=(20, 15), dpi=300)
+        f = plt.figure(figsize=(15, 8), dpi=300)
         ax = plt.gca()
         plt.title("Mobility Adjustments, Population Attached Beta: " + all_regions[region])
-        beta_df[region].plot(ax=ax, color=(0.1, 0.1, 0.1))
-        betap_df[region].plot(ax=ax, color='b', style='--')
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=ax, color=(0.1, 0.1, 0.1))
+        betap_df[region].loc[betap_df.index >= tstart].plot(ax=ax, color='b', style='--')
+        ax.legend(['Disconnected', 'Pop Attached'])
         f.tight_layout()
-        plt.savefig("output/connected_regional_model/mobility_option1_" + region)
+        plt.savefig("output/connected_regional_model/" + name_prefix + "_mobility_option1")
+        plt.close()
 
-        # plot disconnected vs Option 1 only
-        f = plt.figure(figsize=(20, 15), dpi=300)
+        # plot disconnected vs Option 1 detailed
+        f, axs = plt.subplots(3, 1, figsize=(15, 22), dpi=300)
+        f.suptitle("Mobility Adjustments, Population Attached Beta: " + all_regions[region])
+        axs.flat[0].set_title("This Region's Contact With Other Regions (Anywhere)")
+        axs.flat[1].set_title("Relative Prevalence To This Region")
+        axs.flat[2].set_title("Beta")
+        rc2.plot(ax=axs.flat[0], color=[colordict[x] for x in rc2.columns])
+        In_df2.plot(ax=axs.flat[1], color=[colordict[x] for x in In_df.columns])
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=axs.flat[2], color=(0.1, 0.1, 0.1))
+        betap_df[region].loc[betap_df.index >= tstart].plot(ax=axs.flat[2], color='b', style='--')
+        axs[2].legend(['Disconnected', 'Pop Attached'])
+        f.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.savefig("output/connected_regional_model/" + name_prefix + "_mobility_option1_detailed")
+        plt.close()
+
+        # plot disconnected vs Option 2 only
+        f = plt.figure(figsize=(15, 8), dpi=300)
         ax = plt.gca()
         plt.title("Mobility Adjustments, Location Attached Beta: " + all_regions[region])
-        beta_df[region].plot(ax=ax, color=(0.1, 0.1, 0.1))
-        betar_df[region].plot(ax=ax, color='r', style='--')
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=ax, color=(0.1, 0.1, 0.1))
+        betal_df[region].loc[betal_df.index >= tstart].plot(ax=ax, color='r', style='--')
+        ax.legend(['Disconnected', 'Loc Attached'])
         f.tight_layout()
-        plt.savefig("output/connected_regional_model/mobility_option2_" + region)
+        plt.savefig("output/connected_regional_model/" + name_prefix + "_mobility_option2")
+        
+        # plot disconnected vs Option 2 detailed
+        f, axs = plt.subplots(4, 1, figsize=(15, 23), dpi=300)
+        f.suptitle("Mobility Adjustments, Location Attached Beta: " + all_regions[region])
+        axs.flat[0].set_title("Fraction of Time Spent In This Region Done By People From Other Regions")
+        axs.flat[1].set_title("Fraction of Other Region's Time Spent In This Region")
+        axs.flat[2].set_title("Relative Prevalence To This Region")
+        axs.flat[3].set_title("Beta")
+        Dt2.plot(ax=axs.flat[0], color=[colordict[x] for x in Dt2.columns])
+        Ds2.plot(ax=axs.flat[1], color=[colordict[x] for x in Ds2.columns])
+        In_df2.plot(ax=axs.flat[2], color=[colordict[x] for x in In_df.columns])
+        betal_df[region].loc[betal_df.index >= tstart].plot(ax=axs.flat[3], color='r', style='--')
+        beta_df[region].loc[beta_df.index >= tstart].plot(ax=axs.flat[3], color=(0.1, 0.1, 0.1))
+        axs[3].legend(['Disconnected', 'Loc Attached'])
+        f.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.savefig("output/connected_regional_model/" + name_prefix + "_mobility_option2_detailed")
+        plt.close()
 
 
 
