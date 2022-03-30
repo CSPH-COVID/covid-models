@@ -172,6 +172,11 @@ class ODEBuilder:
             self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
             self.reset_ode()
 
+    # the t-values at which the model results will be evaluated in outputs (and for fitting)
+    @property
+    def t_eval(self):
+        return range(min(self.trange), max(self.trange))
+
     # return the parameters as a dataframe with t and compartments as index and parameters as columns
     @property
     def params_as_df(self):

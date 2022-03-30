@@ -33,7 +33,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # if increment is None, set trange to match TC tslices, with breaks added anywhere that has a tslice in model_params
         if increment is None:
             model_param_tslices = {tslice for param, param_specs in self.model_params.items() if isinstance(param_specs, dict) and 'tslices' in param_specs.keys() for tslice in param_specs['tslices']}
-            trange = sorted(list(set(ts for ts in self.tslices if ts < self.tmax).union({0}).union({tlength}).union(model_param_tslices)))
+            trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
+            trange = [ts for ts in trange if ts < self.tmax]
         # if increment is an integer, generate evenly spaced slices
         elif isinstance(increment, int):
             trange = list(range(0, tlength, increment)) + [tlength]
