@@ -41,8 +41,8 @@ class CovidModelFit:
                 return model.solution_sum('seir')['Ih']
             fitted_tc, fitted_tc_cov = spo.curve_fit(
                 f=func
-                , xdata=model.trange
-                , ydata=self.actual_hosp[:len(model.trange)]
+                , xdata=model.t_eval
+                , ydata=self.actual_hosp[:len(model.t_eval)]
                 , p0=model.tc[-look_back:]
                 , bounds=([self.tc_min] * look_back, [self.tc_max] * look_back))
 
