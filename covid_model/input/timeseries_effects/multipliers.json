@@ -11,5 +11,8 @@
   "treatment_mab": {
     "hosp": 0.21,
     "hlos": 0.72
+  },
+  "treatment_pax": {
+    "hosp": 0.11
   }
 }
