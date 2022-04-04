@@ -128,5 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-/covid_model/output/
-*.iml
+# manually added ignores
+covid_model/output/
+.idea/
