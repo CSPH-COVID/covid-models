@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import json
 import datetime as dt
 from multiprocessing import Pool
-from functools import partial
 
 from db import db_engine
 from covid_model import RegionalCovidModel, all_regions
@@ -19,18 +18,7 @@ def region_fit(args):
     print(f'Region: {rname}')
     try:
         engine = db_engine()
-        # get hospitalization data and adjust start/end dates to fit hospitalizations
-        print(f"{rname}: Adjusting start / end dates")
-        region_counties = json.load(open(region_params))[region]['county_names']
         region_county_ids = json.load(open(region_params))[region]['county_fips']
-        hosps = ExternalHosps(engine).fetch_from_db(region_county_ids)
-        start_date = max(dt.datetime.strptime(fit_params.start_date, "%Y-%m-%d").date(),
-                         min(hosps.index[hosps['currently_hospitalized'] > 0]) - dt.timedelta(days=1)).strftime(
-            "%Y-%m-%d")
-        end_date = min(dt.datetime.strptime(fit_params.end_date, "%Y-%m-%d").date(),
-                       max(hosps.index[hosps['currently_hospitalized'] > 0])).strftime("%Y-%m-%d")
-        specs_args.update({'start_date': start_date, 'end_date': end_date})
-        print(f'{rname}: Adjusted start and end dates: {specs_args["start_date"]}, {specs_args["end_date"]}')
         print(f'{rname}: Creating fit object and loading hospitalizations')
         fit = CovidModelFit(engine=engine, region_params=fit_params.region_params, region=region,
                             tc_min=fit_params.tc_min, tc_max=fit_params.tc_max, **specs_args)
