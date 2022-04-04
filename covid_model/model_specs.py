@@ -16,7 +16,8 @@ from covid_model.utils import get_params
 
 class CovidModelSpecifications:
 
-    def __init__(self, start_date=None, end_date=None, engine=None, from_specs=None, **spec_args):
+    def __init__(self, start_date=None, engine=None, from_specs=None, **spec_args):
+
         self.start_date = None
         self.end_date = None
 
@@ -26,27 +27,16 @@ class CovidModelSpecifications:
 
         self.tslices = None
         self.tc = None
-        if 'tslices' in spec_args or 'tc' in spec_args:
-                self.tslices = spec_args['tslices']
-                self.tc = spec_args['tc']
         self.tc_cov = None
-        #TODO: set tc_cov?
 
         self.model_params = None
         self.group_pops = None
         self.vacc_proj_params = None
-        self.attribute_multipliers = None
-        for spec_attribute in ['vacc_proj_params', 'attribute_multipliers']:
-            if spec_attribute in spec_args and spec_args[spec_attribute] is not None:
-                with open(spec_args[spec_attribute], 'r') as f:
-                    setattr(self, spec_attribute, json.load(f))
         self.timeseries_effects = {}
+        self.attribute_multipliers = None
 
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df (including proj) is saved to avoid unnecessary processing
-
-        if start_date is not None and from_specs is not None:
-            raise NotImplementedError(f'Changing the start_date of an existing spec is not supported.')
 
         # base specs can be provided via a database spec_id or an CovidModelSpecifications object
         if from_specs is not None:
@@ -60,7 +50,7 @@ class CovidModelSpecifications:
                 row = df.iloc[0]
 
                 self.start_date = row['start_date']
-                self.end_date = end_date if end_date is not None else row['end_date']
+                self.end_date = spec_args['end_date'] if spec_args['end_date'] is not None else row['end_date']
                 self.spec_id = row['spec_id']
                 self.base_spec_id = row['base_spec_id']
                 self.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=json.loads(row['tc_cov'].replace('{', '[').replace('}', ']')))
@@ -69,7 +59,7 @@ class CovidModelSpecifications:
                 self.set_vacc_proj(json.loads(row['vacc_proj_params']))
                 self.timeseries_effects = json.loads(row['timeseries_effects'])
                 self.attribute_multipliers = json.loads(row['attribute_multipliers'])
-                self.update_specs(engine=engine, **spec_args)
+                self.tags = json.loads(row['tags'])
             # if from_specs is an existing specification, do a deep copy
             elif isinstance(from_specs, CovidModelSpecifications):
                 self.start_date = from_specs.start_date
@@ -79,22 +69,20 @@ class CovidModelSpecifications:
                 self.timeseries_effects = copy.deepcopy(from_specs.timeseries_effects)
                 self.base_spec_id = from_specs.spec_id if from_specs.spec_id is not None else from_specs.base_spec_id
                 self.update_specs(
-                    end_date=end_date if end_date is not None else from_specs.end_date,
+                    end_date=spec_args['end_date'] if spec_args['end_date'] is not None else from_specs.end_date,
                     tslices=copy.deepcopy(from_specs.tslices), tc=copy.deepcopy(from_specs.tc),
                     params=copy.deepcopy(from_specs.model_params),
                     vacc_proj_params=copy.deepcopy(from_specs.vacc_proj_params),
-                    attribute_multipliers=copy.deepcopy(from_specs.attribute_multipliers),
-                    **spec_args)
+                    attribute_multipliers=copy.deepcopy(from_specs.attribute_multipliers))
             else:
                 raise TypeError(f'from_specs must be an int or CovidModelSpecifications; not a {type(from_specs)}.')
 
-        else:
-            if start_date is None:
-                raise NotImplementedError(f'If not pulling from existing spec, must specify start_date')
-            self.start_date = dt.datetime.strptime(start_date, "%Y-%m-%d").date()
-            end_date = dt.datetime.strptime(end_date, "%Y-%m-%d").date() if end_date is not None and type(end_date) == str else end_date
+        if start_date is not None:
+            if self.start_date is not None and start_date != self.start_date:
+                raise NotImplementedError(f'Changing the start_date of an existing spec is not supported.')
+            self.start_date = start_date
 
-            self.update_specs(engine=engine, end_date=end_date, **spec_args)
+        self.update_specs(engine=engine, **spec_args)
 
     def update_specs(self, engine=None, end_date=None,
                      tslices=None, tc=None, params=None,
