@@ -180,7 +180,7 @@ class ODEBuilder:
     # return the parameters as a dataframe with t and compartments as index and parameters as columns
     @property
     def params_as_df(self):
-        return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
+        return pd.concat({t: pd.DataFrame.from_dict(self.params[self.t_prev_lookup[t]], orient='index') for t in self.t_eval}).rename_axis(index=['t'] + list(self.param_attr_names))
 
     # get the level associated with a given attribute name
     # e.g. if attributes are ['seir', 'age', 'variant'], the level of 'age' is 1 and the level of 'variant' is 2
