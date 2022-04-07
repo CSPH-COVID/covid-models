@@ -12,13 +12,13 @@ class MyTestCase(unittest.TestCase):
 
     def region_test(self, region=None, batch_size=6, increment_size=2, write_batch_output=False):
         os.chdir('../covid_model')
-        run_str = f"python run_fit.py -om --fit_id 553 --batch_size {batch_size}"\
+        run_str = f"python run_fit.py --from_specs 1123 --batch_size {batch_size}"\
                   f" --increment_size {increment_size}" \
                   f" --params input/params.json " \
-                  f" --refresh_vacc "
+                  f" --refresh_actual_vacc "
         if region is not None:
             run_str += f"--region {region} --region_params input/region_params.json"
-            run_str += f" --hosp_data ../../data/processed_lpha_hospbycounty_20220128.csv"
+            #run_str += f" --hosp_data ../../data/processed_lpha_hospbycounty_20220128.csv"
         if write_batch_output:
             run_str += " --write_batch_output"
         output = os.system(run_str)

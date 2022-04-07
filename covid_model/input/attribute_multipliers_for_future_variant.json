@@ -1,5 +1,5 @@
 [
-  {"attrs": {"variant": "future"}, "param": "betta", "mult": 5.625, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "betta", "mult": 8.4375, "desc": "Future variant has the same features as Omicron."},
   {"attrs": {"variant": "future"}, "param": "hosp", "mult": 0.357, "desc": "Future variant has the same features as Omicron."},
   {"attrs": {"variant": "future"}, "param": "dh", "mult": 1.3225, "desc": "Future variant has the same features as Omicron."},
   {"attrs": {"variant": "future"}, "param": "dnh", "mult": 0.13225, "desc": "Future variant has the same features as Omicron."},
