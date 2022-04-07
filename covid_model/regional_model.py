@@ -4,7 +4,7 @@ from scipy import sparse
 from collections import OrderedDict
 from covid_model.model import CovidModel
 from covid_model.data_imports import get_region_mobility_from_file, get_region_mobility_from_db
-from db import db_engine
+from covid_model.db import db_engine
 
 
 class RegionalCovidModel(CovidModel):
