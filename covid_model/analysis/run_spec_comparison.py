@@ -21,7 +21,6 @@ from covid_model.run_model_scenarios import build_legacy_output_df
 
 
 if __name__ == '__main__':
-    # parser = ModelSpecsArgumentParser()
     parser = argparse.ArgumentParser()
     parser.add_argument("-sids", "--spec_ids", type=int, nargs='+', help="specification IDs to compare")
     parser.add_argument("-p", "--params", type=str, help="overwerite model params")
@@ -38,68 +37,57 @@ if __name__ == '__main__':
 
     engine = db_engine()
 
-    fig, ax = plt.subplots()
-    actual_hosps(engine, ax=ax, color='black')
+    fig, axs = plt.subplots(2)
+    actual_hosps(engine, ax=axs[1], color='black')
 
     for spec_id in run_args.spec_ids:
-        # create models
-        models = dict()
-        models['no future variant'] = CovidModel(end_date=to_date, engine=engine, from_specs=spec_id, params=run_args.params)
-        if future_variant_seed_date is not None:
-            models['w/ future variant'] = CovidModelWithFutureVariant(end_date=to_date, engine=engine, from_specs=spec_id, future_seed_date=future_variant_seed_date, params=run_args.params)
-            # add attribute multipliers for future variant
-            if run_args.future_variant_attribute_multipliers is not None:
-                models['w/ future variant'].attribute_multipliers = [am for am in models['w/ future variant'].attribute_multipliers if 'variant' not in am['attrs'].keys() or am['attrs']['variant'] != 'future']  # remove attr mults for future variant
-                models['w/ future variant'].attribute_multipliers += run_args.future_variant_attribute_multipliers if isinstance(run_args.future_variant_attribute_multipliers, list) else json.load(open(run_args.future_variant_attribute_multipliers))  # add new attr mults for future variant
 
-        # prep, run, and plot models
-        for sublabel, model in models.items():
-            t0 = perf_counter()
-            print(f'Prepping model for specification {spec_id}...')
+        t0 = perf_counter()
+        print(f'Prepping model for specification {spec_id}...')
+        model = CovidModelWithFutureVariant(end_date=to_date, engine=engine, from_specs=spec_id, params=run_args.params, future_seed_date=future_variant_seed_date)
+        # model = CovidModel(end_date=to_date, engine=engine, from_specs=spec_id, params=run_args.params)
 
-            # adjust TC to future TC over the next 8 weeks
-            if run_args.future_tc is not None:
-                window_size = 14
-                change_over_n_windows = 6
-                future_tcs = list(np.linspace(model.tc[-1], run_args.future_tc, change_over_n_windows + 1))[1:]
-                future_tslices = list(range(model.tslices[-1], model.tslices[-1] + window_size*change_over_n_windows + 1, window_size))[1:]
-                model.apply_tc(tc=future_tcs, tslices=future_tslices)
+        # adjust TC to future TC over the next 8 weeks
+        if run_args.future_tc is not None:
+            window_size = 14
+            change_over_n_windows = 6
+            future_tcs = list(np.linspace(model.tc[-1], run_args.future_tc, change_over_n_windows + 1))[1:]
+            future_tslices = list(range(model.tslices[-1], model.tslices[-1] + window_size*change_over_n_windows + 1, window_size))[1:]
+            model.apply_tc(tc=future_tcs, tslices=future_tslices)
 
-            # add winter TC shift starting on November 25
-            if run_args.winter_tc_shift:
-                today = dt.date.today()
-                # shift TC at winter start date
-                winter_start_date = dt.date(today.year, 11, 25) if today.strftime('%m%d') < '1125' else dt.date(today.year + 1, 11, 25)
-                winter_start_t = (winter_start_date - model.start_date).days
-                winter_tslices = [winter_start_t, *(tslice for tslice in model.tslices if tslice > winter_start_t)]
-                winter_tc = [tc + run_args.winter_tc_shift for tc in model.tc[-len(winter_tslices):]]
-                model.apply_tc(tc=winter_tc, tslices=winter_tslices)
-                # shift TC back at winter end date
-                winter_end_date = dt.date(today.year, 2, 1) if today.strftime('%m%d') < '0201' else dt.date(today.year + 1, 2, 1)
-                winter_end_t = (winter_end_date - model.start_date).days
-                post_winter_tslices = [winter_end_t, *(tslice for tslice in model.tslices if tslice > winter_end_t)]
-                post_winter_tc = [tc - run_args.winter_tc_shift for tc in model.tc[-len(post_winter_tslices):]]
-                model.apply_tc(tc=post_winter_tc, tslices=post_winter_tslices)
-                print(post_winter_tslices)
-                print(post_winter_tc)
-                print(model.tslices)
-                print(model.tc)
+        # add winter TC shift starting on November 25
+        if run_args.winter_tc_shift:
+            today = dt.date.today()
+            # shift TC at winter start date
+            winter_start_date = dt.date(today.year, 11, 25) if today.strftime('%m%d') < '1125' else dt.date(today.year + 1, 11, 25)
+            winter_start_t = (winter_start_date - model.start_date).days
+            winter_tslices = [winter_start_t, *(tslice for tslice in model.tslices if tslice > winter_start_t)]
+            winter_tc = [tc + run_args.winter_tc_shift for tc in model.tc[-len(winter_tslices):]]
+            model.apply_tc(tc=winter_tc, tslices=winter_tslices)
+            # shift TC back at winter end date
+            winter_end_date = dt.date(today.year, 2, 1) if today.strftime('%m%d') < '0201' else dt.date(today.year + 1, 2, 1)
+            winter_end_t = (winter_end_date - model.start_date).days
+            post_winter_tslices = [winter_end_t, *(tslice for tslice in model.tslices if tslice > winter_end_t)]
+            post_winter_tc = [tc - run_args.winter_tc_shift for tc in model.tc[-len(post_winter_tslices):]]
+            model.apply_tc(tc=post_winter_tc, tslices=post_winter_tslices)
 
-            # make immunity last forever for vaccinated people
-            model.build_param_lookups()
-            model.set_param('imm_decay_days', 999999999999, trange=range(919, model.tmax), except_attrs={'vacc': 'none'})
+        # prep model
+        model.prep()
 
-            # prep model
-            model.prep(rebuild_param_lookups=False)
+        t1 = perf_counter()
+        print(f'Model prepped in {t1-t0} seconds.')
 
-            t1 = perf_counter()
-            print(f'Model prepped in {t1-t0} seconds.')
+        # solve and plot
+        model.solve_seir()
+        label = model.tags['scenario'] if 'scenario' in model.tags else 'unknown'
+        modeled(model, ['I', 'A'], ax=axs[0], label=label, share_of_total=True)
+        modeled(model, 'Ih', ax=axs[1], label=label)
 
-            # solve and plot
-            model.solve_seir()
-            label = (model.tags['scenario'] if 'scenario' in model.tags else 'unknown') + ', ' + sublabel
-            modeled(model, 'Ih', ax=ax, label=label)
+    for ax in axs:
+        format_date_axis(ax, interval_months=1)
+        ax.set_xlim(from_date, to_date)
+        ax.legend(loc='best')
 
-    format_date_axis(ax)
-    plt.legend(loc='best')
+    axs[0].set_ylabel('SARS-CoV-2 Infection Prevalence')
+    axs[1].set_ylabel('Hospitalized with COVID-19')
     plt.show()

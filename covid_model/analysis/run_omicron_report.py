@@ -45,8 +45,8 @@ if __name__ == '__main__':
     t0 = perf_counter()
     engine = db_engine()
     model = CovidModel(end_date=to_date, engine=engine, **parser.specs_args_as_dict())
+    # model.apply_tc(tc=model.tc + [1.0], tslices=model.tslices + [815])
     model.prep()
-    # model.apply_tc(tc=model.tc + [1.0], tslices=model.tslices + [850])
     t1 = perf_counter()
     print(f'Model prepped in {t1-t0} seconds.')
 
@@ -89,10 +89,10 @@ if __name__ == '__main__':
             ax.legend(loc='best')
         if plot == "imm":
             # immunity
-            ax.plot(model.daterange, model.immunity('delta'), label='Immunity vs Delta', color='cyan')
-            ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='darkcyan')
-            ax.plot(model.daterange, model.immunity('delta', to_hosp=True), label='Immunity vs Severe Delta', color='gold')
-            ax.plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Severe Omicron', color='darkorange')
+            ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='cyan')
+            ax.plot(model.daterange, model.immunity('omicron', age='65+'), label='Immunity vs Omicron (65+ only)', color='darkcyan')
+            ax.plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Severe Omicron', color='gold')
+            ax.plot(model.daterange, model.immunity('omicron', to_hosp=True, age='65+'), label='Immunity vs Severe Omicron (65+ only)', color='darkorange')
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylim(0, 1)
             ax.set_ylabel('Percent Immune')
@@ -115,7 +115,7 @@ if __name__ == '__main__':
         base_tslices = model.tslices.copy()
         base_tc = model.tc.copy()
         if "hosp" in plots:
-            hosps_df = pd.DataFrame(index=model.trange)
+            hosps_df = pd.DataFrame(index=model.t_eval)
         # for tc_shift, tc_shift_days in [(0, 0), (-0.05, 14), (-0.1, 14), (-0.2, 21), (-0.5, 42)]:
         for tc_shift, tc_shift_days in [(0, 0)]:
             # TODO: Make the start date for TC shifts dynamic and/or configurable
