@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 import datetime as dt
+import copy
 from collections import OrderedDict
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.ode_builder import ODEBuilder
@@ -136,6 +137,19 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
             self.tslices = [tslice for tslice in self.tslices if tslice < tslices[0]] + tslices
+            self.trange = sorted(list(set(self.trange).union(self.tslices)))
+            for i, t in enumerate(self.trange):
+                if t not in self.params.keys():
+                    self.params[t] = copy.deepcopy(self.params[self.trange[i-1]])
+
+            # rebuild trange lookups
+            self.t_prev_lookup = {t_int: max(t for t in self.trange if t <= t_int) for t_int in
+                                  range(min(self.trange), max(self.trange))}
+            self.t_prev_lookup[max(self.trange)] = self.t_prev_lookup[max(self.trange) - 1]
+            self.t_next_lookup = {t_int: min(t for t in self.trange if t > t_int) for t_int in
+                                  range(min(self.trange), max(self.trange))}
+            self.t_next_lookup[max(self.trange)] = self.t_next_lookup[max(self.trange) - 1]
+
             self.tc = self.tc[:len(self.tslices) + 1]  # truncate tc if longer than tslices
             self.tc += [self.tc[-1]] * (1 + len(self.tslices) - len(self.tc))  # extend tc if shorter than tslices
 
@@ -239,10 +253,14 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.model_params['alpha']
 
     # immunity
-    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False):
+    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
         params = self.params_as_df
         group_by_attr_names = [attr_name for attr_name in self.param_attr_names if attr_name != 'variant']
         n = self.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
+
+        if age is not None:
+            params = params.xs(age, level='age')
+            n = n.xs(age, level='age')
 
         if vacc_only:
             params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
@@ -255,7 +273,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         else:
             return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
-    # write to covid_model.results
+    # write to covid_model.results     n      
     def write_results_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
 
         # if there's no existing fit assigned, create a new fit and assign that one
