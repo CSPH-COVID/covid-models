@@ -101,7 +101,10 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # alter parameters based on attribute multipliers
         if self.attribute_multipliers:
             for attr_mult_specs in self.attribute_multipliers:
-                self.set_param(**attr_mult_specs)
+                if 'attrs' in attr_mult_specs.keys() and 'region' in  attr_mult_specs['attrs'].keys():
+                    pass
+                else:
+                    self.set_param(**attr_mult_specs)
 
     # handy properties for the beginning t, end t, and the full range of t values
     @property
