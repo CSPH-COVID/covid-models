@@ -10,13 +10,15 @@ class CovidModelWithFutureVariant(CovidModel):
 
     attr = OrderedDict({**CovidModel.attr, 'variant': CovidModel.attr['variant'] + ['future']})
 
-    def __init__(self, base_model=None, deepcopy_params=True, future_seed_date=None, variant_attr_mults=None, **spec_args):
+    def __init__(self, base_model=None, deepcopy_params=True, future_seed_date=None, **spec_args):
         super().__init__(base_model=base_model, deepcopy_params=deepcopy_params, **spec_args)
 
         # set future seed
         if future_seed_date is not None:
             future_seed_t = (future_seed_date - self.start_date).days
-            self.model_params['future_seed'] = {"tslices": [future_seed_t, future_seed_t + 25], "value": [0, 1, 0]}
+            self.model_params['future_seed'] = {"tslices": [future_seed_t, future_seed_t + 25], "value": [0, 5, 0]}
+        elif 'future_seed':
+            self.model_params['future_seed'] = 0
 
         # # apply attribute multipliers for future variant
         # if variant_attr_mults is not None:
