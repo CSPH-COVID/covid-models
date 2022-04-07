@@ -89,10 +89,8 @@ if __name__ == '__main__':
             ax.legend(loc='best')
         if plot == "imm":
             # immunity
-            # ax.plot(model.daterange, model.immunity('delta'), label='Immunity vs Delta', color='cyan')
             ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='cyan')
             ax.plot(model.daterange, model.immunity('omicron', age='65+'), label='Immunity vs Omicron (65+ only)', color='darkcyan')
-            # ax.plot(model.daterange, model.immunity('delta', to_hosp=True), label='Immunity vs Severe Delta', color='gold')
             ax.plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Severe Omicron', color='gold')
             ax.plot(model.daterange, model.immunity('omicron', to_hosp=True, age='65+'), label='Immunity vs Severe Omicron (65+ only)', color='darkorange')
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))

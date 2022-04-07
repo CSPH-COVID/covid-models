@@ -21,7 +21,6 @@ from covid_model.run_model_scenarios import build_legacy_output_df
 
 
 if __name__ == '__main__':
-    # parser = ModelSpecsArgumentParser()
     parser = argparse.ArgumentParser()
     parser.add_argument("-sids", "--spec_ids", type=int, nargs='+', help="specification IDs to compare")
     parser.add_argument("-p", "--params", type=str, help="overwerite model params")
