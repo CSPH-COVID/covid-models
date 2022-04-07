@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 import json
 import datetime as dt
+import copy
 from collections import OrderedDict
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.ode_builder import ODEBuilder
@@ -12,37 +14,52 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron'],
-                        # 'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
+                        'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
                         'immun': ['none', 'weak', 'strong']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
 
     default_end_date = dt.date(2022, 5, 31)
 
-    def __init__(self, base_model=None, deepcopy_params=True, **spec_args):
+    def __init__(self, base_model=None, deepcopy_params=True, increment=None, **spec_args):
 
         # if a base model is provided, use its specifications
         if base_model is not None:
             spec_args['from_specs'] = base_model
 
-        # initiate the parent classes; dates will be set in CovidModelSpecifications.__init__
+        # initiate CovidModelSpecifications parent class; dates will be set in CovidModelSpecifications.__init__
         CovidModelSpecifications.__init__(self, **spec_args)
-        ODEBuilder.__init__(self, base_ode_builder=base_model, deepcopy_params=deepcopy_params, trange=range((self.end_date - self.start_date).days), attributes=self.attr, param_attr_names=self.param_attr_names)
+
+        # build trange based on the value provided in the increment argument
+        tlength = (self.end_date - self.start_date).days
+        # if increment is None, set trange to match TC tslices, with breaks added anywhere that has a tslice in model_params
+        if increment is None:
+            model_param_tslices = {(dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice for param, param_specs in self.model_params.items() if isinstance(param_specs, dict) and 'tslices' in param_specs.keys() for tslice in param_specs['tslices']}
+            trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
+            trange = [ts for ts in trange if ts < self.tmax]
+        # if increment is an integer, generate evenly spaced slices
+        elif isinstance(increment, int):
+            trange = list(range(0, tlength, increment)) + [tlength]
+        # otherwise, just plug in the increment as the trange
+        else:
+            trange = list(increment)
+
+        # initiate ODEBuilder parent class
+        ODEBuilder.__init__(self, base_ode_builder=base_model, deepcopy_params=deepcopy_params, trange=trange, attributes=self.attr, param_attr_names=self.param_attr_names)
+
         # the var values for the solution; these get populated when self.solve_seir is run
         self.solution = None
         self.solution_y = None
         self.solution_ydf_full = None
 
     # a model must be prepped before it can be run; if any params EXCEPT the efs (i.e. TC) change, it must be re-prepped
-    def prep(self):
-        self.build_param_lookups()
+    def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
+        if rebuild_param_lookups:
+            self.build_param_lookups(**build_param_lookup_args)
         self.build_ode()
         self.compile()
 
-    def build_param_lookups(self, apply_vaccines=True):
-        # set TC
-        self.apply_tc()
+    def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
 
         # prep general parameters
         for name, val in self.model_params.items():
@@ -50,23 +67,29 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                 self.set_param_using_age_dict(name, val)
             else:
                 for i, (tmin, tmax) in enumerate(zip([self.tmin] + val['tslices'], val['tslices'] + [self.tmax])):
+                    tmin = (dt.datetime.strptime(tmin, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmin, str) else tmin
+                    tmax = (dt.datetime.strptime(tmax, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmax, str) else tmax
                     v = {a: av[i] for a, av in val['value'].items()} if isinstance(val['value'], dict) else val['value'][i]
                     self.set_param_using_age_dict(name, v, trange=range(tmin, tmax))
 
         if apply_vaccines:
             vacc_per_available = self.get_vacc_per_available()
 
+            # apply vacc_delay
+            vacc_per_available = vacc_per_available.groupby('age').shift(vacc_delay).fillna(0)
+
+            # group vacc_per_available by trange interval
+            t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), self.trange + [self.tmax], right=False, retbins=False, labels=self.trange)
+            vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'age']).mean()
+
             # convert to dictionaries for performance lookup
             vacc_per_available_dict = vacc_per_available.to_dict()
 
             # set the fail rate and vacc per unvacc rate for each dose
-            vacc_delay = 14
             for shot in self.attr['vacc'][1:]:
-                self.set_param(f'{shot}_per_available', 0, trange=range(0, vacc_delay))
                 for age in self.attr['age']:
-                    for t in range(vacc_delay, self.tmax):
-                        self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t - vacc_delay, age)],
-                                       {'age': age}, trange=[t])
+                    for t in self.trange:
+                        self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t, age)], {'age': age}, trange=[t])
 
         # alter parameters based on timeseries effects
         multipliers = self.get_timeseries_effect_multipliers()
@@ -78,17 +101,23 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # alter parameters based on attribute multipliers
         if self.attribute_multipliers:
             for attr_mult_specs in self.attribute_multipliers:
-                self.set_param(**attr_mult_specs)
+                if 'attrs' in attr_mult_specs.keys() and 'region' in  attr_mult_specs['attrs'].keys():
+                    pass
+                else:
+                    self.set_param(**attr_mult_specs)
 
     # handy properties for the beginning t, end t, and the full range of t values
     @property
     def tmin(self): return 0
 
     @property
-    def tmax(self): return (self.end_date - self.start_date).days
+    def tmax(self): return (self.end_date - self.start_date).days + 1
 
     @property
-    def daterange(self): return pd.date_range(self.start_date, periods=len(self.trange))
+    def daterange(self): return pd.date_range(self.start_date, end=self.end_date - dt.timedelta(days=1))
+
+    @property
+    def tslices_dates(self): return [self.start_date + dt.timedelta(days=ts) for ts in [0] + self.tslices]
 
     # new exposures by day by group
     @property
@@ -115,6 +144,12 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
             self.tslices = [tslice for tslice in self.tslices if tslice < tslices[0]] + tslices
+            self.trange = sorted(list(set(self.trange).union(self.tslices)))
+            for i, t in enumerate(self.trange):
+                if t not in self.params.keys():
+                    self.params[t] = copy.deepcopy(self.params[self.trange[i-1]])
+
+            self.build_t_lookups()  # rebuild t lookups
             self.tc = self.tc[:len(self.tslices) + 1]  # truncate tc if longer than tslices
             self.tc += [self.tc[-1]] * (1 + len(self.tslices) - len(self.tc))  # extend tc if shorter than tslices
 
@@ -125,11 +160,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # if the lengths do not match, raise an error
         if len(self.tc) != len(self.tslices) + 1:
             raise ValueError(f'The length of tc ({len(self.tc)}) must be equal to the length of tslices ({len(self.tslices)}) + 1.')
-
-        # apply to the ef parameter
-        # TODO: the ODE is no longer using this (uses non-linear multiplier instead), so we should check if this is used and get rid of it
-        for tmin, tmax, tc in zip([self.tmin] + self.tslices, self.tslices + [self.tmax], self.tc):
-            self.set_param('ef', tc, trange=range(tmin, tmax))
 
         # apply the new TC values to the non-linear multiplier to update the ODE
         # TODO: only update the nonlinear multipliers for TCs that have been changed
@@ -163,6 +193,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'alpha'}, constant='alpha_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'delta'}, constant='delta_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
+        self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2'}, constant='ba2_seed')
 
         # exposure
         asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
@@ -179,7 +210,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # disease termination
         for variant in self.attributes['variant']:
-            priorinf = 'omicron' if variant == 'omicron' else 'non-omicron'
+            # TODO: Rename "non-omicron" to "other"; will need to make the change in attribute_multipliers, which will break old specifications
+            priorinf = variant if variant != 'none' and variant in self.attributes['priorinf'] else 'non-omicron'
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
             self.add_flows_by_attr({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - priorinf_fail_rate)')
@@ -216,10 +248,14 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         return sum_df['E'] - sum_df['E'].shift(1) + sum_df['E'].shift(1) / self.model_params['alpha']
 
     # immunity
-    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False):
+    def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
         params = self.params_as_df
         group_by_attr_names = [attr_name for attr_name in self.param_attr_names if attr_name != 'variant']
         n = self.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
+
+        if age is not None:
+            params = params.xs(age, level='age')
+            n = n.xs(age, level='age')
 
         if vacc_only:
             params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
@@ -275,9 +311,10 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             df['tc'] = unique_params_df['ef']
 
         # write to database
+        chunksize = int(np.floor(10000.0 / df.shape[1]))
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
-                  , index=False, if_exists='append', method='multi', chunksize=1000000)
+                  , index=False, if_exists='append', method='multi', chunksize=chunksize)
 
     def write_gparams_lookup_to_csv(self, fname):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}

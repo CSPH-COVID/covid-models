@@ -73,7 +73,7 @@ def total_hosps(model, group=None, **plot_params):
     plt.plot(model.daterange, hosps, **{'c': 'blue', 'label': 'Modeled Hosps.', **plot_params})
 
 
-def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], share_of_total=False, **plot_params):
+def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], share_of_total=False, from_date=None, **plot_params):
     if type(compartments) == str:
         compartments = [compartments]
 
@@ -92,7 +92,13 @@ def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], sha
         df = df[compartments].sum(axis=1)
 
     df.index = model.daterange
+    if from_date is not None:
+        df = df.loc[from_date]
+
     df.plot(ax=ax, **plot_params)
+
+    if share_of_total:
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
 
 def modeled_re(model, ax=None, **plot_params):
@@ -111,7 +117,11 @@ def modeled_by_group(model, axs, compartment='Ih', **plot_params):
 
 
 def transmission_control(model, **plot_params):
-    plt.plot(model.fixed_tslices[:-1], model.tc, **plot_params)
+    # need to extend one more time period to see the last step. Assume it's the same gap as the second to last step
+    tcs = model.tc + [np.infty]  # the last tc doesn't get plotted b/c of "steps-post" style.
+    tslices = [0] + model.tslices + [2*model.tslices[-1]-model.tslices[-2]] # 0 is implicit first tslice
+    tc_df = pd.DataFrame(tcs, columns=['TC'], index=[model.start_date + dt.timedelta(days=d) for d in tslices])
+    tc_df.plot(drawstyle="steps-post", **plot_params)
 
 
 def re_estimates(model, ax=None, **plot_params):

@@ -1,4 +1,5 @@
 select
     measure_date
-    , hospitalized as currently_hospitalized
-from cophs.hospitalized_with_emresource_forward_fill
+    , trended_hospitalized as currently_hospitalized
+from emresource.hospitalized_with_corrections
+order by 1
