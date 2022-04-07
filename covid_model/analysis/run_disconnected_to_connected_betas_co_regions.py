@@ -22,6 +22,7 @@ def run():
     parser.add_argument("-rg", "--regions", nargs="+", choices=all_regions.keys(), required=True, help="Specify the regions to be run, default is all regions (not counties)")
     parser.add_argument("-sids", "--spec_ids", nargs="+", type=int, required=True, help="Specify the spec_ids corresponding to each region (must match the order of regions)")
     parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
+    parser.add_argument("-mob", "--mobility", type=str, help="the file path to a mobility file; default to fetching mobility data from the database")
     fit_params = parser.parse_args()
     regions = fit_params.regions
     spec_ids = fit_params.spec_ids
@@ -76,7 +77,7 @@ def run():
     print(f'Building Contact Matrix')
     fname = "output/connected_regional_model/cache/cm.pkl"
     if not exists(fname):
-        cm = RegionalCovidModel.construct_region_contact_matrices(OrderedDict([(region, all_regions[region]) for region in regions]), region_params, fpath='../contact_matrices/mobility.csv')
+        cm = RegionalCovidModel.construct_region_contact_matrices(OrderedDict([(region, all_regions[region]) for region in regions]), region_params, engine=engine, fpath=fit_params.mobility)
         pkl.dump(cm, open(fname, 'wb'))
     else:
         cm = pkl.load(open(fname, 'rb'))
