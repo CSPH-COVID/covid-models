@@ -11,7 +11,7 @@
     {"attrs": {"variant": "delta"}, "param": "dnh", "mult": 3.28, "desc": "Delta is more severe than wildtype."},
 
     {"attrs": {"variant": ["omicron", "ba2"]}, "param": "betta", "mult": 5.625, "desc": "Omicron is more infectious than wildtype; note that relative infecitousness is betta/gamma."},
-    {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.357, "desc": "Omicron is less severe than wildtype."},
+    {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.238, "desc": "Omicron is less severe than wildtype."},
     {"attrs": {"variant": ["omicron", "ba2"]}, "param": "dh", "mult": 1.3225, "desc": "Omicron has same hospital morality as Delta (THIS IS LIKELY WRONG)."},
     {"attrs": {"variant": ["omicron", "ba2"]}, "param": "dnh", "mult": 0.13225, "desc": "Omicron is less severe than wildtype."},
     {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hlos", "mult": 0.6, "desc": "Omicron has shorter length of stay than wildtype."},
@@ -40,15 +40,15 @@
       ],
       "BA.2 is 1.3x as infectious": [
         {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.3, "desc": "BA.2 is more infectious than BA.1.1."},
-        {"param": "ba2_seed", "mult": 12, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+        {"param": "ba2_seed", "mult": 0.6, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
       ],
       "BA.2 is 1.5x as infectious": [
         {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.5, "desc": "BA.2 is more infectious than BA.1.1."},
-        {"param": "ba2_seed", "mult": 2, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+        {"param": "ba2_seed", "mult": 0.1, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
       ],
       "BA.2 is 1.8x as infectious": [
         {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.8, "desc": "BA.2 is more infectious than BA.1.1."},
-        {"param": "ba2_seed", "mult": 0.1, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+        {"param": "ba2_seed", "mult": 0.002, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
       ]
   }
 
