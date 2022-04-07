@@ -82,7 +82,7 @@ class CovidModelSpecifications:
                 raise NotImplementedError(f'Changing the start_date of an existing spec is not supported.')
             self.start_date = start_date
 
-        self.update_specs(**spec_args)
+        self.update_specs(engine=engine, **spec_args)
 
     def update_specs(self, engine=None, end_date=None,
                      tslices=None, tc=None, params=None,
