@@ -142,14 +142,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                 if t not in self.params.keys():
                     self.params[t] = copy.deepcopy(self.params[self.trange[i-1]])
 
-            # rebuild trange lookups
-            self.t_prev_lookup = {t_int: max(t for t in self.trange if t <= t_int) for t_int in
-                                  range(min(self.trange), max(self.trange))}
-            self.t_prev_lookup[max(self.trange)] = self.t_prev_lookup[max(self.trange) - 1]
-            self.t_next_lookup = {t_int: min(t for t in self.trange if t > t_int) for t_int in
-                                  range(min(self.trange), max(self.trange))}
-            self.t_next_lookup[max(self.trange)] = self.t_next_lookup[max(self.trange) - 1]
-
+            self.build_t_lookups()  # rebuild t lookups
             self.tc = self.tc[:len(self.tslices) + 1]  # truncate tc if longer than tslices
             self.tc += [self.tc[-1]] * (1 + len(self.tslices) - len(self.tc))  # extend tc if shorter than tslices
 
