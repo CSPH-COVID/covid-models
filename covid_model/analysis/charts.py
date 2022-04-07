@@ -73,7 +73,7 @@ def total_hosps(model, group=None, **plot_params):
     plt.plot(model.daterange, hosps, **{'c': 'blue', 'label': 'Modeled Hosps.', **plot_params})
 
 
-def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], share_of_total=False, **plot_params):
+def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], share_of_total=False, from_date=None, **plot_params):
     if type(compartments) == str:
         compartments = [compartments]
 
@@ -92,7 +92,13 @@ def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], sha
         df = df[compartments].sum(axis=1)
 
     df.index = model.daterange
+    if from_date is not None:
+        df = df.loc[from_date]
+
     df.plot(ax=ax, **plot_params)
+
+    if share_of_total:
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
 
 def modeled_re(model, ax=None, **plot_params):
