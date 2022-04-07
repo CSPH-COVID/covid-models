@@ -11,7 +11,7 @@ import scipy.optimize as spo
 from covid_model.data_imports import ExternalHosps
 from covid_model import CovidModel
 from covid_model.model_specs import CovidModelSpecifications
-from charts import transmission_control, modeled
+from covid_model.analysis.charts import transmission_control, modeled
 
 
 class CovidModelFit:
@@ -64,13 +64,14 @@ class CovidModelFit:
 
         # prep model (we only do this once to save time)
         t0 = perf_counter()
+        tslices = self.base_specs.tslices + list(range(self.base_specs.tslices[-1] + window_size, end_t - last_window_min_size, window_size))
+        tc = self.base_specs.tc + [self.tc_0] * (len(tslices) + 1 - len(self.base_specs.tc))
+        base_model.apply_tc(tc=tc, tslices=tslices)
         base_model.prep()
         t1 = perf_counter()
         print(f'Model prepped for fitting in {t1-t0} seconds.')
 
         # run fit
-        tslices = self.base_specs.tslices + list(range(self.base_specs.tslices[-1] + window_size, end_t - last_window_min_size, window_size))
-        tc = self.base_specs.tc + [self.tc_0] * (len(tslices) + 1 - len(self.base_specs.tc))
         fitted_tc_cov = None
         if look_back is None:
             look_back = len(tslices) + 1
