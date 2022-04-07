@@ -8,13 +8,7 @@ from covid_model.db import db_engine
 
 
 class RegionalCovidModel(CovidModel):
-    attr = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
-                        'age': ['0-19', '20-39', '40-64', '65+'],
-                        'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                        'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron'],
-                        'immun': ['none', 'weak', 'strong'],
-                        'region': ['']})
+    attr = OrderedDict({**CovidModel.attr, 'region': ['']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun', 'region')
 
