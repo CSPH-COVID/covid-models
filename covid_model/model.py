@@ -34,7 +34,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         tlength = (self.end_date - self.start_date).days
         # if increment is None, set trange to match TC tslices, with breaks added anywhere that has a tslice in model_params
         if increment is None:
-            model_param_tslices = {tslice for param, param_specs in self.model_params.items() if isinstance(param_specs, dict) and 'tslices' in param_specs.keys() for tslice in param_specs['tslices']}
+            model_param_tslices = {(dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice for param, param_specs in self.model_params.items() if isinstance(param_specs, dict) and 'tslices' in param_specs.keys() for tslice in param_specs['tslices']}
             trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
             trange = [ts for ts in trange if ts < self.tmax]
         # if increment is an integer, generate evenly spaced slices
