@@ -133,6 +133,9 @@ class ODEBuilder:
         # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
 
         self.trange = trange if trange is not None else base_ode_builder.trange
+        self.t_prev_lookup = None
+        self.t_next_lookup = None
+        self.build_t_lookups()
         self.attributes = attributes if attributes is not None else base_ode_builder.attributes
         self.param_attr_names = param_attr_names if param_attr_names is not None else attributes.keys() if attributes is not None else base_ode_builder.param_attr_names
 
@@ -168,10 +171,21 @@ class ODEBuilder:
             self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
             self.reset_ode()
 
+    # the t-values at which the model results will be evaluated in outputs (and for fitting)
+    @property
+    def t_eval(self):
+        return range(min(self.trange), max(self.trange))
+
     # return the parameters as a dataframe with t and compartments as index and parameters as columns
     @property
     def params_as_df(self):
-        return pd.concat({t: pd.DataFrame.from_dict(p, orient='index') for t, p in self.params.items()}).rename_axis(index=['t'] + list(self.param_attr_names))
+        return pd.concat({t: pd.DataFrame.from_dict(self.params[self.t_prev_lookup[t]], orient='index') for t in self.t_eval}).rename_axis(index=['t'] + list(self.param_attr_names))
+
+    def build_t_lookups(self):
+        self.t_prev_lookup = {t_int: max(t for t in self.trange if t <= t_int) for t_int in range(min(self.trange), max(self.trange))}
+        self.t_prev_lookup[max(self.trange)] = self.t_prev_lookup[max(self.trange) - 1]
+        self.t_next_lookup = {t_int: min(t for t in self.trange if t > t_int) for t_int in range(min(self.trange), max(self.trange))}
+        self.t_next_lookup[max(self.trange)] = self.t_next_lookup[max(self.trange) - 1]
 
     # get the level associated with a given attribute name
     # e.g. if attributes are ['seir', 'age', 'variant'], the level of 'age' is 1 and the level of 'variant' is 2
@@ -364,7 +378,7 @@ class ODEBuilder:
     # ODE step forward
     def ode(self, t, y):
         dy = [0] * self.length
-        t_int = min(math.floor(t), len(self.trange) - 1)
+        t_int = self.t_prev_lookup[math.floor(t)]
 
         # apply linear terms
         dy += (self.linear_matrix[t_int]).dot(y)
@@ -381,16 +395,17 @@ class ODEBuilder:
     # solve ODE using scipy.solve_ivp, and put solution in solution_y and solution_ydf
     # TODO: try Julia ODE package, to improve performance
     def solve_ode(self, y0_dict, method='RK45'):
+        t_eval = range(min(self.trange), max(self.trange))
         self.solution = spi.solve_ivp(
             fun=self.ode,
             t_span=[min(self.trange), max(self.trange)],
             y0=self.y0_from_dict(y0_dict),
-            t_eval=self.trange,
+            t_eval=t_eval,
             method=method)
         if not self.solution.success:
             raise RuntimeError(f'ODE solver failed with message: {self.solution.message}')
         self.solution_y = np.transpose(self.solution.y)
-        self.solution_ydf = pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
+        self.solution_ydf = pd.concat([self.y_to_series(self.solution_y[t]) for t in t_eval], axis=1, keys=t_eval, names=['t']).transpose()
 
     # convert y-array to series with compartment attributes as multiindex
     def y_to_series(self, y):
