@@ -3,6 +3,7 @@ import numpy as np
 import datetime as dt
 import json
 import copy
+from collections import OrderedDict
 
 import scipy.stats as sps
 from sqlalchemy import MetaData, func
@@ -15,7 +16,7 @@ from covid_model.utils import get_params
 
 class CovidModelSpecifications:
 
-    def __init__(self, start_date=None, end_date=None, engine=None, from_specs=None, **spec_args):
+    def __init__(self, start_date=None, engine=None, from_specs=None, **spec_args):
 
         self.start_date = None
         self.end_date = None
@@ -43,14 +44,13 @@ class CovidModelSpecifications:
             if isinstance(from_specs, int):
                 if engine is None:
                     raise ValueError(f'Database engine is required to fetch specification {from_specs} from db.')
-
                 df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {from_specs}", con=engine, coerce_float=True)
                 if len(df) == 0:
                     raise ValueError(f'{from_specs} is not a valid spec ID.')
                 row = df.iloc[0]
 
                 self.start_date = row['start_date']
-                self.end_date = end_date if end_date is not None else row['end_date']
+                self.end_date = spec_args['end_date'] if spec_args['end_date'] is not None else row['end_date']
                 self.spec_id = row['spec_id']
                 self.base_spec_id = row['base_spec_id']
                 self.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=json.loads(row['tc_cov'].replace('{', '[').replace('}', ']')))
@@ -59,6 +59,7 @@ class CovidModelSpecifications:
                 self.set_vacc_proj(json.loads(row['vacc_proj_params']))
                 self.timeseries_effects = json.loads(row['timeseries_effects'])
                 self.attribute_multipliers = json.loads(row['attribute_multipliers'])
+                self.tags = json.loads(row['tags'])
             # if from_specs is an existing specification, do a deep copy
             elif isinstance(from_specs, CovidModelSpecifications):
                 self.start_date = from_specs.start_date
@@ -68,7 +69,7 @@ class CovidModelSpecifications:
                 self.timeseries_effects = copy.deepcopy(from_specs.timeseries_effects)
                 self.base_spec_id = from_specs.spec_id if from_specs.spec_id is not None else from_specs.base_spec_id
                 self.update_specs(
-                    end_date=end_date if end_date is not None else from_specs.end_date,
+                    end_date=spec_args['end_date'] if spec_args['end_date'] is not None else from_specs.end_date,
                     tslices=copy.deepcopy(from_specs.tslices), tc=copy.deepcopy(from_specs.tc),
                     params=copy.deepcopy(from_specs.model_params),
                     vacc_proj_params=copy.deepcopy(from_specs.vacc_proj_params),
@@ -81,7 +82,7 @@ class CovidModelSpecifications:
                 raise NotImplementedError(f'Changing the start_date of an existing spec is not supported.')
             self.start_date = start_date
 
-        self.update_specs(**spec_args)
+        self.update_specs(engine=engine, **spec_args)
 
     def update_specs(self, engine=None, end_date=None,
                      tslices=None, tc=None, params=None,
@@ -147,6 +148,46 @@ class CovidModelSpecifications:
                                           orient='series').items()} if self.proj_vacc_df is not None else None),
                 timeseries_effects=json.dumps(self.timeseries_effects),
                 attribute_multipliers=json.dumps(self.attribute_multipliers)
+            )
+            session.execute(stmt)
+            session.commit()
+
+    def preform_write_query(self, tags=None):
+        # returns all the data you would need to write to the database but doesn't actually write to the database
+        if tags is not None:
+            self.tags.update(tags)
+
+        write_info = OrderedDict([
+            ("created_at", dt.datetime.now()),
+            ("base_spec_id", int(self.base_spec_id) if self.base_spec_id is not None else None),
+            ("tags", json.dumps(self.tags)),
+            ("start_date", self.start_date),
+            ("end_date", self.end_date),
+            ("tslices", self.tslices),
+            ("tc", self.tc),
+            ("tc_cov", json.dumps(self.tc_cov)),
+            ("model_params", json.dumps(self.model_params)),
+            ("vacc_actual", json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()})),
+            ("vacc_proj_params", json.dumps(self.vacc_proj_params)),
+            ("vacc_proj", json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None)),
+            ("timeseries_effects", json.dumps(self.timeseries_effects)),
+            ("attribute_multipliers", json.dumps(self.attribute_multipliers))
+        ])
+
+        return write_info
+
+    @classmethod
+    def write_preformed_to_db(cls, write_info, engine, schema='covid_model', table='specifications'):
+        # writes the given info to the db without needing an explicit instance
+        specs_table = get_sqa_table(engine, schema=schema, table=table)
+
+        with Session(engine) as session:
+            max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
+            spec_id = max_spec_id + 1
+
+            stmt = specs_table.insert().values(
+                spec_id=spec_id,
+                **write_info
             )
             session.execute(stmt)
             session.commit()

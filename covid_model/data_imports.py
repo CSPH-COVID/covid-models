@@ -118,8 +118,6 @@ class ExternalVaccWithProjections(ExternalData):
         return df
 
 
-class ExternalContactMatrices(ExternalData):
-    pass
 
 
 # load actual hospitalization data for fitting
@@ -191,3 +189,18 @@ def get_corrected_emresource(fpath):
 
     print(raw_reports)
     print(pd.to_datetime(pd.to_numeric(raw_reports).groupby('facility').rolling(20).agg(np.max)))
+
+
+def get_region_mobility_from_db(engine, fpath=None) -> pd.DataFrame:
+    with open('sql/mobility_dwell_hours.sql') as f:
+        df = pd.read_sql(f.read(), engine, index_col=['measure_date'])
+    if fpath:
+        df.to_csv(fpath)
+    return df
+
+
+def get_region_mobility_from_file(fpath) -> pd.DataFrame:
+    dtype = {'origin_county_id': str, 'destination_county_id': str}
+    df = pd.read_csv(fpath, dtype=dtype, index_col=['measure_date'], parse_dates=['measure_date'])
+    df[['origin_county_id', 'destination_county_id']] = df[['origin_county_id', 'destination_county_id']].replace(np.nan, None)
+    return df

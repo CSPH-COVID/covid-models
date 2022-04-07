@@ -1,0 +1,16 @@
+[
+  {"attrs": {"variant": "future"}, "param": "betta", "mult": 12.65625, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "hosp", "mult": 0.357, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "dh", "mult": 1.3225, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "dnh", "mult": 0.13225, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "hlos", "mult": 0.6, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "alpha", "mult": 0.6, "desc": "Future variant has the same features as Omicron."},
+  {"attrs": {"variant": "future"}, "param": "gamm", "mult": 1.66667, "desc": "Future variant has the same features as Omicron."},
+
+  {"param": "immunity", "attrs": {"variant": "future", "priorinf": "non-omicron", "immun": "strong"}, "val": 0.9, "desc": "Omicron reduces maximum non-Omicron prior infection immunity."},
+  {"param": "immunity", "attrs": {"variant": "future", "priorinf": "non-omicron", "immun": "weak"}, "val": 0.1, "desc": "Omicron reduces minimum non-Omicron prior infection immunity."},
+  {"param": "immunity", "attrs": {"variant": "future", "priorinf": ["none", "non-omicron"], "immun": "weak"}, "val": 0.2, "desc": "Omicron reduces minimum vaccine immunity."},
+  {"param": "immunity", "attrs": {"variant": "future", "priorinf": ["none", "non-omicron"], "vacc": "dose3", "immun": "weak"}, "val": 0.4, "desc": "Omicron reduces minimum vaccine immunity, but less so with a booster."},
+
+  {"param": "severe_immunity", "attrs": {"variant": "future"}, "mult": 0.9, "desc": "Future variant has the same severe disease immunity as Omicron."}
+]
