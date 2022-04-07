@@ -10,15 +10,15 @@
   {"attrs": {"variant": "delta"}, "param": "dnh", "mult": 3.28, "desc": "Delta is more severe than wildtype."},
 
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "betta", "mult": 5.625, "desc": "Omicron is more infectious than wildtype; note that relative infecitousness is betta/gamma."},
-  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.357, "desc": "Omicron is less severe than wildtype."},
+  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.238, "desc": "Omicron is less severe than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "dh", "mult": 1.3225, "desc": "Omicron has same hospital morality as Delta (THIS IS LIKELY WRONG)."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "dnh", "mult": 0.13225, "desc": "Omicron is less severe than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hlos", "mult": 0.6, "desc": "Omicron has shorter length of stay than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "alpha", "mult": 0.6, "desc": "Omicron has shorter incubation period than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "gamm", "mult": 1.66667, "desc": "Omicron has shorter infectious period than wildtype."},
 
-  {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.8, "desc": "BA.2 is more infectious than BA.1.1."},
-  {"param": "ba2_seed", "mult": 0.1, "desc": "Increase the seed for BA.2 so that we can reach 25% BA.2 by mid-March."},
+  {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.5, "desc": "BA.2 is more infectious than BA.1.1."},
+  {"param": "ba2_seed", "mult": 0.1, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."},
 
   {"param": "imm_decay_days", "attrs": {"vacc": "shot3"}, "mult": 1.25, "desc": "Booster immunity decays more slowly than 2-dose immunity."},
 
