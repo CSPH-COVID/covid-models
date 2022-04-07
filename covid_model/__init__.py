@@ -30,4 +30,4 @@ all_counties = {
   "weld": "Weld County",
 }
 
-all_regions_and_counties = all_regions.copy().update(all_counties)
+all_regions_and_counties = {**all_regions, **all_counties}
