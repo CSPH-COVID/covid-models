@@ -133,10 +133,9 @@ class ODEBuilder:
         # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
 
         self.trange = trange if trange is not None else base_ode_builder.trange
-        self.t_prev_lookup = {t_int: max(t for t in self.trange if t <= t_int) for t_int in range(min(self.trange), max(self.trange))}
-        self.t_prev_lookup[max(self.trange)] = self.t_prev_lookup[max(self.trange) - 1]
-        self.t_next_lookup = {t_int: min(t for t in self.trange if t > t_int) for t_int in range(min(self.trange), max(self.trange))}
-        self.t_next_lookup[max(self.trange)] = self.t_next_lookup[max(self.trange) - 1]
+        self.t_prev_lookup = None
+        self.t_next_lookup = None
+        self.build_t_lookups()
         self.attributes = attributes if attributes is not None else base_ode_builder.attributes
         self.param_attr_names = param_attr_names if param_attr_names is not None else attributes.keys() if attributes is not None else base_ode_builder.param_attr_names
 
@@ -181,6 +180,12 @@ class ODEBuilder:
     @property
     def params_as_df(self):
         return pd.concat({t: pd.DataFrame.from_dict(self.params[self.t_prev_lookup[t]], orient='index') for t in self.t_eval}).rename_axis(index=['t'] + list(self.param_attr_names))
+
+    def build_t_lookups(self):
+        self.t_prev_lookup = {t_int: max(t for t in self.trange if t <= t_int) for t_int in range(min(self.trange), max(self.trange))}
+        self.t_prev_lookup[max(self.trange)] = self.t_prev_lookup[max(self.trange) - 1]
+        self.t_next_lookup = {t_int: min(t for t in self.trange if t > t_int) for t_int in range(min(self.trange), max(self.trange))}
+        self.t_next_lookup[max(self.trange)] = self.t_next_lookup[max(self.trange) - 1]
 
     # get the level associated with a given attribute name
     # e.g. if attributes are ['seir', 'age', 'variant'], the level of 'age' is 1 and the level of 'variant' is 2
