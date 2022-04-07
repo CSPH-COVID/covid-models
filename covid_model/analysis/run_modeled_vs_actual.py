@@ -25,6 +25,7 @@ if __name__ == '__main__':
     t0 = perf_counter()
     engine = db_engine()
     model = CovidModel(engine=engine, **parser.specs_args_as_dict())
+
     model.prep()
     t1 = perf_counter()
     print(f'Model prepped in {t1-t0} seconds.')

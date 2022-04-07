@@ -39,7 +39,7 @@ def run():
 
     # run fit
     engine = db_engine()
-    fit = CovidModelFit(engine=engine, region_params=fit_params.region_params, region=fit_params.region, tc_min=fit_params.tc_min, tc_max=fit_params.tc_max, **parser.specs_args_as_dict())
+    fit = CovidModelFit(engine=engine, region_params=region_params, region=fit_params.region, tc_min=fit_params.tc_min, tc_max=fit_params.tc_max, **parser.specs_args_as_dict())
 
     # extract county IDs for the provided region; if statewide, set counties=None
     if region is not None:
