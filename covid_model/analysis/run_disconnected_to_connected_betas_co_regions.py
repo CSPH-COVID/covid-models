@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from db import db_engine
+from covid_model.db import db_engine
 from covid_model import RegionalCovidModel, all_regions
 from covid_model.cli_specs import ModelSpecsArgumentParser
-from analysis.charts import actual_hosps, modeled
+from covid_model.analysis.charts import actual_hosps, modeled
 
 
 def run():
