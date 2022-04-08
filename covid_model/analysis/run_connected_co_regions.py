@@ -22,7 +22,7 @@ def run():
     # plot
     df = model.solution_sum(['seir', 'region']).stack([0, 1]).reset_index(name='y')
     #df['seir_age'] = df['seir'] + " : " + df['age']
-    g = sns.FacetGrid(df, row='seir', column='region', height=4, aspect=3, sharey=False)
+    g = sns.FacetGrid(df, row='seir', hue='seir', col='region', height=4, aspect=3, sharey=False)
     g.map(sns.lineplot, 't', 'y')
     g.add_legend()
     plt.tight_layout()
