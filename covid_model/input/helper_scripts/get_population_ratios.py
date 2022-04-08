@@ -1,6 +1,9 @@
+### Python Standard Library ###
 import json
 from collections import OrderedDict
-from datetime import datetime as dt, timedelta as td
+### Third Party Imports ###
+### Local Imports ###
+
 
 regions = OrderedDict([("cent", "Central"),
             ("cm", "Central Mountains"),

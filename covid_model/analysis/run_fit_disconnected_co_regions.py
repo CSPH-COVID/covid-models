@@ -1,15 +1,15 @@
-import matplotlib.pyplot as plt
+### Python Standard Library ###
 import json
-import datetime as dt
 from multiprocessing import Pool
-
+### Third Party Imports ###
+import matplotlib.pyplot as plt
+### Local Imports ###
 from covid_model.db import db_engine
-from covid_model import RegionalCovidModel, all_regions
+from covid_model import RegionalCovidModel
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.model_fit import CovidModelFit
 from covid_model.analysis.charts import actual_hosps, modeled
 from covid_model.cli_specs import ModelSpecsArgumentParser
-from covid_model.data_imports import ExternalHosps
 
 
 def region_fit(args):

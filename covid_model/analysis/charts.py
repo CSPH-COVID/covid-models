@@ -1,20 +1,18 @@
-from covid_model.data_imports import get_deaths, get_hosps_df, get_hosps_by_age, get_deaths_by_age
-from covid_model.model import CovidModel
-from covid_model.db import db_engine
+### Python Standard Library ###
+from time import perf_counter
+import datetime as dt
+### Third Party Imports ###
+import seaborn as sns
+import numpy as np
+import pandas as pd
 import scipy.stats as sps
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import matplotlib.dates as mdates
-from matplotlib import cm, colors
-import seaborn as sns
-import datetime as dt
-import numpy as np
-import pandas as pd
-# import pmdarima
-import arch
-import json
-from time import perf_counter
-
+### Local Imports ###
+from covid_model.data_imports import get_deaths, get_hosps_by_age, get_deaths_by_age
+from covid_model.model import CovidModel
+from covid_model.db import db_engine
 from covid_model.data_imports import ExternalHosps
 
 

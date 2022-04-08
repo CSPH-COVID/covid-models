@@ -1,11 +1,10 @@
-import json
-
+### Python Standard Library ###
+### Third Party Imports ###
 from matplotlib import pyplot as plt
 import seaborn as sns
-
+### Local Imports ###
 from covid_model.db import db_engine
-from covid_model import CovidModel, RegionalCovidModel
-from covid_model.model_fit import CovidModelFit
+from covid_model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
 
 

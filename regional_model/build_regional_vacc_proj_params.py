@@ -1,11 +1,9 @@
+### Python Standard Library ###
+### Third Party Imports ###
 import pandas as pd
-import numpy as np
-import datetime as dt
-import scipy.integrate as spi
-import scipy.optimize as spo
-import matplotlib.pyplot as plt
-from db_utils.conn import db_engine
 from sklearn.linear_model import LinearRegression
+### Local Imports ###
+from db_utils.conn import db_engine
 
 
 def main():

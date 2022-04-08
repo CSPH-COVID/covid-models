@@ -1,10 +1,11 @@
+### Python Standard Library ###
+from collections import OrderedDict
+### Third Party Imports ###
 import numpy as np
 from scipy import sparse
-
-from collections import OrderedDict
-from covid_model.model import CovidModel
+### Local Imports ###
+from covid_model import CovidModel
 from covid_model.data_imports import get_region_mobility_from_file, get_region_mobility_from_db
-from covid_model.db import db_engine
 
 
 class RegionalCovidModel(CovidModel):

@@ -1,4 +1,8 @@
+### Python Standard Library ###
 import setuptools
+### Third Party Imports ###
+### Local Imports ###
+
 
 # with open("README.md", "r", encoding="utf-8") as fh:
 #     long_description = fh.read()

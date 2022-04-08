@@ -1,9 +1,9 @@
+### Python Standard Library ###
 import os
-import psycopg2
-import pandas as pd
+### Third Party Imports ###
 from sqlalchemy import create_engine
 from sqlalchemy import MetaData, Table
-import json
+### Local Imports ###
 
 
 def db_engine(db_name_env=None, db_user_env=None, db_host_env=None, db_credentials_env=None, env_prefix='', db_type='bigquery'):

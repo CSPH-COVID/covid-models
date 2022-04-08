@@ -1,5 +1,7 @@
-import pandas as pd
+### Python Standard Library ###
+### Third Party Imports ###
 import numpy as np
+### Local Imports ###
 
 
 # tslices and values define a stepwise function; get the value of that function for a given t

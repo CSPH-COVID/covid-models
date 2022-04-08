@@ -1,19 +1,17 @@
+### Python Standard Library ###
+import random
 from time import perf_counter
-
+import datetime as dt
+### Third Party Imports ###
 import numpy as np
 import pandas as pd
-import datetime as dt
-
 import scipy.stats as sps
 import pmdarima
 import arch
-
 from sqlalchemy import MetaData
-
-from db import db_engine
-from model import CovidModel
-from model_specs import CovidModelSpecifications
-import random
+### Local Imports ###
+from covid_model.db import db_engine
+from covid_model import CovidModel
 
 
 def forecast_timeseries(data, horizon=1, sims=10, arima_order='auto', use_garch=False):

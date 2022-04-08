@@ -1,12 +1,13 @@
-import numpy as np
+### Python Standard Library ###
 import datetime as dt
-from matplotlib import pyplot as plt, ticker as mtick
+### Third Party Imports ###
 from cycler import cycler
-
+import numpy as np
+from matplotlib import pyplot as plt, ticker as mtick
+### Local Imports ###
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
-from covid_model.analysis.charts import modeled
 
 
 def build_default_model(days):

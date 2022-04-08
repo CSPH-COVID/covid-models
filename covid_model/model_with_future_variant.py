@@ -1,9 +1,8 @@
-import datetime as dt
-import json
+### Python Standard Library ###
 from collections import OrderedDict
-import copy
-
-from covid_model.model import CovidModel
+### Third Party Imports ###
+### Local Imports ###
+from covid_model import CovidModel
 
 
 class CovidModelWithFutureVariant(CovidModel):

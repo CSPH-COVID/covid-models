@@ -1,11 +1,11 @@
-import math
+### Python Standard Library ###
 from operator import itemgetter
-
+### Third Party Imports ###
+### Local Imports ###
 from covid_model.ode_builder import ODEBuilder
 
 
 class ODEBuilderWithParamInterpolation(ODEBuilder):
-
     def ode(self, t, y):
         dy = [0] * self.length
         t_int = int(t)

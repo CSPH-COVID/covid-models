@@ -1,22 +1,13 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-import seaborn as sns
-import datetime as dt
-import json
-from charts import modeled, actual_hosps, mmwr_infections_growth_rate, re_estimates, format_date_axis
+### Python Standard Library ###
 from time import perf_counter
-from timeit import timeit
-import argparse
-
+### Third Party Imports ###
+import matplotlib.pyplot as plt
+### Local Imports ###
+from covid_model.analysis.charts import modeled, actual_hosps
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
-# from covid_model.model_with_omicron import CovidModelWithVariants
-# from covid_model.model_with_immunity_rework import CovidModelWithVariants
-from covid_model.model_specs import CovidModelSpecifications
-from covid_model.run_model_scenarios import build_legacy_output_df
+
 
 if __name__ == '__main__':
     parser = ModelSpecsArgumentParser()

@@ -1,8 +1,11 @@
+### Python Standard Library ###
 import os
+import json
+### Third Party Imports ###
 import psycopg2
 import pandas as pd
 from sqlalchemy import create_engine
-import json
+### Local Imports ###
 
 
 def db_engine(db_name_env=None, db_user_env=None, db_host_env=None, db_credentials_env=None, env_prefix=''):

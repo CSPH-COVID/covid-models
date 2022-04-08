@@ -1,17 +1,17 @@
-import pandas as pd
-import numpy as np
+### Python Standard Library ###
 import datetime as dt
 import json
 import copy
 from collections import OrderedDict
+### Third Party Imports ###
+import pandas as pd
+import numpy as np
 from scipy import sparse
-
-import scipy.stats as sps
-from sqlalchemy import MetaData, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-
-from covid_model.db import db_engine, get_sqa_table
-from covid_model.data_imports import ExternalVaccWithProjections, ExternalVacc, get_region_mobility_from_db
+### Local Imports ###
+from covid_model.db import get_sqa_table
+from covid_model.data_imports import ExternalVacc, get_region_mobility_from_db
 from covid_model.utils import get_params
 
 

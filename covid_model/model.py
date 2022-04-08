@@ -1,9 +1,12 @@
-import numpy as np
-import pandas as pd
+### Python Standard Library ###
 import json
 import datetime as dt
 import copy
 from collections import OrderedDict
+### Third Party Imports ###
+import numpy as np
+import pandas as pd
+### Local Imports ###
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.ode_builder import ODEBuilder
 

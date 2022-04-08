@@ -1,10 +1,10 @@
-import pandas as pd
-import numpy as np
+### Python Standard Library ###
 import datetime as dt
+### Third Party Imports ###
 from matplotlib import pyplot as plt
-
-from covid_model.analysis.dynamic_projections import get_tc_sims
-from covid_model.model import CovidModelFit
+### Local Imports ###
+from covid_model.analysis.misc.dynamic_projections import get_tc_sims
+from covid_model.model_fit import CovidModelFit
 from db_utils.conn import db_engine
 
 if __name__ == '__main__':

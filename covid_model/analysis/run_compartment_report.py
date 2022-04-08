@@ -1,14 +1,15 @@
-import numpy as np
-import pandas as pd
+### Python Standard Library ###
+import datetime as dt
+### Third Party Imports ###
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
-import datetime as dt
+### Local Imports ###
 from covid_model.analysis.charts import modeled
-
 from covid_model.db import db_engine
 import covid_model
-from covid_model import CovidModel, RegionalCovidModel, all_regions
+from covid_model import CovidModel, RegionalCovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
+
 
 if __name__ == '__main__':
     engine = db_engine()

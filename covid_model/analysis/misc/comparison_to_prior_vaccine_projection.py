@@ -1,11 +1,13 @@
+### Python Standard Library ###
+import datetime as dt
+### Third Party Imports ###
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
-import datetime as dt
-import json
-from db import db_engine
-from data_imports import get_hosps_df, get_vaccinations_by_county, get_vaccinations
+### Local Imports ###
+from covid_model.db import db_engine
+from covid_model.data_imports import get_vaccinations
 
 
 def build_data(engine, proj_params, group_pops, sql, group_pops_alt=None):

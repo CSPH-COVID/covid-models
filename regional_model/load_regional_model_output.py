@@ -1,6 +1,9 @@
-import pandas as pd
-import datetime as dt
+### Python Standard Library ###
 import os
+import datetime as dt
+### Third Party Imports ###
+import pandas as pd
+### Local Imports ###
 from db_utils.conn import db_engine
 
 

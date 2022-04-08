@@ -1,12 +1,14 @@
-from covid_model.db import db_engine
+### Python Standard Library ###
+### Third Party Imports ###
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import matplotlib.colors as mcolors
 import matplotlib.cm as mcm
-import datetime as dt
-import seaborn as sns
+### Local Imports ###
+from covid_model.db import db_engine
+
 
 def cmap_map(function, cmap):
     """ Applies function (which should operate on vectors of shape 3: [r, g, b]), on colormap cmap.

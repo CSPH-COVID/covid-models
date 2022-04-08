@@ -1,19 +1,16 @@
-import numpy as np
-import pandas as pd
+### Python Standard Library ###
 import datetime as dt
 import json
 import os
 from pathlib import Path
-
+### Third Party Imports ###
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import matplotlib.ticker as mtick
-import seaborn as sns
-
-from charts import plot_kde, actual_hosps, format_date_axis
-from dynamic_projections import get_sims, plot_prediction_interval
+### Local Imports ###
+from covid_model.analysis.misc.dynamic_projections import get_sims, plot_prediction_interval
 from covid_model.db import db_engine
-from covid_model.model import CovidModelFit, CovidModel
+from covid_model.model_fit import CovidModelFit
 
 
 def build_mab_prevalence(base_mab_prevalence, mab_prevalence_target, mab_prevalence_target_date, start_date=dt.datetime.today().strftime('%Y-%m-%d')):
