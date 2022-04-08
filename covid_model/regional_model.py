@@ -4,17 +4,11 @@ from scipy import sparse
 from collections import OrderedDict
 from covid_model.model import CovidModel
 from covid_model.data_imports import get_region_mobility_from_file, get_region_mobility_from_db
-from db import db_engine
+from covid_model.db import db_engine
 
 
 class RegionalCovidModel(CovidModel):
-    attr = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
-                        'age': ['0-19', '20-39', '40-64', '65+'],
-                        'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                        'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron'],
-                        'immun': ['none', 'weak', 'strong'],
-                        'region': ['']})
+    attr = OrderedDict({**CovidModel.attr, 'region': ['']})
 
     param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun', 'region')
 
@@ -28,9 +22,9 @@ class RegionalCovidModel(CovidModel):
         return y0d
 
     @classmethod
-    def construct_region_contact_matrices(cls, regions: OrderedDict, region_params, fpath=None):
+    def construct_region_contact_matrices(cls, regions: OrderedDict, region_params, fpath=None, engine=None):
         regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_params.items() if key in regions.keys()])
-        df = get_region_mobility_from_file(fpath) if fpath else get_region_mobility_from_db(db_engine())
+        df = get_region_mobility_from_file(fpath) if fpath else get_region_mobility_from_db(engine)
 
         # add regions to dataframe
         regions_lookup = {val: key for key, vals in regions.items() for val in vals[1]}
