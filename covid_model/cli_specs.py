@@ -12,7 +12,7 @@ class ModelSpecsArgumentParser(ArgumentParser):
         self.add_argument('-tsl', '--tslices', nargs='+', type=int)
         self.add_argument('-tc', '--tc', nargs='+', type=float)
         self.add_argument('-p', '--params', type=str, help="path to parameters file to use")
-        self.add_argument('-rp', '--region_params', type=str, help="path to region parameters file to use")
+        self.add_argument('-rd', '--region_definitions', type=str, help="path to region definitions file to use")
         self.add_argument('-r', '--regions', nargs='+', type=str, help="regions to be run, default is no regions (statewide model)")
         self.add_argument('-rv', '--refresh_actual_vacc', action='store_true')
         self.add_argument('-vpp', '--vacc_proj_params', type=str)

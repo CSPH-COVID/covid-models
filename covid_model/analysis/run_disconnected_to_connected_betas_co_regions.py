@@ -21,14 +21,14 @@ def run():
     parser = ModelSpecsArgumentParser()
     parser.add_argument("-rg", "--regions", nargs="+", choices=all_regions.keys(), required=True, help="Specify the regions to be run, default is all regions (not counties)")
     parser.add_argument("-sids", "--spec_ids", nargs="+", type=int, required=True, help="Specify the spec_ids corresponding to each region (must match the order of regions)")
-    parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
+    parser.add_argument("-rp", "--region_definitions", type=str, default="input/region_definitions.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_definitions.json'")
     parser.add_argument("-mob", "--mobility", type=str, help="the file path to a mobility file; default to fetching mobility data from the database")
     fit_params = parser.parse_args()
     regions = fit_params.regions
     spec_ids = fit_params.spec_ids
     spec_id_dict = OrderedDict(zip(regions, spec_ids))
-    with open(fit_params.region_params, 'r') as f:
-        region_params = json.loads(f.read())
+    with open(fit_params.region_definitions, 'r') as f:
+        region_definitions = json.loads(f.read())
     engine = db_engine()
 
     # retrieve beta and In for each run
@@ -46,13 +46,13 @@ def run():
             model.prep()
             model.solve_seir()
             solution = model.solution_sum('seir')[['S', 'E', 'A', 'I', 'Ih', 'D']]
-            In = (model.model_params['lamb'] * solution['A'] + solution['I']) / region_params[region]['total_pop']
+            In = (model.model_params['lamb'] * solution['A'] + solution['I']) / region_definitions[region]['total_pop']
             In_df = pd.DataFrame(index=model.daterange, columns=[region], data=In.values)
             beta_df = pd.DataFrame(index=model.tslices_dates, columns=[region], data=[(1 - tc) * model.model_params['betta'] for tc in model.tc])
             In_df.to_csv(fnames[0])
             beta_df.to_csv(fnames[1])
             solution.to_csv(fnames[2])
-            actual_hosps(engine, county_ids=region_params[region]['county_fips'])
+            actual_hosps(engine, county_ids=region_definitions[region]['county_fips'])
             modeled(model, 'Ih')
             plt.savefig('output/connected_regional_model/' + str(spec_id) + '_fitted_hosps_'  + region + ".png", dpi=300)
             plt.close()
@@ -77,7 +77,7 @@ def run():
     print(f'Building Contact Matrix')
     fname = "output/connected_regional_model/cache/cm.pkl"
     if not exists(fname):
-        cm = RegionalCovidModel.construct_region_contact_matrices(OrderedDict([(region, all_regions[region]) for region in regions]), region_params, engine=engine, fpath=fit_params.mobility)
+        cm = RegionalCovidModel.construct_region_contact_matrices(OrderedDict([(region, all_regions[region]) for region in regions]), region_definitions, engine=engine, fpath=fit_params.mobility)
         pkl.dump(cm, open(fname, 'wb'))
     else:
         cm = pkl.load(open(fname, 'rb'))

@@ -23,8 +23,8 @@ class RegionalCovidModel(CovidModel):
         return y0d
 
     @classmethod
-    def construct_region_contact_matrices(cls, regions: OrderedDict, region_params, fpath=None, engine=None):
-        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_params.items() if key in regions.keys()])
+    def construct_region_contact_matrices(cls, regions: OrderedDict, region_definitions, fpath=None, engine=None):
+        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_definitions.items() if key in regions.keys()])
         df = get_region_mobility_from_file(fpath) if fpath else get_region_mobility_from_db(engine)
 
         # add regions to dataframe

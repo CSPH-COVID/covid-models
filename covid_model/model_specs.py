@@ -34,7 +34,7 @@ class CovidModelSpecifications:
         self.timeseries_effects = {}
         self.attribute_multipliers = None
 
-        self.model_region_params = None
+        self.model_region_definitions = None
         self.model_mobility_mode = None
         self.actual_mobility = None
         self.mobility_proj_params = None
@@ -95,7 +95,7 @@ class CovidModelSpecifications:
                      refresh_actual_vacc=False, vacc_proj_params=None,
                      timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
                      attribute_multipliers=None,
-                     region_params=None, regions=None,
+                     region_definitions=None, regions=None,
                      mobility_mode = None, refresh_actual_mobility=False, mobility_proj_params = None):
 
         if end_date is not None:
@@ -103,7 +103,7 @@ class CovidModelSpecifications:
         if tslices or tc:
             self.set_tc(tslices=tslices, tc=tc)
         if params:
-            self.set_model_params(params, region_params)
+            self.set_model_params(params, region_definitions)
         if refresh_actual_vacc:
             self.set_actual_vacc(engine, regions)
         if refresh_actual_vacc or vacc_proj_params or end_date:
@@ -224,12 +224,12 @@ class CovidModelSpecifications:
         self.tc = (self.tc if append else []) + list(tc)
         self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
 
-    def set_model_params(self, model_params, model_region_params=None):
-        # model_params and model_region_params may be dictionary or path to json file which will be converted to json
+    def set_model_params(self, model_params, model_region_definitions):
+        # model_params and model_region_definitions may be dictionary or path to json file which will be converted to json
         model_params = copy.deepcopy(model_params) if type(model_params) == dict else json.load(open(model_params))
-        model_region_params = copy.deepcopy(model_region_params) if type(model_region_params) == dict else json.load(open(model_region_params))
+        model_region_definitions = copy.deepcopy(model_region_definitions) if type(model_region_definitions) == dict else json.load(open(model_region_definitions))
         self.model_params = model_params
-        self.model_region_params = model_region_params
+        self.model_region_definitions = model_region_definitions
 
     def set_vacc_proj(self, vacc_proj_params=None):
         if vacc_proj_params is not None:
@@ -240,7 +240,7 @@ class CovidModelSpecifications:
         if engine is not None:
             actual_vacc_df_list = []
             for region in regions:
-                county_ids = self.model_region_params[region]['counties_fips']
+                county_ids = self.model_region_definitions[region]['counties_fips']
                 actual_vacc_df_list.append(ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True))
             self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         if actual_vacc_df is not None:
@@ -249,11 +249,11 @@ class CovidModelSpecifications:
     def set_actual_mobility(self, engine, actual_mobility_df=None):
         if engine is not None:
             regions = self.attr['region']
-            county_ids = [fips for region in regions for fips in self.model_region_params[region]['counties_fips']]
+            county_ids = [fips for region in regions for fips in self.model_region_definitions[region]['counties_fips']]
             df = get_region_mobility_from_db(engine, county_ids=county_ids).reset_index('measure_date')
 
             # add regions to dataframe
-            regions_lookup = {fips: region for region in regions for fips in self.model_region_params[region]['counties_fips']}
+            regions_lookup = {fips: region for region in regions for fips in self.model_region_definitions[region]['counties_fips']}
             df['origin_region'] = [regions_lookup[id] for id in df['origin_county_id']]
             df['destination_region'] = [regions_lookup[id] for id in df['destination_county_id']]
             df['t'] = (df['measure_date'] - self.start_date).dt.days
