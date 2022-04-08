@@ -60,7 +60,7 @@ class CovidModelSpecifications:
                 self.spec_id = row['spec_id']
                 self.base_spec_id = row['base_spec_id']
                 self.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=json.loads(row['tc_cov'].replace('{', '[').replace('}', ']')))
-                self.set_model_params(json.loads(row['model_params']))
+                self.set_model_params(json.loads(row['model_params']), model_region_params=spec_args['region_params'])
                 self.actual_vacc_df = pd.concat({k: pd.DataFrame(v).stack() for k, v in json.loads(row['vacc_actual']).items()}, axis=1).rename_axis(index=['t', 'age'])
                 self.set_vacc_proj(json.loads(row['vacc_proj_params']))
                 self.timeseries_effects = json.loads(row['timeseries_effects'])

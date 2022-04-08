@@ -60,10 +60,10 @@ class ExternalHosps(ExternalData):
 class ExternalVacc(ExternalData):
     def fetch_from_db(self, county_ids=None):
         if county_ids is None:
-            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+            sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
+            sql = open('sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 
