@@ -1,13 +1,16 @@
+### Python Standard Library ###
+from operator import itemgetter
+import math
+import copy
+from collections import OrderedDict, defaultdict
+### Third Party Imports ###
 import numpy as np
 import pandas as pd
-from collections import OrderedDict, defaultdict
 import sympy as sym
 from sympy.parsing.sympy_parser import parse_expr
 import scipy.integrate as spi
 import scipy.sparse as spsp
-from operator import itemgetter
-import math
-import copy
+### Local Imports ###
 
 
 class ODEFlowTerm:

@@ -1,21 +1,16 @@
+### Python Standard Library ###
+import datetime as dt
+from time import perf_counter
+### Third Party Imports ###
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
-import seaborn as sns
-import datetime as dt
-import json
-from charts import modeled, actual_hosps, mmwr_infections_growth_rate, re_estimates, format_date_axis
-from time import perf_counter
-from timeit import timeit
-import argparse
-
+### Local Imports ###
+from covid_model.analysis.charts import modeled, actual_hosps, format_date_axis
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
-# from covid_model.model_with_omicron import CovidModelWithVariants
-# from covid_model.model_with_immunity_rework import CovidModelWithVariants
-from covid_model.model_specs import CovidModelSpecifications
 from covid_model.run_model_scenarios import build_legacy_output_df
 
 plot_opts = {
@@ -24,6 +19,7 @@ plot_opts = {
     "var": "Variant Share of Infections",
     "imm": "Percent Immune"
 }
+
 
 if __name__ == '__main__':
 

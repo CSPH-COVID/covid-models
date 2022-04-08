@@ -1,11 +1,10 @@
-import os
-
-import matplotlib.pyplot as plt
-import pandas as pd
+### Python Standard Library ###
 import json
 import datetime as dt
-
-from covid_model.model import CovidModel
+### Third Party Imports ###
+import matplotlib.pyplot as plt
+import pandas as pd
+### Local Imports ###
 from db import db_engine
 from model_fit import CovidModelFit
 from analysis.charts import actual_hosps, modeled
@@ -36,6 +35,7 @@ regions = {
   "sw": "Southwest",
   "wcp": "West Central Partnership"
 }
+
 
 def run():
     # get fit params

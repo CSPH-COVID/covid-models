@@ -1,8 +1,10 @@
-import numpy as np
-import pandas as pd
+### Python Standard Library ###
 import os
-from pprint import pprint
 from collections import defaultdict
+from pprint import pprint
+### Third Party Imports ###
+import numpy as np
+### Local Imports ###
 
 
 if __name__ == '__main__':

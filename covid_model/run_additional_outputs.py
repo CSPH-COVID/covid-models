@@ -1,9 +1,13 @@
-import pandas as pd
-import numpy as np
+### Python Standard Library ###
 import datetime as dt
 import json
-from db import db_engine
-from data_imports import get_hosps_df, get_vaccinations_by_county, ExternalVaccWithProjections
+### Third Party Imports ###
+import pandas as pd
+import numpy as np
+### Local Imports ###
+from covid_model.db import db_engine
+from covid_model.data_imports import get_hosps_df, get_vaccinations_by_county, ExternalVaccWithProjections
+
 
 if __name__ == '__main__':
     engine = db_engine()

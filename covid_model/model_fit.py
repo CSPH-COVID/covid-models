@@ -1,13 +1,10 @@
-import json
-
-import numpy as np
-import pandas as pd
+### Python Standard Library ###
 import datetime as dt
 from time import perf_counter
+### Third Party Imports ###
 from matplotlib import pyplot as plt
-
 import scipy.optimize as spo
-
+### Local Imports ###
 from covid_model.data_imports import ExternalHosps
 from covid_model import CovidModel
 from covid_model.model_specs import CovidModelSpecifications

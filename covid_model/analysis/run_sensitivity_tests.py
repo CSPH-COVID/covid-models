@@ -1,12 +1,17 @@
-from model import CovidModelFit
-from run_fit import run_fit
-from db import db_engine
-from charts import actual_hosps, modeled
+### Python Standard Library ###
 import json
-import matplotlib.pyplot as plt
 import datetime as dt
 import argparse
+### Third Party Imports ###
+import matplotlib.pyplot as plt
 import pandas as pd
+### Local Imports ###
+from covid_model.model_fit import CovidModelFit
+from covid_model.run_fit import run_fit
+from covid_model.db import db_engine
+from charts import actual_hosps, modeled
+
+
 
 def run_sensitivity_tests(fit_id, alternate_params, refit_from_date=dt.datetime(2020, 4, 10), batch_size=3, add_base=False, plot_compartment='Ih'):
     batch = 'sensitivity_' + dt.datetime.now().strftime('%Y%m%d_%H%M%S')

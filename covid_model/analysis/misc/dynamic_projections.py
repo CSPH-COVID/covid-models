@@ -1,33 +1,32 @@
+### Python Standard Library ###
+import datetime as dt
+import random
+### Third Party Imports ###
 import numpy as np
 import pandas as pd
-import datetime as dt
-import json
-import random
-
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as mtick
-import seaborn as sns
-
 import scipy.stats as sps
 import pmdarima
 import arch
-
+### Local Imports ###
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
-from charts import plot_kde, modeled, actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_kde, actual_hosps, format_date_axis
 
 
 def uq_sample_tcs(fit, sample_n):
     fitted_efs_dist = sps.multivariate_normal(mean=fit.fitted_tc, cov=fit.fitted_efs_cov)
     fitted_efs_samples = fitted_efs_dist.rvs(sample_n)
-    return [list(fit.fixed_tc) + list(sample) for sample in (fitted_efs_samples if sample_n > 1 else [fitted_efs_samples])]
+    return [list(fit.fixed_tc) + list(sample) for sample in
+            (fitted_efs_samples if sample_n > 1 else [fitted_efs_samples])]
 
 
 def arima_garch_fit_and_sim(data, horizon=1, sims=10, arima_order='auto', use_garch=False):
     historical_values = np.log(1 - np.array(data))
     if arima_order is None or arima_order == 'auto':
-       arima_model = pmdarima.auto_arima(historical_values, suppress_warnings=True, seasonal=False)
+        arima_model = pmdarima.auto_arima(historical_values, suppress_warnings=True, seasonal=False)
     else:
         arima_model = pmdarima.ARIMA(order=arima_order, suppress_warnings=True).fit(historical_values)
     arima_results = arima_model.arima_res_
@@ -40,7 +39,8 @@ def arima_garch_fit_and_sim(data, horizon=1, sims=10, arima_order='auto', use_ga
         # fit a GARCH(1,1) model on the residuals of the ARIMA model
         garch = arch.arch_model(arima_residuals, p=1, q=1)
         garch_model = garch.fit(disp='off')
-        garch_sims = [e[0] for e in garch_model.forecast(horizon=1, reindex=False, method='simulation').simulations.values[0]]
+        garch_sims = [e[0] for e in
+                      garch_model.forecast(horizon=1, reindex=False, method='simulation').simulations.values[0]]
 
         # simulate projections iteratively
         all_projections = []
@@ -71,9 +71,9 @@ def plot_spaghetti(data, ax, ylabel=None):
 
 
 def plot_prediction_interval(data, ax, ci=0.8, ylabel=None, save_fig=None, format_as_dates=True, **plot_params):
-    hosp_low = data.quantile(0.5 - ci/2, axis=1)
+    hosp_low = data.quantile(0.5 - ci / 2, axis=1)
     hosp_mid = data.quantile(0.5, axis=1)
-    hosp_high = data.quantile(0.5 + ci/2, axis=1)
+    hosp_high = data.quantile(0.5 + ci / 2, axis=1)
     # hosp_mid.plot(ax=ax, c='navy')
     ax.fill_between(hosp_low.index, hosp_low, hosp_high, **{'color': 'navy', 'alpha': 0.3, **plot_params})
 
@@ -122,7 +122,7 @@ def get_tc_sims(fit, max_date, sample_count, samples_per_fit_sim=5, plot=False, 
     tc_sims = []
     i = 0
     for tcs in sample_tcs:
-        print(f'Generating simulated TCs #{i}-{i+samples_per_fit_sim-1}...')
+        print(f'Generating simulated TCs #{i}-{i + samples_per_fit_sim - 1}...')
         next_tcs = arima_garch_fit_and_sim(tcs[skip:], horizon=horizon, arima_order=arima_order)
         for next_tc in next_tcs[:samples_per_fit_sim]:
             i += 1
@@ -139,13 +139,14 @@ def get_tc_sims(fit, max_date, sample_count, samples_per_fit_sim=5, plot=False, 
                                  ci=0.95, alpha=0.3)
 
 
-def get_sims(fit: CovidModelFit, engine, max_date, sample_count, samples_per_fit_sim=5, output_dir='output', arima_order='auto', skip=8, model_params={}):
+def get_sims(fit: CovidModelFit, engine, max_date, sample_count, samples_per_fit_sim=5, output_dir='output',
+             arima_order='auto', skip=8, model_params={}):
     increment = 14
     max_t = (max_date - dt.datetime(2020, 1, 24)).days
     # fit.tslices[-1] += increment // 2
     tslices = fit.tslices + list(range(fit.tslices[-1] + increment, max_t, 14)) + [max_t]
 
-    sample_tcs = uq_sample_tcs(fit, sample_count//samples_per_fit_sim)
+    sample_tcs = uq_sample_tcs(fit, sample_count // samples_per_fit_sim)
     horizon = len(tslices) - 1 - len(sample_tcs[0])
 
     model = CovidModel(tslices=tslices, engine=engine)
@@ -168,8 +169,12 @@ def get_sims(fit: CovidModelFit, engine, max_date, sample_count, samples_per_fit
             model.solve_seir()
             tc_sims[i] = model.ef_by_t
             hosp_sims[i] = model.solution_sum('seir')['Ih']
-            new_infection_sims[i] = (model.solution_ydf.stack(level='age').stack(level='vacc')['E'] / params_df['alpha']).groupby('t').sum()
-            new_hosp_sims[i] = (model.solution_ydf.stack(level='age').stack(level='vacc')['I'] * params_df['gamm'] * params_df['hosp']).groupby('t').sum()
+            new_infection_sims[i] = (
+                        model.solution_ydf.stack(level='age').stack(level='vacc')['E'] / params_df['alpha']).groupby(
+                't').sum()
+            new_hosp_sims[i] = (
+                        model.solution_ydf.stack(level='age').stack(level='vacc')['I'] * params_df['gamm'] * params_df[
+                    'hosp']).groupby('t').sum()
             death_sims[i] = model.solution_sum('seir')['D']
             # modeled(model, ax=ax, compartments='Ih', **{'c': 'navy', 'alpha': min(1, 10.0/total_sample_count), **plot_params})
 
@@ -200,30 +205,40 @@ def plot_projection_summary(fit: CovidModelFit, engine, max_date, sample_count, 
     fig, axs = plt.subplots(3, 3, figsize=(16, 11))
     plt.grid(color='lightgray')
 
-    tc_sims, hosp_sims, new_hosp_sims, death_sims = get_sims(fit, engine, max_date, sample_count, model_params=model_params)
+    tc_sims, hosp_sims, new_hosp_sims, death_sims = get_sims(fit, engine, max_date, sample_count,
+                                                             model_params=model_params)
 
     start_date = dt.datetime.today().strftime('%Y-%m-%d')
     end_date_str = max_date.strftime("%b %#d, %Y")
     # plot_spaghetti(hosp_sims, ax=axs[0, 0], ylabel='Daily Patients Hospitalized with COVID-19')
-    plot_prediction_interval(hosp_sims, ax=axs[0, 0], ylabel='Daily Patients Hospitalized with COVID-19', ci=0.50, alpha=0.5)
-    plot_prediction_interval(hosp_sims, ax=axs[0, 0], ylabel='Daily Patients Hospitalized with COVID-19', ci=0.95, alpha=0.3)
+    plot_prediction_interval(hosp_sims, ax=axs[0, 0], ylabel='Daily Patients Hospitalized with COVID-19', ci=0.50,
+                             alpha=0.5)
+    plot_prediction_interval(hosp_sims, ax=axs[0, 0], ylabel='Daily Patients Hospitalized with COVID-19', ci=0.95,
+                             alpha=0.3)
     actual_hosps(engine, ax=axs[0, 0], color='xkcd:midnight')
-    plot_prediction_interval(tc_sims, ax=axs[1, 0], ylabel='Projected Transmission Control', color='darkorange', ci=0.50, alpha=0.5)
-    plot_prediction_interval(tc_sims, ax=axs[1, 0], ylabel='Projected Transmission Control', color='darkorange', ci=0.95, alpha=0.3)
-    plot_peak_distribution(hosp_sims.loc[start_date:], ax=axs[0, 1], xlabel=f'Hospitalized Patients Peak From Now Through {end_date_str}')
+    plot_prediction_interval(tc_sims, ax=axs[1, 0], ylabel='Projected Transmission Control', color='darkorange',
+                             ci=0.50, alpha=0.5)
+    plot_prediction_interval(tc_sims, ax=axs[1, 0], ylabel='Projected Transmission Control', color='darkorange',
+                             ci=0.95, alpha=0.3)
+    plot_peak_distribution(hosp_sims.loc[start_date:], ax=axs[0, 1],
+                           xlabel=f'Hospitalized Patients Peak From Now Through {end_date_str}')
     plot_peak_value_vs_date(hosp_sims.loc[start_date:], ax=axs[0, 2])
     # plot_date_of_peak(hosp_sims, ax=axs[0, 2], xlabel=f'Day of Hospitalizations Peak From Now Through {end_date_str}')
-    plot_kde(new_hosp_sims.loc[start_date:].sum(axis=0), ax=axs[1, 1], color='royalblue', xlabel=f'Total Hospital Admissions From Now Through {end_date_str}')
-    plot_kde(death_sims.iloc[-1] - death_sims.loc[start_date], ax=axs[1, 2], color='xkcd:charcoal', xlabel=f'Total Deaths From Now Through {end_date_str}')
+    plot_kde(new_hosp_sims.loc[start_date:].sum(axis=0), ax=axs[1, 1], color='royalblue',
+             xlabel=f'Total Hospital Admissions From Now Through {end_date_str}')
+    plot_kde(death_sims.iloc[-1] - death_sims.loc[start_date], ax=axs[1, 2], color='xkcd:charcoal',
+             xlabel=f'Total Deaths From Now Through {end_date_str}')
     for i, days in enumerate([14, 28, 56]):
         d = dt.datetime.today() + dt.timedelta(days=days)
-        plot_kde(hosp_sims.loc[d.strftime('%Y-%m-%d')], ax=axs[2, i], color='teal', xlabel=f'Patients Hospitalized with COVID-19 on {d.strftime("%b %#d, %Y")}')
+        plot_kde(hosp_sims.loc[d.strftime('%Y-%m-%d')], ax=axs[2, i], color='teal',
+                 xlabel=f'Patients Hospitalized with COVID-19 on {d.strftime("%b %#d, %Y")}')
 
     [ax.grid(True, color='lightgray') for ax in axs.flatten()]
     fig.tight_layout(pad=3)
 
 
-def plot_projection_comparison(engine, fits, model_params_dict, sample_count=20, max_date=dt.datetime(2022, 5, 31), base_output_dir=None):
+def plot_projection_comparison(engine, fits, model_params_dict, sample_count=20, max_date=dt.datetime(2022, 5, 31),
+                               base_output_dir=None):
     fig, ax = plt.subplots(figsize=(11, 11))
     # plt.grid(color='lightgray')
 
@@ -234,10 +249,14 @@ def plot_projection_comparison(engine, fits, model_params_dict, sample_count=20,
         output_dir = None
         if base_output_dir is not None:
             output_dir = f'{base_output_dir}/{scen_label}'
-        tc_sims, hosp_sims, new_hosp_sims, death_sims = get_sims(fit, engine, max_date=max_date, sample_count=sample_count, model_params={'vacc_proj_params': model_params}, output_dir=output_dir)
+        tc_sims, hosp_sims, new_hosp_sims, death_sims = get_sims(fit, engine, max_date=max_date,
+                                                                 sample_count=sample_count,
+                                                                 model_params={'vacc_proj_params': model_params},
+                                                                 output_dir=output_dir)
         start_date = dt.datetime.today().strftime('%Y-%m-%d')
         end_date_str = max_date.strftime("%b %#d, %Y")
-        plot_kde(new_hosp_sims.loc[start_date:].sum(axis=0), ax=ax, ci=None, xlabel=f'Total Hospital Admissions From Now Through {end_date_str}', label=scen_label, color=color)
+        plot_kde(new_hosp_sims.loc[start_date:].sum(axis=0), ax=ax, ci=None,
+                 xlabel=f'Total Hospital Admissions From Now Through {end_date_str}', label=scen_label, color=color)
         plt.legend(loc='best')
 
 
@@ -254,12 +273,9 @@ if __name__ == '__main__':
     # del params["current trajectory w/o 5-11 vacc."]
     # plot_projection_comparison(engine, fits=[fit], model_params_dict=params, sample_count=100, base_output_dir='output/sims/vacc_projs')
 
-
-    get_tc_sims(fit, sample_count=500, samples_per_fit_sim=10, max_date=dt.datetime(2022, 5, 31), plot=True, arima_order=(2, 0, 1))
+    get_tc_sims(fit, sample_count=500, samples_per_fit_sim=10, max_date=dt.datetime(2022, 5, 31), plot=True,
+                arima_order=(2, 0, 1))
     plt.show()
-
-
-
 
     # vacc_scens = ['current trajectory']
     # new_hosp_dists = pd.DataFrame()
@@ -277,4 +293,3 @@ if __name__ == '__main__':
     # sns.displot(new_hosp_dists, kind='kde', fill=True)
     # print(new_hosp_dists.mean())
     # new_hosp_dists.to_csv('output/simulated_new_hosps_by_vacc_scen.csv')
-

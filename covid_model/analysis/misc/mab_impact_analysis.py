@@ -1,13 +1,12 @@
-import numpy as np
+### Python Standard Library ###
+### Third Party Imports ###
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import datetime as dt
-import json
+### Local Imports ###
 from covid_model.db import db_engine
-from covid_model.model import CovidModelFit, CovidModel
-from charts import modeled, actual_hosps
-from vacc_scen_comparison import build_mab_prevalence
+from covid_model.model import CovidModel
+from covid_model.analysis.charts import modeled, actual_hosps
+from covid_model.analysis.misc.vacc_scen_comparison import build_mab_prevalence
 
 if __name__ == '__main__':
     engine = db_engine()

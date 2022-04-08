@@ -1,17 +1,17 @@
+### Python Standard Library ###
 import json
 import datetime as dt
-from functools import reduce
 from collections import OrderedDict
 from os.path import exists
 import pickle as pkl
-
+### Third Party Imports ###
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
+### Local Imports ###
 from covid_model.db import db_engine
-from covid_model import RegionalCovidModel, all_regions
+from covid_model import RegionalCovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
 from covid_model.analysis.charts import actual_hosps, modeled
 

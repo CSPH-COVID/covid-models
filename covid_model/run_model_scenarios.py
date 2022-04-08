@@ -1,19 +1,20 @@
-from covid_model.analysis.charts import actual_hosps, modeled
+### Python Standard Library ###
+import json
+import argparse
+import datetime as dt
+import dateutil.relativedelta as durel
+### Third Party Imports ###
+import pandas as pd
+import numpy as np
+### Local Imports ###
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.model import CovidModel
 from covid_model.db import db_engine
-import datetime as dt
-import dateutil.relativedelta as durel
-import pandas as pd
-import numpy as np
-import json
-import argparse
-
-import matplotlib.pyplot as plt
 
 ###################################################################################
 # TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
 ###################################################################################
+
 
 def build_legacy_output_df(model: CovidModel):
     ydf = model.solution_sum(['seir', 'age']).stack(level='age')

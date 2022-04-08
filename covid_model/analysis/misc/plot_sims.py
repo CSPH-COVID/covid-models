@@ -1,9 +1,11 @@
+### Python Standard Library ###
 import datetime as dt
+### Third Party Imports ###
 import matplotlib.pyplot as plt
-
-from model_sims import CovidModelSimulation
-from db import db_engine
-from analysis.charts import format_date_axis
+### Local Imports ###
+from covid_model.model_sims import CovidModelSimulation
+from covid_model.db import db_engine
+from covid_model.analysis.charts import format_date_axis
 
 
 def plot_prediction_interval(data, ax, ci=0.8, ylabel=None, save_fig=None, format_as_dates=True, **plot_params):
