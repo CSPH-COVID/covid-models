@@ -59,10 +59,10 @@ class ExternalHosps(ExternalData):
 class ExternalVacc(ExternalData):
     def fetch_from_db(self, county_ids=None):
         if county_ids is None:
-            sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open('sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 
@@ -191,9 +191,13 @@ def get_corrected_emresource(fpath):
     print(pd.to_datetime(pd.to_numeric(raw_reports).groupby('facility').rolling(20).agg(np.max)))
 
 
-def get_region_mobility_from_db(engine, fpath=None) -> pd.DataFrame:
-    with open('sql/mobility_dwell_hours.sql') as f:
-        df = pd.read_sql(f.read(), engine, index_col=['measure_date'])
+def get_region_mobility_from_db(engine, county_ids=None, fpath=None) -> pd.DataFrame:
+    if county_ids is None:
+        with open('covid_model/sql/mobility_dwell_hours.sql') as f:
+            df = pd.read_sql(f.read(), engine, index_col=['measure_date'])
+    else:
+        with open('covid_model/sql/mobility_dwell_hours_county_subset.sql') as f:
+            df = pd.read_sql(f.read(), engine, index_col=['measure_date'], params={'county_ids': county_ids})
     if fpath:
         df.to_csv(fpath)
     return df
