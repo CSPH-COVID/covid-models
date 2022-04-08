@@ -142,10 +142,10 @@
     {"tslices": null, "attributes": {"age": "65+"}, "values": 0.774879}
    ],
   "hosp": [
-    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "0-19"}, "values": [0.0386, 0.0386, 0.0239]},
-    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "20-39"}, "values": [0.0622, 0.0637, 0.0398]},
-    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "40-64"}, "values": [0.0863, 0.085, 0.0563]},
-    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "65+"}, "values": [0.1343, 0.1343, 0.1343]},
+    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "0-19"}, "values": [0.0286, 0.0286, 0.0223]},
+    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "20-39"}, "values": [0.0461, 0.0472, 0.0372]},
+    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "40-64"}, "values": [0.0639, 0.0630, 0.0526]},
+    {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "co", "age": "65+"}, "values": [0.0995, 0.0995, 0.1255]},
     {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "ad", "age": "0-19"}, "values": [0.0398, 0.0398, 0.0246]},
     {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "ad", "age": "20-39"}, "values": [0.0641, 0.0656, 0.041]},
     {"tslices": ["2020-06-19", "2020-09-30"], "attributes": {"region": "ad", "age": "40-64"}, "values": [0.0889, 0.0876, 0.058]},
@@ -373,14 +373,20 @@
     {"tslices": ["2020-03-01"], "attributes": {"region":  "wcp"}, "values": [0, 0]}
    ],
   "alpha_seed": [
-    {"tslices": ["2020-11-09", "2020-12-04"], "attributes": {}, "values": [0, 0, 0]}
+    {"tslices": ["2020-11-09", "2020-12-04"], "attributes": {}, "values": [0, 1, 0]}
    ],
   "delta_seed": [
-    {"tslices": ["2021-03-07", "2021-04-11"], "attributes": {}, "values": [0, 0, 0]}
+    {"tslices": ["2021-03-07", "2021-04-11"], "attributes": {}, "values": [0, 1, 0]}
    ],
   "om_seed": [
-    {"tslices": ["2021-11-16", "2021-12-11"], "attributes": {}, "values": [0, 0, 0]}
+    {"tslices": ["2021-11-16", "2021-12-11"], "attributes": {}, "values": [0, 1, 0]}
    ],
+  "ba2_seed": [
+    {"tslices": ["2021-12-08", "2022-01-02"], "attributes": {}, "values": [0, 1, 0]}
+   ],
+  "future_seed": [
+    {"tslices": null, "attributes":  {}, "values": 0}
+  ],
   "immunity": [
     {"tslices": null, "attributes": {}, "values": 0}
    ],

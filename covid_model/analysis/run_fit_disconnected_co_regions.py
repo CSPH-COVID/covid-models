@@ -3,13 +3,13 @@ import json
 import datetime as dt
 from multiprocessing import Pool
 
-from db import db_engine
+from covid_model.db import db_engine
 from covid_model import RegionalCovidModel, all_regions
 from covid_model.model_specs import CovidModelSpecifications
-from model_fit import CovidModelFit
-from analysis.charts import actual_hosps, modeled
+from covid_model.model_fit import CovidModelFit
+from covid_model.analysis.charts import actual_hosps, modeled
 from covid_model.cli_specs import ModelSpecsArgumentParser
-from data_imports import ExternalHosps
+from covid_model.data_imports import ExternalHosps
 
 
 def region_fit(args):
