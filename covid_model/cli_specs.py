@@ -25,7 +25,7 @@ class ModelSpecsArgumentParser(ArgumentParser):
         self.add_argument('-am', '--attribute_multipliers', type=str)
         self.add_argument('-sd', '--start_date', type=date.fromisoformat, help="format: YYYY-MM-DD")
         self.add_argument('-ed', '--end_date', type=date.fromisoformat, help="format: YYYY-MM-DD")
-        self.set_defaults(refresh_actual_vacc=False, refresh_actual_mobility=False, mobility_mode="none", start_date=None, regions="co")
+        self.set_defaults(refresh_actual_vacc=False, refresh_actual_mobility=False, mobility_mode="none", start_date=None, regions=["co"])
 
         self.specs_args = self.parse_known_args()[0].__dict__.keys()
 
