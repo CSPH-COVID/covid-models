@@ -4,18 +4,18 @@ import datetime as dt
 import json
 import copy
 from collections import OrderedDict
+from scipy import sparse
 
 import scipy.stats as sps
 from sqlalchemy import MetaData, func
 from sqlalchemy.orm import Session
 
 from covid_model.db import db_engine, get_sqa_table
-from covid_model.data_imports import ExternalVaccWithProjections, ExternalVacc
+from covid_model.data_imports import ExternalVaccWithProjections, ExternalVacc, get_region_mobility_from_db
 from covid_model.utils import get_params
 
 
 class CovidModelSpecifications:
-
     def __init__(self, start_date=None, engine=None, from_specs=None, **spec_args):
 
         self.start_date = None
@@ -30,16 +30,22 @@ class CovidModelSpecifications:
         self.tc_cov = None
 
         self.model_params = None
-        self.group_pops = None
         self.vacc_proj_params = None
         self.timeseries_effects = {}
         self.attribute_multipliers = None
 
+        self.model_region_params = None
+        self.model_mobility_mode = None
+        self.actual_mobility = None
+        self.mobility_proj_params = None
+
         self.actual_vacc_df = None
         self.proj_vacc_df = None  # the combined vacc rate df (including proj) is saved to avoid unnecessary processing
 
+
         # base specs can be provided via a database spec_id or an CovidModelSpecifications object
         if from_specs is not None:
+            # TODO: copy region model parameters, mobility projection params, etc.
             # if from_specs is an int, get specs from the database
             if isinstance(from_specs, int):
                 if engine is None:
@@ -89,16 +95,17 @@ class CovidModelSpecifications:
                      refresh_actual_vacc=False, vacc_proj_params=None,
                      timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
                      attribute_multipliers=None,
-                     region_params=None, region=None):
+                     region_params=None, regions=None,
+                     mobility_mode = None, refresh_actual_mobility=False, mobility_proj_params = None):
 
         if end_date is not None:
             self.end_date = end_date
         if tslices or tc:
             self.set_tc(tslices=tslices, tc=tc)
         if params:
-            self.set_model_params(params, region_params, region)
+            self.set_model_params(params, region_params)
         if refresh_actual_vacc:
-            self.set_actual_vacc(engine, county_ids=self.tags["county_fips"] if "county_fips" in self.tags.keys() else None)
+            self.set_actual_vacc(engine, regions)
         if refresh_actual_vacc or vacc_proj_params or end_date:
             if vacc_proj_params is not None:
                 self.vacc_proj_params = vacc_proj_params
@@ -118,6 +125,22 @@ class CovidModelSpecifications:
 
         if attribute_multipliers:
             self.set_attr_mults(attribute_multipliers)
+
+        self.model_mobility_mode = mobility_mode
+
+        if refresh_actual_mobility:
+            self.set_actual_mobility(engine)
+
+        if mobility_proj_params or end_date:
+            if mobility_proj_params is not None:
+                self.mobility_proj_params = mobility_proj_params
+            self.set_mobility_proj(self.mobility_proj_params)
+        # add mobility data to model params.
+        if refresh_actual_mobility or mobility_proj_params or end_date:
+            if self.model_mobility_mode == "none":
+                print('mobility mode is "none", not adding mobility to model params')
+            else:
+                self.model_params.update(self.get_mobility_as_params())
 
     def write_to_db(self, engine, schema='covid_model', table='specifications', tags=None):
         specs_table = get_sqa_table(engine, schema=schema, table=table)
@@ -201,32 +224,69 @@ class CovidModelSpecifications:
         self.tc = (self.tc if append else []) + list(tc)
         self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
 
-    def set_model_params(self, model_params, region_model_params=None, region=None):
-        # model_params may be dictionary or path to json file which will be converted to json
-        # region_model_params is the same, but will only be used if region != None. Contains region specific modifications to parameters
-        # every key present in region_model_params will completely overwrite that entry in model_params
+    def set_model_params(self, model_params, model_region_params=None):
+        # model_params and model_region_params may be dictionary or path to json file which will be converted to json
         model_params = copy.deepcopy(model_params) if type(model_params) == dict else json.load(open(model_params))
-        if region is not None:
-            region_model_params = region_model_params if type(region_model_params) == dict else json.load(open(region_model_params))
-            model_params.update(region_model_params[region])
-            self.tags['region'] = region   # record which option we ran with
-            self.tags['county_fips'] = model_params['county_fips']
-            self.tags['county_names'] = model_params['county_names']
-            _ = model_params.pop('county_fips')   # remove from the parameters
-            _ = model_params.pop('county_names')   # remove from the parameters
+        model_region_params = copy.deepcopy(model_region_params) if type(model_region_params) == dict else json.load(open(model_region_params))
         self.model_params = model_params
-        self.group_pops = self.model_params['group_pop']
+        self.model_region_params = model_region_params
 
     def set_vacc_proj(self, vacc_proj_params=None):
         if vacc_proj_params is not None:
             self.vacc_proj_params = copy.deepcopy(vacc_proj_params) if isinstance(vacc_proj_params, dict) else json.load(open(vacc_proj_params))
         self.proj_vacc_df = self.get_proj_vacc()
 
-    def set_actual_vacc(self, engine, county_ids=None, actual_vacc_df=None):
+    def set_actual_vacc(self, engine, regions=None, actual_vacc_df=None):
         if engine is not None:
-            self.actual_vacc_df = ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids)
+            actual_vacc_df_list = []
+            for region in regions:
+                county_ids = self.model_region_params[region]['counties_fips']
+                actual_vacc_df_list.append(ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True))
+            self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         if actual_vacc_df is not None:
             self.actual_vacc_df = actual_vacc_df.copy()
+
+    def set_actual_mobility(self, engine, actual_mobility_df=None):
+        if engine is not None:
+            regions = self.attr['region']
+            county_ids = [fips for region in regions for fips in self.model_region_params[region]['counties_fips']]
+            df = get_region_mobility_from_db(engine, county_ids=county_ids).reset_index('measure_date')
+
+            # add regions to dataframe
+            regions_lookup = {fips: region for region in regions for fips in self.model_region_params[region]['counties_fips']}
+            df['origin_region'] = [regions_lookup[id] for id in df['origin_county_id']]
+            df['destination_region'] = [regions_lookup[id] for id in df['destination_county_id']]
+            df['t'] = (df['measure_date'] - self.start_date).dt.days
+            # find most recent data before self.start_date and set its time to zero so we have an initial mobility
+            df.replace({'t': max(df['t'][df['t']<=0])}, 0, inplace=True)
+
+            df = df[df['t']>=0].drop(columns=['origin_county_id', 'destination_county_id']) \
+                .groupby(['t', 'origin_region', 'destination_region']) \
+                .aggregate(total_dwell_duration_hrs=('total_dwell_duration_hrs', 'sum'))
+
+            # Create dictionaries of matrices, both D and M.
+            ts = df.index.get_level_values('t')
+            region_idx = {region: i for i, region in enumerate(regions)}
+            dwell_matrices = {}
+            for t in ts:
+                dfsub = df.loc[df.index.get_level_values('t') == t].reset_index('t', drop=True).reset_index()
+                idx_i = [region_idx[region] for region in dfsub['origin_region']]
+                idx_j = [region_idx[region] for region in dfsub['destination_region']]
+                vals = dfsub['total_dwell_duration_hrs']
+                dwell = sparse.coo_array((vals, (idx_i, idx_j)), shape=(len(regions), len(regions))).todense()
+                dwell[np.isnan(dwell)] = 0
+                dwell_rownorm = dwell / dwell.sum(axis=1)[:, np.newaxis]
+                dwell_colnorm = dwell / dwell.sum(axis=0)[np.newaxis, :]
+                dwell_matrices[t] = {"dwell": dwell, "dwell_rownorm": dwell_rownorm, "dwell_colnorm": dwell_colnorm}
+
+            self.actual_mobility = dwell_matrices
+        if actual_mobility_df is not None:
+            self.actual_mobility = actual_mobility_df.copy()
+
+    def set_mobility_proj(self, mobility_proj_params=None):
+        if mobility_proj_params is not None:
+            self.mobility_proj_params = copy.deepcopy(mobility_proj_params) if isinstance(mobility_proj_params, dict) else json.load(open(mobility_proj_params))
+        self.proj_mobility = self.get_proj_mobility()
 
     def set_attr_mults(self, attr_mults):
         self.attribute_multipliers = copy.deepcopy(attr_mults) if isinstance(attr_mults, list) else json.load(open(attr_mults))
@@ -288,6 +348,7 @@ class CovidModelSpecifications:
         return multipliers
 
     def get_proj_vacc(self):
+        # TODO: Still works with region included in vaccine df?
         proj_lookback = self.vacc_proj_params['lookback'] if 'lookback' in self.vacc_proj_params.keys() else 7
         proj_fixed_rates = self.vacc_proj_params['fixed_rates'] if 'fixed_rates' in self.vacc_proj_params.keys() else None
         max_cumu = self.vacc_proj_params['max_cumu'] if 'max_cumu' in self.vacc_proj_params.keys() else 0
@@ -317,7 +378,8 @@ class CovidModelSpecifications:
                 # vaccs = df.index.unique('vacc')
                 for t in projections.index.unique('t'):
                     this_max_cumu = get_params(max_cumu.copy(), t)
-                    max_cumu_df = pd.DataFrame(this_max_cumu) * pd.DataFrame(self.group_pops, index=shots).transpose()
+                    # TODO: Update how to deal with group pop
+                    max_cumu_df = pd.DataFrame(this_max_cumu) * pd.DataFrame(self.model_params['group_pop'], index=shots).transpose()
                     for i in range(len(groups)):
                         group = groups[i]
                         current_rate = projections.loc[(t, group)]
@@ -337,11 +399,38 @@ class CovidModelSpecifications:
 
     def get_vacc_per_available(self):
         vacc_rates = self.get_vacc_rates()
-        populations = pd.Series(self.model_params['group_pop'], name='population').rename_axis(index='age')
-        cumu_vacc = vacc_rates.groupby('age').cumsum()
+        populations = [{'age': li['attributes']['age'], 'region': li['attributes']['region'], 'population':li['values']} for li in self.model_params['group_pop'] if li['attributes']['region'] in self.attr['region']]
+        populations = pd.DataFrame(populations).set_index(['age', 'region'])
+        cumu_vacc = vacc_rates.groupby(['age', 'region']).cumsum()
         cumu_vacc_final_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
-        cumu_vacc_final_shot['none'] = cumu_vacc_final_shot.join(populations)['population'] - cumu_vacc_final_shot.sum(axis=1)
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.join(populations)
+        cumu_vacc_final_shot['none'] = cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)
+        cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3']).reorder_levels(['t', 'age', 'region'])
+
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
 
         return (vacc_rates / available_for_vacc).fillna(0)
+
+    def get_proj_mobility(self):
+        # TODO: implement mobility projections
+        return {}
+
+    def get_mobility_as_params(self):
+        mobility_dict = self.actual_mobility
+        mobility_dict.update(self.proj_mobility)
+        tslices = list(mobility_dict.keys())
+        params = {}
+        if self.model_mobility_mode == "population_attached":
+            matrix_list = [np.dot(mobility_dict[t]['dwell_rownorm'], np.transpose(mobility_dict[t]['dwell_colnorm'])) for t in tslices]
+            for j, from_region in enumerate(self.attr['region']):
+                params[f"mob_{from_region}"] =\
+                        [{'tslices': tslices[1:], 'attributes': {'region': to_region}, 'values': [m[i,j] for m in matrix_list]} for i, to_region in enumerate(self.attr['region'])]
+        else:
+            raise ValueError(f'Mobility mode {self.model_mobility_mode} not yet supported')
+        # add in region populations as parameters for use later
+        region_pops = {params_list['attributes']['region']: params_list['values'] for params_list in self.model_params['total_pop'] }
+        params.update(
+            {f"region_pop_{region}": [{'tslices': None, 'attributes': {}, 'values': region_pops[region] }] for region in self.attr['region']}
+        )
+        return params
