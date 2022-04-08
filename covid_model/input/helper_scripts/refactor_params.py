@@ -44,25 +44,25 @@ def main():
         if len(regions) == 1 and "co" in regions:
             for i in range(len(new_params[param_name])):
                 del new_params[param_name][i]['attributes']['region']
-        print("test")
 
-    # easy but ugly
-    #with open("new_params.json", 'w') as f:
-    #    json.dump(new_params, f)
-
-    # harder but prettier
-    with open("new_params.json", 'w') as f:
-        f.write("{\n")
-        for param_name, param_list in new_params.items():
-            f.write(f'  "{param_name}": [\n')
-            for l in param_list:
-                tslices_string = "[" + ", ".join("\"" + str(ts) + "\"" for ts in l["tslices"]) + "]" if l['tslices'] is not None else "null"
-                attributes_string = json.dumps(l['attributes'])
-                values_string = "[" + ", ".join(str(v) for v in l["values"]) + "]" if l['tslices'] is not None else l['values']
-                f.write(f'    {{"tslices": {tslices_string}, "attributes": {attributes_string}, "values": {values_string}}},\n')
-            f.write("   ],\n")
-        f.write("}\n")
-    print("done")
+    if (False):
+        # easy but ugly
+        with open("new_params.json", 'w') as f:
+            json.dump(new_params, f, indent=2)
+    else:
+        # harder but prettier
+        with open("new_params.json", 'w') as f:
+            f.write("{\n")
+            for param_name, param_list in new_params.items():
+                f.write(f'  "{param_name}": [\n')
+                for l in param_list:
+                    tslices_string = "[" + ", ".join("\"" + str(ts) + "\"" for ts in l["tslices"]) + "]" if l['tslices'] is not None else "null"
+                    attributes_string = json.dumps(l['attributes'])
+                    values_string = "[" + ", ".join(str(v) for v in l["values"]) + "]" if l['tslices'] is not None else l['values']
+                    f.write(f'    {{"tslices": {tslices_string}, "attributes": {attributes_string}, "values": {values_string}}},\n')
+                f.write("   ],\n")
+            f.write("}\n")
+        print("done")
 
 
 if __name__ == "__main__":
