@@ -21,7 +21,7 @@ def run():
     parser.add_argument("-ws", "--window_size", type=int, help="the number of days in each TC-window; default to 14")
     parser.add_argument("-tmn", "--tc_min", type=float, default=0, help="The lowest tc to allow")
     parser.add_argument("-tmx", "--tc_max", type=float, default=0.99, help="The lowest tc to allow")
-    parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
+    parser.add_argument("-rd", "--region_definitions", type=str, default="input/region_definitions.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_definitions.json'")
     parser.add_argument("-rg", "--region", choices=covid_model.all_regions_and_counties.keys(), required=False, help="Specify the region to be run, if not specified, just runs default parameters")
     parser.add_argument("-rh", "--hosp_data", type=str, help="the path to the hospitalizations data for regions (temporary fix)")
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
@@ -33,20 +33,20 @@ def run():
     batch_size = fit_params.batch_size if fit_params.batch_size is not None else look_back
     increment_size = fit_params.increment_size if fit_params.increment_size is not None else 1
     window_size = fit_params.window_size if fit_params.window_size is not None else 14
-    region_params = fit_params.region_params
+    region_definitions = fit_params.region_definitions
     region = fit_params.region
     write_batch_output = fit_params.write_batch_output
     model_class = getattr(covid_model, fit_params.model_class)
 
     # run fit
     engine = db_engine()
-    fit = CovidModelFit(engine=engine, region_params=region_params, region=fit_params.region, tc_min=fit_params.tc_min, tc_max=fit_params.tc_max, **parser.specs_args_as_dict())
+    fit = CovidModelFit(engine=engine, region_definitions=region_definitions, region=fit_params.region, tc_min=fit_params.tc_min, tc_max=fit_params.tc_max, **parser.specs_args_as_dict())
 
     # extract county IDs for the provided region; if statewide, set counties=None
     if region is not None:
-        counties = json.load(open(region_params))[region]['county_names']
+        counties = json.load(open(region_definitions))[region]['county_names']
         #counties = counties if type(counties) == list else [counties]
-        county_ids = json.load(open(region_params))[region]['county_fips']
+        county_ids = json.load(open(region_definitions))[region]['county_fips']
         #county_ids = county_ids if type(county_ids) == list else [county_ids]
     else:
         counties, county_ids = (None, None)
@@ -66,7 +66,7 @@ def run():
     # run fit
     fit.run(engine, look_back=look_back, batch_size=batch_size,
             increment_size=increment_size, window_size=window_size,
-            region_params=region_params, region=region,
+            region_definitions=region_definitions, region=region,
             write_batch_output=write_batch_output,
             model_class=model_class,
             model_args={"region": region} if region is not None else dict())
