@@ -77,7 +77,7 @@ class CovidModelSpecifications:
                 self.update_specs(
                     end_date=spec_args['end_date'] if spec_args['end_date'] is not None else from_specs.end_date,
                     tslices=copy.deepcopy(from_specs.tslices), tc=copy.deepcopy(from_specs.tc),
-                    params=copy.deepcopy(from_specs.model_params),
+                    params=copy.deepcopy(from_specs.model_params), region_params=from_specs.model_region_params,
                     vacc_proj_params=copy.deepcopy(from_specs.vacc_proj_params),
                     attribute_multipliers=copy.deepcopy(from_specs.attribute_multipliers))
             else:
@@ -136,7 +136,7 @@ class CovidModelSpecifications:
                 self.mobility_proj_params = mobility_proj_params
             self.set_mobility_proj(self.mobility_proj_params)
         # add mobility data to model params.
-        if refresh_actual_mobility or mobility_proj_params or end_date:
+        if refresh_actual_mobility or mobility_proj_params or (end_date and self.actual_mobility is not None):
             if self.model_mobility_mode == "none":
                 print('mobility mode is "none", not adding mobility to model params')
             else:
