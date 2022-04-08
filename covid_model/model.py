@@ -17,7 +17,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron'],
+                        'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
                         'immun': ['none', 'weak', 'strong'],
                         'region': ['co']})
 
@@ -202,12 +202,14 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # exposure
         asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
         for variant in self.attributes['variant']:
+            # No mobility between regions (or a single region)
             if self.model_mobility_mode is None or self.model_mobility_mode == "none":
                 for region in self.attributes['region']:
                     sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': region})
                     asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': region})
                     self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
                     self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+            # Transmission parameters attached to the susceptible population
             if self.model_mobility_mode == "population_attached":
                 for from_region in self.attributes['region']:
                     # TODO: need region specific beta here.
@@ -217,9 +219,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
                         self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
                         self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
-
-
-
 
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
@@ -240,9 +239,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
 
         # immunity decay
-        # self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / imm3_decay_days')
-        # self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / imm2_decay_days')
-        # self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / imm1_decay_days')
         self.add_flows_by_attr({'immun': 'strong'}, {'immun': 'weak'}, coef='1 / imm_decay_days')
 
     # define initial state y0
