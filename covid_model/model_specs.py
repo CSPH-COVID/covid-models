@@ -96,7 +96,7 @@ class CovidModelSpecifications:
                      timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
                      attribute_multipliers=None,
                      region_params=None, regions=None,
-                     mobility_mode = None, refresh_actual_mobility=False, mobility_proj_params = None):
+                     mobility_mode=None, refresh_actual_mobility=False, mobility_proj_params=None):
 
         if end_date is not None:
             self.end_date = end_date
