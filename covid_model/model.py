@@ -3,6 +3,8 @@ import pandas as pd
 import json
 import datetime as dt
 from collections import OrderedDict
+
+
 from covid_model.model_specs import CovidModelSpecifications
 from covid_model.ode_builder import ODEBuilder
 
@@ -14,14 +16,20 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
                         'variant': ['none', 'alpha', 'delta', 'omicron'],
-                        # 'immun': ['none', 'imm0', 'imm1', 'imm2', 'imm3']})
-                        'immun': ['none', 'weak', 'strong']})
+                        'immun': ['none', 'weak', 'strong'],
+                        'region': ['co']})
 
-    param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun')
+    param_attr_names = ('age', 'vacc', 'priorinf', 'variant', 'immun', 'region')
 
     default_end_date = dt.date(2022, 5, 31)
 
     def __init__(self, base_model=None, deepcopy_params=True, **spec_args):
+
+        # update region attribute levels using base model, then spec_args as appropriate
+        if base_model:
+            self.attr['region'] = base_model.attr['region']
+        if 'regions' in spec_args.keys():
+            self.attr['region'] = spec_args['regions']
 
         # if a base model is provided, use its specifications
         if base_model is not None:
@@ -44,15 +52,16 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     def build_param_lookups(self, apply_vaccines=True):
 
         # prep general parameters
-        for name, val in self.model_params.items():
-            if not isinstance(val, dict) or 'tslices' not in val.keys():
-                self.set_param_using_age_dict(name, val)
-            else:
-                for i, (tmin, tmax) in enumerate(zip([self.tmin] + val['tslices'], val['tslices'] + [self.tmax])):
-                    tmin = (dt.datetime.strptime(tmin, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmin, str) else tmin
-                    tmax = (dt.datetime.strptime(tmax, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmax, str) else tmax
-                    v = {a: av[i] for a, av in val['value'].items()} if isinstance(val['value'], dict) else val['value'][i]
-                    self.set_param_using_age_dict(name, v, trange=range(tmin, tmax))
+        for param_name, param_list in self.model_params.items():
+            for param_dict in param_list:
+                if param_dict['tslices']:
+                    for i, (tmin, tmax) in enumerate(zip([self.tmin] + param_dict['tslices'], param_dict['tslices'] + [self.tmax])):
+                        tmin = (dt.datetime.strptime(tmin, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmin, str) else tmin
+                        tmax = (dt.datetime.strptime(tmax, "%Y-%m-%d").date() - self.start_date).days if isinstance(tmax, str) else tmax
+                        v = {a: av[i] for a, av in param_dict['values'].items()} if isinstance(param_dict['values'], dict) else param_dict['values'][i]
+                        self.set_param(param_name, v, param_dict['attributes'], trange=range(tmin, tmax))
+                else:
+                    self.set_param(param_name, param_dict['values'], param_dict['attributes'])
 
         if apply_vaccines:
             vacc_per_available = self.get_vacc_per_available()
@@ -65,9 +74,10 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             for shot in self.attr['vacc'][1:]:
                 self.set_param(f'{shot}_per_available', 0, trange=range(0, vacc_delay))
                 for age in self.attr['age']:
-                    for t in range(vacc_delay, self.tmax):
-                        self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t - vacc_delay, age)],
-                                       {'age': age}, trange=[t])
+                    for region in self.attr['region']:
+                        for t in range(vacc_delay, self.tmax):
+                            self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t - vacc_delay, age, region)],
+                                           {'age': age, 'region': region}, trange=[t])
 
         # alter parameters based on timeseries effects
         multipliers = self.get_timeseries_effect_multipliers()
@@ -106,16 +116,10 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         infected = (self.solution_sum('seir')['I'].shift(3) + self.solution_sum('seir')['A'].shift(3))
         return infect_duration * self.new_infections.groupby('t').sum() / infected
 
-    # provide a dictionary by age (as in params.json) and update parameters accordingly
-    def set_param_using_age_dict(self, name, val, trange=None):
-        if not isinstance(val, dict):
-            self.set_param(name, val, trange=trange)
-        else:
-            for age, v in val.items():
-                self.set_param(name, v, attrs={'age': age}, trange=trange)
-
     # set TC by slice, and update non-linear multipliers; defaults to reseting the last TC values
     def apply_tc(self, tc=None, tslices=None, suppress_ode_rebuild=False):
+        # assume tc is a dictionary for different regions
+
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
             self.tslices = [tslice for tslice in self.tslices if tslice < tslices[0]] + tslices
@@ -166,10 +170,24 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # exposure
         asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
         for variant in self.attributes['variant']:
-            sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant})
-            asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant})
-            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-            self.add_flows_by_attr({'seir': 'S', 'variant': 'none'}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+            if self.model_mobility_mode is None or self.model_mobility_mode == "none":
+                for region in self.attributes['region']:
+                    sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': region})
+                    asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': region})
+                    self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                    self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+            if self.model_mobility_mode == "population_attached":
+                for from_region in self.attributes['region']:
+                    # TODO: need region specific beta here.
+                    asymptomatic_transmission = f'(1 - immunity) * betta / region_pop_{from_region}'
+                    for to_region in self.attributes['region']:
+                        sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
+                        asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
+                        self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                        self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
+
+
+
 
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
@@ -197,7 +215,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     # define initial state y0
     @property
     def y0_dict(self):
-        y0d = {('S', age, 'none', 'none', 'none', 'none'): n for age, n in self.group_pops.items()}
+        group_pops = { (li['attributes']['region'], li['attributes']['age']): li['values'] for li in self.model_params['group_pop'] if li['attributes']['region'] in self.attr['region']}
+        y0d = {('S', age, 'none', 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
         return y0d
 
     # override solve_ode to use default y0_dict
