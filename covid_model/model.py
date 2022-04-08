@@ -17,7 +17,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                         'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron'],
+                        'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
                         'immun': ['none', 'weak', 'strong'],
                         'region': ['co']})
 
