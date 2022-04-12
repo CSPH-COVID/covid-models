@@ -17,7 +17,6 @@ if __name__ == '__main__':
     argparser.add_argument('-fd', '--from_date', type=dt.date.fromisoformat, default=dt.date(2020, 3, 1), help='x-axis minimum date')
     argparser.add_argument('-td', '--to_date', type=dt.date.fromisoformat, default=dt.date.today(), help='x-axis maximum date')
     argparser.add_argument("-mc", "--model_class", default="CovidModel", help="Name of the class to use for the model (Defaults to CovidModel)")
-    argparser.add_argument("-rg", "--region", choices=all_regions.keys(), required=False, help="Specify the region to be run, if running a regional model, if not specified, just runs default parameters")
     argparser.add_argument("-sp", "--save_prefix", default=None, help="If specified, saves the figure with the given prefix")
     argparser.add_argument('-gba', '--group_by_attr_names', nargs='+', type=str,
                            choices=CovidModel.attr.keys(), default=['age', 'vacc', 'priorinf'],
