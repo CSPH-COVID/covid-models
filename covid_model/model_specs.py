@@ -410,7 +410,10 @@ class CovidModelSpecifications:
                             projections.loc[(t, groups[i + 1])] += excess_rate
 
                     cumu_vacc += projections.loc[t]
-            return projections
+
+            # TODO: Make this work for regions besides Colorado
+            projections['region'] = 'co'
+            return projections.set_index('region', append=True)
 
     def get_vacc_rates(self):
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
