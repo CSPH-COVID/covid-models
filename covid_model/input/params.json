@@ -359,7 +359,7 @@
     {"tslices": null, "attributes": {}, "values": 360}
    ],
   "initial_seed": [
-    {"tslices": ["2020-01-25"], "attributes": {"region":   "co"}, "values": [0, 0]},
+    {"tslices": ["2020-01-25"], "attributes": {"region":   "co"}, "values": [2.2, 0]},
     {"tslices": ["2020-03-08"], "attributes": {"region": "cent"}, "values": [2.2, 0]},
     {"tslices": ["2020-03-01"], "attributes": {"region":   "cm"}, "values": [0, 0]},
     {"tslices": ["2020-03-01"], "attributes": {"region":  "met"}, "values": [0, 0]},
