@@ -58,6 +58,7 @@ class CovidModelFit:
 
         # create base model
         base_model = model_class(from_specs=self.base_specs, end_date=end_date, **model_args)
+        base_model.tags = {}
 
         # prep model (we only do this once to save time)
         t0 = perf_counter()
