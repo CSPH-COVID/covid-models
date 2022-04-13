@@ -51,7 +51,7 @@ class CovidModelFit:
     # method = 'curve_fit' or 'minimize'
     def run(self, engine, method='curve_fit', window_size=14, look_back=None,
             last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, model_class=CovidModel,
-            model_args=dict(), forward_sim_each_batch=False, use_base_specs_end_date=False, **spec_args):
+            model_args=dict(), forward_sim_each_batch=False, use_base_specs_end_date=False, print_prefix="", **unused_args):
         # get the end date from actual hosps
         end_t = (self.base_specs.end_date - self.base_specs.start_date).days if use_base_specs_end_date else self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)
@@ -66,7 +66,7 @@ class CovidModelFit:
         base_model.apply_tc(tc=tc, tslices=tslices)
         base_model.prep()
         t1 = perf_counter()
-        print(f'Model prepped for fitting in {t1-t0} seconds.')
+        print(f'{print_prefix} Model prepped for fitting in {t1-t0} seconds.')
 
         # run fit
         fitted_tc_cov = None
@@ -87,13 +87,13 @@ class CovidModelFit:
             model = model_class(base_model=base_model, end_date=this_end_date, deepcopy_params=False, **model_args)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
             t02 = perf_counter()
-            print(f'Model copied in {t02-t01} seconds.')
+            print(f'{print_prefix} Model copied in {t02-t01} seconds.')
 
             fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
-            print(f'Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds.')
+            print(f'{print_prefix} Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds.')
             if write_batch_output:
                 model.tags['run_type'] = 'intermediate-fit'
                 model.write_to_db(engine)
@@ -110,7 +110,7 @@ class CovidModelFit:
                 modeled(model, compartments='Ih', c='blue', ax=ax)
                 ax = fig.add_subplot(212)
                 transmission_control(model, ax=ax)
-                plt.savefig(f'output/{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_forward_sim_{i}.png')
+                plt.savefig(f'covid_model/output/{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_forward_sim_{i}.png')
                 plt.close()
 
         self.fitted_tc = tc
