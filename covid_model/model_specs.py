@@ -163,6 +163,7 @@ class CovidModelSpecifications:
         if self.model_mobility_mode != "none" and (refresh_actual_mobility or mobility_proj_params or end_date):
             self.model_params.update(self.get_mobility_as_params())
 
+    def prepare_write_specs_query(self, tags=None):
     # handy properties for the beginning t, end t, and the full range of t values
     @property
     def tmin(self): return 0
