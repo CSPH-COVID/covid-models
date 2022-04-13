@@ -18,6 +18,7 @@ from covid_model.data_imports import ExternalHosps
 
 def actual_hosps(engine, county_ids=None, **plot_params):
     hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
+    hosps.index = pd.to_datetime(hosps.index)
     hosps.plot(**{'color': 'red', 'label': 'Actual Hosps.', **plot_params})
 
 

@@ -28,10 +28,9 @@ if __name__ == '__main__':
                         help="add a plot to the output figure, default: Prevalence, Hospitalizations, Variant Share, "
                              "and Percent Immune")
     parser.add_argument("-fd", "--from_date", default='2021-07-01', type=str, help="min date for plots")
-    parser.add_argument("-td", "--to_date", default='2022-05-31', type=str, help="max date for plots")
     run_args = parser.parse_args()
     from_date = dt.date.fromisoformat(run_args.from_date)
-    to_date = dt.date.fromisoformat(run_args.to_date)
+    to_date = run_args.end_date
 
     run_args.plot = ['prev', 'hosp', 'var', 'imm'] if run_args.plot is None else run_args.plot
     plots = [plot for plot in run_args.plot if plot in plot_opts.keys()]
@@ -40,7 +39,7 @@ if __name__ == '__main__':
     print('Prepping model...')
     t0 = perf_counter()
     engine = db_engine()
-    model = CovidModel(end_date=to_date, engine=engine, **parser.specs_args_as_dict())
+    model = CovidModel(engine=engine, **parser.specs_args_as_dict())
     # model.apply_tc(tc=model.tc + [1.0], tslices=model.tslices + [815])
     model.prep()
     t1 = perf_counter()
@@ -48,7 +47,7 @@ if __name__ == '__main__':
 
     print('Running model...')
     model.solve_seir()
-    build_legacy_output_df(model).to_csv('output/out2.csv')
+    # build_legacy_output_df(model).to_csv('output/out2.csv')
 
     print('Producing charts...')
     ncols = int(np.ceil(np.sqrt(len(plots))))
