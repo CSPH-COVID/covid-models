@@ -40,7 +40,12 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         tlength = (self.end_date - self.start_date).days
         # if increment is None, set trange to match TC tslices, with breaks added anywhere that has a tslice in model_params
         if increment is None:
-            model_param_tslices = {(dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice for param, param_specs_list in self.model_params.items() for param_specs in param_specs_list if param_specs['tslices'] is not None for tslice in param_specs['tslices']}
+            model_param_tslices = set()
+            for param, param_specs_list in self.model_params.items():
+                for param_specs in param_specs_list:
+                    if 'tslices' in param_specs.keys() and param_specs['tslices'] is not None:
+                        for tslice in param_specs['tslices']:
+                            model_param_tslices.add((dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice)
             trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
             trange = [ts for ts in trange if ts < self.tmax]
         # if increment is an integer, generate evenly spaced slices
@@ -113,19 +118,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                     pass
                 else:
                     self.set_param(**attr_mult_specs)
-
-    # handy properties for the beginning t, end t, and the full range of t values
-    @property
-    def tmin(self): return 0
-
-    @property
-    def tmax(self): return (self.end_date - self.start_date).days + 1
-
-    @property
-    def daterange(self): return pd.date_range(self.start_date, end=self.end_date - dt.timedelta(days=1))
-
-    @property
-    def tslices_dates(self): return [self.start_date + dt.timedelta(days=ts) for ts in [0] + self.tslices]
 
     # new exposures by day by group
     @property

@@ -120,7 +120,7 @@ class CovidModelSpecifications:
 
         if end_date is not None:
             self.end_date = end_date
-        if tslices or tc:
+        if tslices or tc or end_date:
             self.set_tc(tslices=tslices, tc=tc)
         if params:
             self.set_model_params(params)
@@ -162,6 +162,20 @@ class CovidModelSpecifications:
         # add mobility data to model params.
         if self.model_mobility_mode != "none" and (refresh_actual_mobility or mobility_proj_params or end_date):
             self.model_params.update(self.get_mobility_as_params())
+
+    def prepare_write_specs_query(self, tags=None):
+    # handy properties for the beginning t, end t, and the full range of t values
+    @property
+    def tmin(self): return 0
+
+    @property
+    def tmax(self): return (self.end_date - self.start_date).days + 1
+
+    @property
+    def daterange(self): return pd.date_range(self.start_date, end=self.end_date - dt.timedelta(days=1))
+
+    @property
+    def tslices_dates(self): return [self.start_date + dt.timedelta(days=ts) for ts in [0] + self.tslices]
 
     def prepare_write_specs_query(self, tags=None):
         # returns all the data you would need to write to the database but doesn't actually write to the database
@@ -227,9 +241,15 @@ class CovidModelSpecifications:
         return (self.end_date - self.start_date).days
 
     def set_tc(self, tslices, tc, tc_cov=None, append=False):
-        self.tslices = (self.tslices if append else []) + list(tslices)
-        self.tc = (self.tc if append else []) + list(tc)
-        self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
+        if tslices:
+            self.tslices = (self.tslices if append else []) + list(tslices)
+        if tc:
+            self.tc = (self.tc if append else []) + list(tc)
+        if tc_cov:
+            self.tc_cov = [list(a) for a in tc_cov] if tc_cov is not None else None
+
+        self.tslices = [ts for ts in self.tslices if ts < self.tmax]
+        self.tc = self.tc[:len(self.tslices) + 1]
 
     def set_model_params(self, model_params):
         # model_params and model_region_definitions may be dictionary or path to json file which will be converted to json
@@ -406,7 +426,10 @@ class CovidModelSpecifications:
                             projections.loc[(t, groups[i + 1])] += excess_rate
 
                     cumu_vacc += projections.loc[t]
-            return projections
+
+            # TODO: Make this work for regions besides Colorado
+            projections['region'] = 'co'
+            return projections.set_index('region', append=True)
 
     def get_vacc_rates(self):
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])

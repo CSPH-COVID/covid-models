@@ -7,7 +7,7 @@ import matplotlib.ticker as mtick
 from covid_model.analysis.charts import modeled
 from covid_model.db import db_engine
 import covid_model
-from covid_model import CovidModel, RegionalCovidModel
+from covid_model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
 
 
@@ -17,7 +17,6 @@ if __name__ == '__main__':
     argparser.add_argument('-fd', '--from_date', type=dt.date.fromisoformat, default=dt.date(2020, 3, 1), help='x-axis minimum date')
     argparser.add_argument('-td', '--to_date', type=dt.date.fromisoformat, default=dt.date.today(), help='x-axis maximum date')
     argparser.add_argument("-mc", "--model_class", default="CovidModel", help="Name of the class to use for the model (Defaults to CovidModel)")
-    argparser.add_argument("-rg", "--region", choices=all_regions.keys(), required=False, help="Specify the region to be run, if running a regional model, if not specified, just runs default parameters")
     argparser.add_argument("-sp", "--save_prefix", default=None, help="If specified, saves the figure with the given prefix")
     argparser.add_argument('-gba', '--group_by_attr_names', nargs='+', type=str,
                            choices=CovidModel.attr.keys(), default=['age', 'vacc', 'priorinf'],
@@ -25,8 +24,7 @@ if __name__ == '__main__':
 
     args = argparser.parse_args()
     model_class = getattr(covid_model, args.model_class)
-    model_args = {"region": args.region} if model_class == RegionalCovidModel else {}
-    model = model_class(engine=engine, **model_args, **argparser.specs_args_as_dict())
+    model = model_class(engine=engine, **argparser.specs_args_as_dict())
     model.prep()
     model.solve_seir()
 
