@@ -26,12 +26,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     default_end_date = dt.date(2022, 5, 31)
 
     def __init__(self, base_model=None, deepcopy_params=True, increment=None, **spec_args):
-
         # update region attribute levels using base model, then spec_args as appropriate
-        if base_model:
-            self.attr['region'] = base_model.attr['region']
-        if 'regions' in spec_args.keys():
-            self.attr['region'] = spec_args['regions']
 
         # if a base model is provided, use its specifications
         if base_model is not None:
@@ -39,12 +34,13 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # initiate CovidModelSpecifications parent class; dates will be set in CovidModelSpecifications.__init__
         CovidModelSpecifications.__init__(self, **spec_args)
+        self.attr['region'] = self.regions  # update compartment based on specifications
 
         # build trange based on the value provided in the increment argument
         tlength = (self.end_date - self.start_date).days
         # if increment is None, set trange to match TC tslices, with breaks added anywhere that has a tslice in model_params
         if increment is None:
-            model_param_tslices = {(dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice for param, param_specs in self.model_params.items() if isinstance(param_specs, dict) and 'tslices' in param_specs.keys() for tslice in param_specs['tslices']}
+            model_param_tslices = {(dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice for param, param_specs_list in self.model_params.items() for param_specs in param_specs_list if param_specs['tslices'] is not None for tslice in param_specs['tslices']}
             trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
             trange = [ts for ts in trange if ts < self.tmax]
         # if increment is an integer, generate evenly spaced slices
@@ -200,7 +196,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2'}, constant='ba2_seed')
 
         # exposure
-        asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
+        asymptomatic_transmission = '(1 - immunity) * kappa * betta / total_pop'
         for variant in self.attributes['variant']:
             # No mobility between regions (or a single region)
             if self.model_mobility_mode is None or self.model_mobility_mode == "none":
@@ -212,8 +208,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             # Transmission parameters attached to the susceptible population
             if self.model_mobility_mode == "population_attached":
                 for from_region in self.attributes['region']:
-                    # TODO: need region specific beta here.
-                    asymptomatic_transmission = f'(1 - immunity) * betta / region_pop_{from_region}'
+                    # kappa in this mobility mode is associated with the to_region, so no need to store every kappa in every region
+                    asymptomatic_transmission = f'(1 - immunity) * kappa * betta / region_pop_{from_region}'
                     for to_region in self.attributes['region']:
                         sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                         asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
@@ -286,9 +282,9 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     # write to covid_model.results
     def write_results_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
 
-        # if there's no existing fit assigned, create a new fit and assign that one
+        # if there's no existing spec_id assigned, write specs to db to get one
         if self.spec_id is None or new_spec:
-            self.write_to_db(engine)
+            self.write_specs_to_db(engine)
 
         # build data frame with index of (t, age, vacc) and one column per seir cmpt
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
@@ -326,7 +322,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             df['tc'] = unique_params_df['ef']
 
         # write to database
-        chunksize = int(np.floor(10000.0 / df.shape[1]))
+        chunksize = int(np.floor(5000.0 / df.shape[1])) # max parameters is 10,000. Assume 1 param per column and use 5,000 for a buffer because 10,000 still doesn't work.
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
                   , index=False, if_exists='append', method='multi', chunksize=chunksize)
@@ -334,3 +330,11 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     def write_gparams_lookup_to_csv(self, fname):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}
         pd.concat(df_by_t, names=['t', 'age']).to_csv(fname)
+
+    def solution_sum(self, group_by_attr_levels, index_with_model_dates=False):
+        df = ODEBuilder.solution_sum(self, group_by_attr_levels)
+        if index_with_model_dates:
+            df['date'] = self.daterange
+            df = df.set_index('date')
+        return df
+
