@@ -138,6 +138,12 @@
   "kappa": [
     {"tslices": null, "attributes": {}, "values": 1}
   ],
+  "kappa_la": [
+    {"tslices": null, "attributes": {}, "values": 1}
+  ],
+  "kappa_pa": [
+    {"tslices": null, "attributes": {}, "values": 1}
+  ],
   "pS": [
     {"tslices": null, "attributes": {"age": "0-19"}, "values": 0.110023},
     {"tslices": null, "attributes": {"age": "20-39"}, "values": 0.35705},
