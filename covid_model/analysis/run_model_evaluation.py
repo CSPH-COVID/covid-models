@@ -18,12 +18,13 @@ if __name__ == '__main__':
     parser.add_argument('-skip', '--skip_first_increments', type=int, default=0, help='skip this many prediction increments at the beginning of the pandemic')
     run_args = parser.parse_args()
 
-    fig = plt.figure(figsize=(26, 12))
+    fig = plt.figure(figsize=(22, 12))
 
     gs = fig.add_gridspec(4, 2)
     ax_hosp = fig.add_subplot(gs[0, 0])
     ax_rmse_by_start_date = fig.add_subplot(gs[1, 0])
     ax_rmse_by_day_of_proj = fig.add_subplot(gs[2, 0])
+    ax_pos_neg = fig.add_subplot(gs[3, 0])
     ax_hosp_scatter = fig.add_subplot(gs[:2, 1])
     ax_trend_scatter = fig.add_subplot(gs[2:, 1])
 
@@ -52,12 +53,14 @@ if __name__ == '__main__':
         projected_tc_count = len([ts for ts in model.tslices if ts >= projection_start_t])
         fixed_tc = model.tc[:-projected_tc_count]
         projected_tc_dict = dict()
-        projected_tc_dict['Hold TC Constant'] = [last_tc] * projected_tc_count
-        projected_tc_dict['Revert TC to 75%'] = [0.75] * projected_tc_count
-        projected_tc_dict['Timeseries Forecast'] = [x.mean() for x in np.array(forecast_timeseries(fixed_tc[run_args.skip_first_increments-2:], horizon=projected_tc_count, sims=1000, arima_order=(1, 0, 1))).transpose()]
+        projected_tc_dict['(1) Hold TC Constant'] = [last_tc] * projected_tc_count
+        projected_tc_dict['(2) Revert to 75%'] = [0.75] * projected_tc_count
+        projected_tc_dict['(3) Revert to Average TC'] = [np.mean(fixed_tc)] * projected_tc_count
+        projected_tc_dict['(4) Timeseries Forecast (AR1)'] = [x.mean() for x in np.array(forecast_timeseries(fixed_tc[run_args.skip_first_increments-2:], horizon=projected_tc_count, sims=1000, arima_order=(1, 0, 0))).transpose()]
 
-        colors = ['navy', 'crimson', 'deepskyblue']
+
         projections_by_method = dict()
+        print(f'Fixed TCs: {fixed_tc}')
         for i, (tc_projection_method, projected_tc) in enumerate(projected_tc_dict.items()):
             print(f'{tc_projection_method}: projected TC from {projection_start_date} to {projection_end_date} is {projected_tc})')
             model.apply_tc(tc=projected_tc)
@@ -79,35 +82,30 @@ if __name__ == '__main__':
     df['Day of Projection'] = (df['Date'] - df['Projection Start Date']).dt.days
     df['Error'] = df['Projected Hospitalizations'] - df['Actual Hospitalizations']
     df['Sq. Error'] = np.square(df['Error'])
+    df['Negative Error'] = np.clip(df['Error'], None, 0)
+    df['Positive Error'] = np.clip(df['Error'], 0, None)
 
     for col in actual_hospitalizations.columns:
         df = pd.merge(df, actual_hospitalizations[col].rename(f'{col} at Projection Start Date'), left_on='projection_start_t', right_index=True)
 
-    # df = df.set_index(['Projection Start Date', 'Projection Method', 'Date']).sort_index()
-    # for period in [7, 14]:
-    #     df[f'Actual Hospitalizations ({period}-Day)'] = df.groupby(['Projection Start Date', 'Projection Method'], as_index=False).rolling(period).mean()['Actual Hospitalizations']
-    #     df[f'Trend ({period}-Day)'] = df[f'Actual Hospitalizations ({period}-Day)'] / df.groupby(['Projection Start Date', 'Projection Method'], as_index=False).shift(period)[f'Actual Hospitalizations ({period}-Day)'] - 1
-    #     import pdb; pdb.set_trace()
-    #     df = df.join(df[f'Actual Hospitalizations ({period}-Day)'].rename(f'Actual Hospitalizations ({period}-Day) at Projection Start Date').rename_axis(index=['aaaa', 'bbbb', 'Projection Start Date']), on='Projection Start Date', how='left')
-    #     df = pd.merge(df, df[f'Actual Hospitalizations ({period}-Day)'].rename(f'Actual Hospitalizations ({period}-Day) at Projection Start Date'), left_on='Projection Start Date', right_on='Date')
-    #     df = pd.merge(df, df[f'Trend ({period}-Day)'].rename(f'Trend ({period}-Day) at Projection Start Date'), left_on='Projection Start Date', right_on='Date')
-    # df = df.reset_index()
-
     # plot
-    colors = ['navy', 'crimson', 'deepskyblue']
+    colors = ['navy', 'crimson', 'deepskyblue', 'orange', 'green', 'gray', 'darkgoldenrod', 'mediumpurple'][:len(projected_tc_dict.keys())]
     sns.lineplot(data=df, x='Date', y='Projected Hospitalizations', hue='Projection Method', style='Projection Start Date', dashes=['']*len(df['Projection Start Date'].unique()), ax=ax_hosp, legend=False, palette=colors)
     sns.lineplot(data=np.sqrt(df.groupby(['Projection Method', 'Projection Start Date'])['Sq. Error'].mean()).to_frame(), x='Projection Start Date', y='Sq. Error', hue='Projection Method', ax=ax_rmse_by_start_date, palette=colors)
     sns.lineplot(data=np.sqrt(df.groupby(['Projection Method', 'Day of Projection'])['Sq. Error'].mean()).to_frame(), x='Day of Projection', y='Sq. Error', hue='Projection Method', ax=ax_rmse_by_day_of_proj, palette=colors)
-    sns.regplot(data=df.groupby(['Projection Method', 'Projection Start Date'])[['Actual Hospitalizations (14-Day) at Projection Start Date', 'Error']].mean(), x='Actual Hospitalizations (14-Day) at Projection Start Date', y='Error', ax=ax_hosp_scatter)
-    sns.regplot(data=df.groupby(['Projection Method', 'Projection Start Date'])[['Trend (14-Day) at Projection Start Date', 'Error']].mean(), x='Trend (14-Day) at Projection Start Date', y='Error', ax=ax_trend_scatter)
-    # sns.heatmap(data=)
+    sns.lineplot(data=df.groupby(['Projection Method', 'Day of Projection'])['Negative Error'].mean().to_frame(), x='Day of Projection', y='Negative Error', hue='Projection Method', ax=ax_pos_neg, palette=colors, legend=False)
+    sns.lineplot(data=df.groupby(['Projection Method', 'Day of Projection'])['Positive Error'].mean().to_frame(), x='Day of Projection', y='Positive Error', hue='Projection Method', ax=ax_pos_neg, palette=colors, legend=False)
+    for i, (proj_method, data) in enumerate(df.groupby(['Projection Method', 'Projection Start Date'])['Actual Hospitalizations (14-Day) at Projection Start Date', 'Trend (14-Day) at Projection Start Date', 'Error'].mean().groupby('Projection Method')):
+        sns.regplot(data=data, x='Actual Hospitalizations (14-Day) at Projection Start Date', y='Error', ax=ax_hosp_scatter, label=proj_method, color=colors[i])
+        sns.regplot(data=data, x='Trend (14-Day) at Projection Start Date', y='Error', ax=ax_trend_scatter, label=proj_method,   color=colors[i])
     actual_hosps(engine, color='black', ax=ax_hosp)
 
-    ax_hosp.set_ylim(0, 4000)
+    ax_hosp.set_ylim(0, 3000)
 
     ax_hosp.set_ylabel('Hospitalized with COVID-19')
     ax_rmse_by_start_date.set_ylabel('Root-Mean-Square Error')
     ax_rmse_by_day_of_proj.set_ylabel('Root-Mean-Square Error')
+    ax_pos_neg.set_ylabel.set_ylabel('Positive and Negative Errors')
 
     for ax in fig.axes:
         ax.grid('lightgray')
