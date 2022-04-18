@@ -88,11 +88,11 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             vacc_per_available = self.get_vacc_per_available()
 
             # apply vacc_delay
-            vacc_per_available = vacc_per_available.groupby('age').shift(vacc_delay).fillna(0)
+            vacc_per_available = vacc_per_available.groupby(['region','age']).shift(vacc_delay).fillna(0)
 
             # group vacc_per_available by trange interval
             t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), self.trange + [self.tmax], right=False, retbins=False, labels=self.trange)
-            vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'age']).mean()
+            vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'region','age']).mean()
 
             # convert to dictionaries for performance lookup
             vacc_per_available_dict = vacc_per_available.to_dict()
@@ -102,7 +102,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                 for age in self.attr['age']:
                     for region in self.attr['region']:
                         for t in self.trange:
-                            self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t, age)], {'age': age}, trange=[t])
+                            self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t, region, age)], {'age': age, 'region':region}, trange=[t])
 
         # alter parameters based on timeseries effects
         multipliers = self.get_timeseries_effect_multipliers()
@@ -198,15 +198,26 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                     self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
                     self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
             # Transmission parameters attached to the susceptible population
-            if self.model_mobility_mode == "population_attached":
+            elif self.model_mobility_mode == "population_attached":
                 for from_region in self.attributes['region']:
-                    # kappa in this mobility mode is associated with the to_region, so no need to store every kappa in every region
-                    asymptomatic_transmission = f'(1 - immunity) * kappa * betta / region_pop_{from_region}'
+                    # kappa in this mobility mode is associated with the susceptible population, so no need to store every kappa in every region
+                    asymptomatic_transmission = f'(1 - immunity) * kappa_pa * betta / region_pop_{from_region}'
                     for to_region in self.attributes['region']:
                         sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                         asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
                         self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
                         self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
+            # Transmission parameters attached to the transmission location
+            elif self.model_mobility_mode == "location_attached":
+                for from_region in self.attributes['region']:
+                    for in_region in self.attributes['region']:
+                        # kappa in this mobility mode is associated with the in_region, so need to store every kappa in every region
+                        asymptomatic_transmission = f'(1 - immunity) * kappa_la_{in_region} * betta / region_pop_{from_region}'
+                        for to_region in self.attributes['region']:
+                            sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
+                            asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
+                            self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                            self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
 
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
