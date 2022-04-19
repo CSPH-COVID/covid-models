@@ -322,7 +322,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             df['tc'] = unique_params_df['ef']
 
         # write to database
-        chunksize = int(np.floor(10000.0 / df.shape[1]))
+        chunksize = int(np.floor(5000.0 / df.shape[1]))
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
                   , index=False, if_exists='append', method='multi', chunksize=chunksize)
