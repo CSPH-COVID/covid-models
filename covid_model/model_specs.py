@@ -489,10 +489,15 @@ class CovidModelSpecifications:
         # union all the region tslices
         df_tcs = pd.concat(results_list, axis=1)
 
-        #self.set_tc(df_tcs.index.drop([0]).to_list(), [0.0]*df_tcs.shape[0])
+        self.set_tc(df_tcs.index.drop([0]).to_list(), [0.0]*df_tcs.shape[0])
 
         # compute alpha parameter for each region and apply to model parameters
-        params = {
-            'kappa': [{'tslices': df_tcs.index.drop([0]).to_numpy().tolist(), 'attributes': {'region': region}, 'values': [(1-tc) for tc in df_tcs[region]]} for region in df_tcs.columns]
-                  }
+        if self.model_mobility_mode == 'none':
+            params = {'kappa': [{'tslices': df_tcs.index.drop([0]).to_numpy().tolist(), 'attributes': {'region': region}, 'values': [(1-tc) for tc in df_tcs[region]]} for region in df_tcs.columns]}
+        elif self.model_mobility_mode == 'location_attached':
+            # TODO: need to write sim results to db first
+            params = {}
+        elif self.model_mobility_mode == 'population_attached':
+            # TODO: need to write sim results to db first
+            params = {}
         return params
