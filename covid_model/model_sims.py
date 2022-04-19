@@ -1,4 +1,5 @@
 ### Python Standard Library ###
+import json
 import random
 from time import perf_counter
 import datetime as dt
@@ -146,19 +147,13 @@ class CovidModelSimulation:
             print(f'Simulation {i+1}/{len(simulated_tcs)} completed in {round(t2-t0, 4)} sec, including {round(t2-t1, 4)} sec to write to database.')
 
         results_hosps_df = pd.DataFrame({i: hosps for i, hosps in enumerate(self.results_hosps)})
-        hosp_percentiles = {int(100*qt): list(results_hosps_df.quantile(0.05, axis=1).values) for qt in [0.05, 0.10, 0.25, 0.5, 0.75, 0.90, 0.95]}
 
-        stmt = self.table.update().where(self.table.c.sim_id == self.sim_id).values(
+        hosp_percentiles = {int(100*qt): list(results_hosps_df.quantile(qt, axis=1).astype(int).values.tolist()) for qt in [0.05, 0.10, 0.25, 0.5, 0.75, 0.90, 0.95]}
+
+        stmt = self.table.update().where(self.table.c.sim_id == int(self.sim_id)).values(
             sim_count=len(self.results_hosps),
-            hospitalized_percentiles=hosp_percentiles
+            hospitalized_percentiles=json.dumps(hosp_percentiles)
         )
 
         conn = self.engine.connect()
         result = conn.execute(stmt)
-
-
-if __name__ == '__main__':
-    engine = db_engine()
-
-    sims = CovidModelSimulation(303, engine=engine, end_date=dt.date(2022, 5, 31))
-    sims.run_simulations(3)
