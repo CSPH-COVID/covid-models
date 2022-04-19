@@ -462,6 +462,14 @@ class CovidModelSpecifications:
             matrix_list = [np.dot(mobility_dict[t]['dwell_rownorm'], np.transpose(mobility_dict[t]['dwell_colnorm'])) for t in tslices]
             for j, from_region in enumerate(self.regions):
                 params[f"mob_{from_region}"] = [{'tslices': tslices[1:], 'attributes': {'region': to_region}, 'values': [m[i,j] for m in matrix_list]} for i, to_region in enumerate(self.regions)]
+        elif self.model_mobility_mode == "location_attached":
+            dwell_rownorm_list = [mobility_dict[t]['dwell_rownorm'] for t in tslices]
+            dwell_colnorm_list = [mobility_dict[t]['dwell_colnorm'] for t in tslices]
+            for j, in_region in enumerate(self.regions):
+                params[f"mob_fracin_{in_region}"] = [{'tslices': tslices[1:], 'attributes': {'seir': 'S', 'region': to_region}, 'values': [m[i,j] for m in dwell_rownorm_list]} for i, to_region in enumerate(self.regions)]
+            for i, from_region in enumerate(self.regions):
+                for j, in_region in enumerate(self.regions):
+                    params[f"mob_{in_region}_fracfrom_{from_region}"] = [{'tslices': tslices[1:], 'attributes': {},  'values': [m[i,j] for m in dwell_colnorm_list]}]
         else:
             raise ValueError(f'Mobility mode {self.model_mobility_mode} not supported')
         # add in region populations as parameters for use later
