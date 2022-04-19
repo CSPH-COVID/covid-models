@@ -8,9 +8,9 @@ import pandas as pd
 import scipy.stats as sps
 import pmdarima
 import arch
-from sqlalchemy import MetaData
+from sqlalchemy.orm import Session
 ### Local Imports ###
-from covid_model.db import db_engine
+from covid_model.db import db_engine, get_sqa_table
 from covid_model import CovidModel
 
 
@@ -66,10 +66,9 @@ class CovidModelSimulation:
         self.model.apply_tc(tslices=tslices, tc=tc)
 
         self.engine = engine
-        self.db_metadata = MetaData(schema='covid_model')
-        self.db_metadata.reflect(engine, only=['simulations', 'simulation_results', 'results'])
-        self.table = self.db_metadata.tables[f'covid_model.simulations']
-        self.results_table = self.db_metadata.tables[f'covid_model.simulation_results']
+
+        self.table = get_sqa_table(engine, schema='covid_model', table='simulations')
+        self.results_table = get_sqa_table(engine, schema='covid_model', table='simulation_results_v2')
         self.sim_id = None
         self.write_to_db(engine)
 
@@ -85,7 +84,7 @@ class CovidModelSimulation:
         row = df.iloc[0]
         sim = CovidModelSimulation(row['spec_id'], engine, end_date=row['end_date'])
 
-        sim.results = pd.read_sql_query(f"select * from covid_model.simulation_results where sim_id = {sim_id}", con=engine, coerce_float=True)
+        sim.results = pd.read_sql_query(f"select * from covid_model.simulation_results_v2 where sim_id = {sim_id}", con=engine, coerce_float=True)
         sim.results_hosps = sim.results.set_index(['sim_result_id', 't'])['Ih'].unstack('sim_result_id')
         sim.results_hosps.index = sim.model.daterange
 
@@ -93,20 +92,22 @@ class CovidModelSimulation:
 
     def write_to_db(self, engine):
 
-        stmt = self.table.insert().values(
-            created_at=dt.datetime.now(),
-            spec_id=int(self.model.spec_id),
-            start_date=self.model.start_date,
-            end_date=self.model.end_date,
-        )
+        with Session(engine) as session:
+            self.sim_id = pd.read_sql(f'select coalesce(max(sim_id), 0) from covid_model.simulations', con=engine).values[0][0] + 1
 
-        conn = engine.connect()
-        result = conn.execute(stmt)
+            stmt = self.table.insert().values(
+                sim_id=int(self.sim_id),
+                created_at=dt.datetime.now(),
+                spec_id=int(self.model.base_spec_id),
+                start_date=self.model.start_date,
+                end_date=self.model.end_date,
+            )
 
-        self.sim_id = result.inserted_primary_key[0]
-        self.db_metadata.reflect(engine, only=['simulations', 'simulation_results', 'results'])
+            session.execute(stmt)
+            session.commit()
 
     def run_base_result(self):
+        import pdb; pdb.set_trace()
         self.model.solve_seir()
         self.base_results = self.model.solution_ydf.stack(level=self.model.param_attr_names)
         self.model.write_results_to_db(self.engine)
