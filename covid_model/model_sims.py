@@ -55,15 +55,13 @@ def forecast_timeseries(data, horizon=1, sims=10, arima_order='auto', use_garch=
 class CovidModelSimulation:
     def __init__(self, specs, engine, end_date=None):
         self.model = CovidModel(end_date=end_date, from_specs=specs, engine=engine)
-        self.model.prep()
         self.base_tc = self.model.tc.copy()
-
         self.window_size = self.model.tslices[-1] - self.model.tslices[-2]
         self.simulation_horizon = int(np.ceil((self.model.tmax - self.model.tslices[-1]) / self.window_size)) - 1
 
-        tslices = self.model.tslices + list(range(self.model.tslices[-1] + self.window_size, self.model.tmax, self.window_size))
-        tc = self.base_tc + [self.base_tc[-1]] * (len(tslices) - len(self.base_tc) + 1)
-        self.model.apply_tc(tslices=tslices, tc=tc)
+        if self.model.tmax - self.model.tslices[-1] > self.window_size:
+            self.model.apply_tc(tslices=list(range(self.model.tslices[-1] + self.window_size, self.model.tmax, self.window_size)))
+        self.model.prep()
 
         self.engine = engine
 
@@ -107,7 +105,6 @@ class CovidModelSimulation:
             session.commit()
 
     def run_base_result(self):
-        import pdb; pdb.set_trace()
         self.model.solve_seir()
         self.base_results = self.model.solution_ydf.stack(level=self.model.param_attr_names)
         self.model.write_results_to_db(self.engine)
@@ -151,7 +148,7 @@ class CovidModelSimulation:
         results_hosps_df = pd.DataFrame({i: hosps for i, hosps in enumerate(self.results_hosps)})
         hosp_percentiles = {int(100*qt): list(results_hosps_df.quantile(0.05, axis=1).values) for qt in [0.05, 0.10, 0.25, 0.5, 0.75, 0.90, 0.95]}
 
-        stmt = self.table.update_specs().where(self.table.c.sim_id == self.sim_id).values(
+        stmt = self.table.update().where(self.table.c.sim_id == self.sim_id).values(
             sim_count=len(self.results_hosps),
             hospitalized_percentiles=hosp_percentiles
         )

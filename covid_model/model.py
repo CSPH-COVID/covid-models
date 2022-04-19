@@ -319,7 +319,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             table = 'simulation_results_v2'
             df['sim_id'] = sim_id
             df['sim_result_id'] = sim_result_id
-            df['tc'] = unique_params_df['ef']
+            df['tc'] = json.dumps(self.tc)
 
         # write to database
         chunksize = int(np.floor(5000.0 / df.shape[1]))
