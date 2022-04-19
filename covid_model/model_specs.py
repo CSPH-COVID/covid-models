@@ -226,7 +226,7 @@ class CovidModelSpecifications:
             # generate a spec_id so we can assign it to ourselves
             max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
             self.spec_id = max_spec_id + 1
-        self.write_prepared_specs_to_db(write_info, engine, schema, table, spec_id=self.spec_id)
+        return self.write_prepared_specs_to_db(write_info, engine, schema, table, spec_id=self.spec_id)
 
     @property
     def days(self):
