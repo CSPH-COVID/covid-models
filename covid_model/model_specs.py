@@ -117,6 +117,7 @@ class CovidModelSpecifications:
                      region_fit_spec_ids=None):
         if regions:
             self.regions = regions
+        self.model_mobility_mode = mobility_mode
 
         if end_date is not None:
             self.end_date = end_date
@@ -149,8 +150,6 @@ class CovidModelSpecifications:
 
         if attribute_multipliers:
             self.set_attr_mults(attribute_multipliers)
-
-        self.model_mobility_mode = mobility_mode
 
         if refresh_actual_mobility:
             self.set_actual_mobility(engine)
