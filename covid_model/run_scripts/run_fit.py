@@ -13,7 +13,7 @@ from covid_model.cli_specs import ModelSpecsArgumentParser
 
 # function that runs the fit on each region, can be run via multiprocessing
 def do_fit_on_region(args):
-    region, specs_args, non_specs_args, perform_specs_write = args
+    region, specs_args, non_specs_args, return_model = args
     specs_args['regions'] = [region]
 
     # initialize fit object
@@ -36,7 +36,7 @@ def do_fit_on_region(args):
         hosps_df.to_csv(f"{get_file_prefix(non_specs_args['outdir'])}fit_hospitalized.csv")
 
     fit.fitted_model.tags['run_type'] = 'fit'
-    return fit.fitted_model.write_specs_to_db(engine=engine) if perform_specs_write else fit.fitted_model.prepare_write_specs_query()
+    return fit.fitted_model if return_model else fit.fitted_model.prepare_write_specs_query()
 
 
 def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, use_base_specs_end_date,
@@ -60,9 +60,11 @@ def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, 
                 write_infos[i] = CovidModelSpecifications.write_prepared_specs_to_db(write_infos[i], db_engine())
     else:
         args_list = map(lambda x: [x, specs_args, non_specs_args, True], specs_args['regions'])
-        write_infos = map(do_fit_on_region, args_list)
+        models =list(map(do_fit_on_region, args_list))
+        engine = db_engine()
+        [m.write_specs_to_db(engine=engine) for m in models]
 
-    return write_infos
+    return write_infos if multiprocess else list(models)
 
 
 if __name__ == '__main__':
