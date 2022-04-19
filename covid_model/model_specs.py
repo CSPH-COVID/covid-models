@@ -434,17 +434,20 @@ class CovidModelSpecifications:
     def get_vacc_per_available(self):
         vacc_rates = self.get_vacc_rates()
         populations = [{'age': li['attributes']['age'], 'region': li['attributes']['region'], 'population':li['values']} for li in self.model_params['group_pop'] if li['attributes']['region'] in self.regions]
-        populations = pd.DataFrame(populations).set_index(['age', 'region'])
-        cumu_vacc = vacc_rates.groupby(['age', 'region']).cumsum()
+        populations = pd.DataFrame(populations).set_index(['region','age'])
+        cumu_vacc = vacc_rates.groupby(['region', 'age']).cumsum()
         cumu_vacc_final_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.join(populations)
-        cumu_vacc_final_shot['none'] = cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)
+        # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
+        cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3']).reorder_levels(['t', 'age', 'region'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
 
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
-
-        return (vacc_rates / available_for_vacc).fillna(0)
+        vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'region', 'age']).sort_index()
+        # because vaccinations exceed the population, we can get rates greater than 1. To prevent compartments have negative people, we have to cap the rate at 1
+        vacc_per_available = vacc_per_available.clip(upper=1)
+        return vacc_per_available
 
     def get_proj_mobility(self):
         # TODO: implement mobility projections
