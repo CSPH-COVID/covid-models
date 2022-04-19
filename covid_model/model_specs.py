@@ -108,7 +108,7 @@ class CovidModelSpecifications:
         self.update_specs(engine=engine, **spec_args)
 
     def update_specs(self, engine=None, end_date=None,
-                     tslices=None, tc=None, increment= None, params=None,
+                     tslices=None, tc=None, params=None,
                      refresh_actual_vacc=False, vacc_proj_params=None,
                      timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
                      attribute_multipliers=None,
