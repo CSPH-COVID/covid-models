@@ -126,7 +126,7 @@ class CovidModelSpecifications:
         if params:
             self.set_model_params(params)
         if region_fit_spec_ids:
-            self.model_params.update(self.get_region_kappas_as_params_using_region_fits(engine, region_fit_spec_ids))
+            self.model_params.update(self.get_kappas_as_params_using_region_fits(engine, region_fit_spec_ids))
         if region_definitions:
             self.set_region_definitions(region_definitions)
         if refresh_actual_vacc:
@@ -464,7 +464,8 @@ class CovidModelSpecifications:
         )
         return params
 
-    def get_region_kappas_as_params_using_region_fits(self, engine, region_fit_spec_ids):
+    def get_kappas_as_params_using_region_fits(self, engine, region_fit_spec_ids):
+        # TODO: load number of infected from database to compute mobility aware kappas
         # will set TC = 0.0 for the model and scale the "kappa" parameter for each region according to its fitted TC values so the forward sim can be run.
         # This approach does not currently support fitting, since only TC can be fit and there's only one set of TC for the model.
         results_list = []
