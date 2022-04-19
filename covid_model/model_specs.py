@@ -114,7 +114,7 @@ class CovidModelSpecifications:
                      attribute_multipliers=None,
                      region_definitions=None, regions=None,
                      mobility_mode='none', refresh_actual_mobility=False, mobility_proj_params=None,
-                     region_fit_spec_ids=None):
+                     region_fit_spec_ids=None, **unused_args):
         if regions:
             self.regions = regions
         self.model_mobility_mode = mobility_mode
