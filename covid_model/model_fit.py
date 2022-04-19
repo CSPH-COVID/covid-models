@@ -76,7 +76,7 @@ class CovidModelFit:
             look_back = len(tslices) + 1
 
         # if there's no batch size, set the batch size to be the total number of windows to be fit
-        if batch_size is None:
+        if batch_size is None or batch_size > look_back:
             batch_size = look_back
 
         trim_off_end_list = list(range(look_back - batch_size, 0, -increment_size)) + [0]
