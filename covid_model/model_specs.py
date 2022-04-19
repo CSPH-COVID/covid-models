@@ -215,6 +215,7 @@ class CovidModelSpecifications:
             )
             session.execute(stmt)
             session.commit()
+        return {**write_info, 'spec_id':spec_id}
 
     def write_specs_to_db(self, engine, schema='covid_model', table='specifications', tags=None):
         # get write info
