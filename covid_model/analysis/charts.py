@@ -118,7 +118,8 @@ def modeled_by_group(model, axs, compartment='Ih', **plot_params):
 def transmission_control(model, **plot_params):
     # need to extend one more time period to see the last step. Assume it's the same gap as the second to last step
     tcs = model.tc + [np.infty]  # the last tc doesn't get plotted b/c of "steps-post" style.
-    tslices = [0] + model.tslices + [2*model.tslices[-1]-model.tslices[-2]] # 0 is implicit first tslice
+    tend = [2*model.tslices[-1]-model.tslices[-2]] if len(model.tslices) > 1 else [2*model.tslices[0]]
+    tslices = [0] + model.tslices + tend # 0 is implicit first tslice
     tc_df = pd.DataFrame(tcs, columns=['TC'], index=[model.start_date + dt.timedelta(days=d) for d in tslices])
     tc_df.plot(drawstyle="steps-post", **plot_params)
 
