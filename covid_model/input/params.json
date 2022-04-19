@@ -368,18 +368,18 @@
     {"tslices": null, "attributes": {}, "values": 360}
    ],
   "initial_seed": [
-    {"tslices": ["2020-01-25"], "attributes": {"region":   "co"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-08"], "attributes": {"region": "cent"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":   "cm"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":  "met"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-09"], "attributes": {"region":   "ms"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":   "ne"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-15"], "attributes": {"region":   "nw"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":  "slv"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":   "sc"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":  "sec"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-30"], "attributes": {"region":   "sw"}, "values": [2.2, 0]},
-    {"tslices": ["2020-03-01"], "attributes": {"region":  "wcp"}, "values": [2.2, 0]}
+    {"tslices": ["2020-01-24", "2020-01-25"], "attributes": {"region":   "co"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-03-01", "2020-03-02"], "attributes": {"region": "cent"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":   "cm"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":  "met"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-03-01", "2020-03-04"], "attributes": {"region":   "ms"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":   "ne"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-03-07", "2020-03-08"], "attributes": {"region":   "nw"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":  "slv"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":   "sc"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":  "sec"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-03-22", "2020-03-23"], "attributes": {"region":   "sw"}, "values": [0, 2.2, 0]},
+    {"tslices": ["2020-02-22", "2020-02-23"], "attributes": {"region":  "wcp"}, "values": [0, 2.2, 0]}
    ],
   "alpha_seed": [
     {"tslices": ["2020-11-09", "2020-12-04"], "attributes": {}, "values": [0, 1, 0]}
