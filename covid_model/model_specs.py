@@ -136,13 +136,7 @@ class CovidModelSpecifications:
                 self.vacc_proj_params = vacc_proj_params
             self.set_vacc_proj(self.vacc_proj_params)
 
-        # TODO: make add_timeseries_effect use existing prevalence and existing multipliers if new prevalence or mults are not provided
-        # if variant_prevalence or param_multipliers:
-        if variant_prevalence:
-            self.add_timeseries_effect('variant', prevalence_data=variant_prevalence,
-                                                      param_multipliers=timeseries_effect_multipliers,
-                                                      fill_forward=True)
-        # if mab_prevalence or param_multipliers:
+        # TODO: make add_timeseries_effect use existing multipliers if new mults are not provided (still a todo? -af)
         if mab_prevalence:
             self.add_timeseries_effect('mab', prevalence_data=mab_prevalence,
                                                       param_multipliers=timeseries_effect_multipliers,
