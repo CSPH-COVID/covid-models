@@ -383,6 +383,7 @@ class CovidModelSpecifications:
         realloc_priority = self.vacc_proj_params['realloc_priority'] if 'realloc_priority' in self.vacc_proj_params.keys() else None
 
         shots = list(self.actual_vacc_df.columns)
+        region_df = pd.DataFrame({'region': self.regions})
 
         # add projections
         proj_from_t = self.actual_vacc_df.index.get_level_values('t').max() + 1
@@ -390,38 +391,41 @@ class CovidModelSpecifications:
         if proj_to_t > proj_from_t:
             proj_trange = range(proj_from_t, proj_to_t)
             # project rates based on the last {proj_lookback} days of data
-            projected_rates = self.actual_vacc_df.loc[(proj_from_t - proj_lookback):].groupby('age').sum() / float(proj_lookback)
+            projected_rates = self.actual_vacc_df[self.actual_vacc_df.index.get_level_values(0) >= proj_from_t-proj_lookback].groupby(['region', 'age']).sum()/proj_lookback
             # override rates using fixed values from proj_fixed_rates, when present
             if proj_fixed_rates:
+                proj_fixed_rates_df = pd.DataFrame(proj_fixed_rates).rename_axis(index='age').reset_index().merge(region_df,how='cross').set_index(['region', 'age'])
                 for shot in shots:
-                    projected_rates[shot] = pd.DataFrame(proj_fixed_rates)[shot]
+                    # TODO: currently treats all regions the same. Need to change if finer control desired
+                    projected_rates[shot] = proj_fixed_rates_df[shot]
             # build projections
-            projections = pd.concat({t: projected_rates for t in proj_trange}).rename_axis(index=['t', 'age'])
+            projections = pd.concat({t: projected_rates for t in proj_trange}).rename_axis(index=['t', 'region', 'age'])
 
             # reduce rates to prevent cumulative vaccination from exceeding max_cumu
             if max_cumu:
-                cumu_vacc = self.actual_vacc_df.groupby('age').sum()
-                groups = realloc_priority if realloc_priority else projections.index.unique('age')
-                # vaccs = df.index.unique('vacc')
+                cumu_vacc = self.actual_vacc_df.groupby(['region', 'age']).sum()
+                groups = realloc_priority if realloc_priority else projections.groupby(['region','age']).sum().index
+                populations = [{'age': li['attributes']['age'], 'region': li['attributes']['region'], 'population': li['values']} for li in self.model_params['group_pop'] if li['attributes']['region'] in self.regions]
                 for t in projections.index.unique('t'):
                     this_max_cumu = get_params(max_cumu.copy(), t)
-                    # TODO: Update how to deal with group pop
-                    max_cumu_df = pd.DataFrame(this_max_cumu) * pd.DataFrame(self.model_params['group_pop'], index=shots).transpose()
+
+                    # TODO: currently treats all regions the same. Need to change if finer control desired
+                    max_cumu_df = pd.DataFrame(this_max_cumu).rename_axis(index='age').reset_index().merge(region_df, how='cross').set_index(['region', 'age']).sort_index()
+                    max_cumu_df = max_cumu_df.mul(pd.DataFrame(populations).set_index(['region', 'age'])['population'], axis=0)
                     for i in range(len(groups)):
                         group = groups[i]
-                        current_rate = projections.loc[(t, group)]
+                        key = tuple([t] + list(group))
+                        current_rate = projections.loc[key]
                         max_rate = max_rate_per_remaining * (max_cumu_df.loc[group] - cumu_vacc.loc[group])
-                        excess_rate = (projections.loc[(t, group)] - max_rate).clip(lower=0)
-                        projections.loc[(t, group)] -= excess_rate
+                        excess_rate = (projections.loc[key] - max_rate).clip(lower=0)
+                        projections.loc[key] -= excess_rate
                         # if a reallocate_order is provided, reallocate excess rate to other groups
                         if i < len(groups) - 1 and realloc_priority is not None:
-                            projections.loc[(t, groups[i + 1])] += excess_rate
+                            projections.loc[tuple([t] + list(groups[i + 1]))] += excess_rate
 
                     cumu_vacc += projections.loc[t]
 
-            # TODO: Make this work for regions besides Colorado
-            projections['region'] = 'co'
-            return projections.set_index('region', append=True)
+            return projections
 
     def get_vacc_rates(self):
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
