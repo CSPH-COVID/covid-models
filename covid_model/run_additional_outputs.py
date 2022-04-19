@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 ### Local Imports ###
 from covid_model.db import db_engine
-from covid_model.data_imports import get_hosps_df, get_vaccinations_by_county, ExternalVaccWithProjections
+from covid_model.data_imports import get_vaccinations_by_county, ExternalVaccWithProjections, ExternalHosps
 
 
 if __name__ == '__main__':
@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # export actual hospitalizations
     print('Exporting hospitalizations...')
-    hosps = pd.DataFrame(get_hosps_df(engine)).reset_index().rename(columns={'currently_hospitalized': 'Iht', 'measure_date': 'date'})
+    hosps = ExternalHosps(engine).fetch(county_ids=None)['currently_hospitalized'].reset_index().rename(columns={'currently_hospitalized': 'Iht', 'measure_date': 'date'})
     hosps['time'] = ((pd.to_datetime(hosps['date']) - dt.datetime(2020, 1, 24)) / np.timedelta64(1, 'D')).astype(int)
     hosps[['time', 'date', 'Iht']].to_csv('output/CO_EMR_Hosp.csv', index=False)
 

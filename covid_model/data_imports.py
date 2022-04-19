@@ -119,16 +119,6 @@ class ExternalVaccWithProjections(ExternalData):
         return df
 
 
-
-
-# load actual hospitalization data for fitting
-# def get_hosps(engine, min_date=dt.datetime(2020, 1, 24)):
-#     actual_hosp_df = pd.read_sql(open('sql/emresource_hospitalizations.sql').read(), engine)
-#     actual_hosp_df['t'] = ((pd.to_datetime(actual_hosp_df['measure_date']) - min_date) / np.timedelta64(1, 'D')).astype(int)
-#     actual_hosp_tmin = actual_hosp_df[actual_hosp_df['currently_hospitalized'].notnull()]['t'].min()
-#     return [0] * actual_hosp_tmin + list(actual_hosp_df['currently_hospitalized'])
-
-
 def get_hosps_df(engine):
     return pd.read_sql(open('sql/emresource_hospitalizations.sql').read(), engine, parse_dates=['measure_date']).set_index('measure_date')['currently_hospitalized']
 
@@ -142,36 +132,6 @@ def get_hosps_by_age(engine, fname):
     cophs_total = df.groupby('measure_date').sum()
     emr_total = get_hosps_df(engine)
     return df * emr_total / cophs_total
-
-
-# load actual death data for plotting
-def get_deaths(engine, min_date=dt.datetime(2020, 1, 24)):
-    sql = """
-        select 
-            reporting_date as measure_date
-            , sum(total_count) as new_deaths
-        from cdphe.covid19_county_summary ccs 
-        where count_type = 'deaths'
-        group by 1
-        order by 1"""
-    df = pd.read_sql(sql, engine, parse_dates=['measure_date']).set_index('measure_date')
-    df = pd.date_range(min_date, df.index.max()).to_frame().join(df, how='left').drop(columns=[0]).fillna(0)
-    df['cumu_deaths'] = df['new_deaths'].cumsum()
-
-    return df
-
-
-def get_deaths_by_age(engine):
-    sql = """select
-        date::date as measure_date
-        , case when age_group in ('0-5', '6-11', '12-17', '18-19') then '0-19' else age_group end as "group"
-        , sum(count::int) as new_deaths
-    from cdphe.temp_covid19_county_summary
-    where count_type like 'deaths, %%' and date_type = 'date of death'
-    group by 1, 2
-    order by 1, 2"""
-    df = pd.read_sql(sql, engine, parse_dates=['measure_date']).set_index(['measure_date', 'age'])
-    return df
 
 
 def get_vaccinations_by_county(engine):
