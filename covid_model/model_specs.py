@@ -174,7 +174,7 @@ class CovidModelSpecifications:
                 end_date=self.end_date,
                 tslices=self.tslices,
                 tc=self.tc,
-                tc_cov=json.dumps(self.tc_cov),
+                tc_cov=json.dumps(self.tc_cov.tolist() if isinstance(self.tc_cov, np.ndarray) else self.tc_cov) if self.tc_cov is not None else None,
                 model_params=json.dumps(self.model_params),
                 vacc_actual=json.dumps({dose: rates.unstack(level='age').to_dict(orient='list') for dose, rates in
                                         self.actual_vacc_df.to_dict(orient='series').items()}),
