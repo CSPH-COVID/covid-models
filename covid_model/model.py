@@ -47,7 +47,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         for tslice in param_specs['tslices']:
                             model_param_tslices.add((dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice)
             trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
-            trange = [ts for ts in trange if ts < self.tmax]
+            trange = [ts for ts in trange if ts < self.tmax and ts >= self.tmin]
         # if increment is an integer, generate evenly spaced slices
         elif isinstance(increment, int):
             trange = list(range(0, tlength, increment)) + [tlength]
@@ -114,10 +114,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # alter parameters based on attribute multipliers
         if self.attribute_multipliers:
             for attr_mult_specs in self.attribute_multipliers:
-                if 'attrs' in attr_mult_specs.keys() and 'region' in  attr_mult_specs['attrs'].keys():
-                    pass
-                else:
-                    self.set_param(**attr_mult_specs)
+                self.set_param(**attr_mult_specs)
 
     # new exposures by day by group
     @property
