@@ -69,7 +69,7 @@ class CovidModelSpecifications:
                     spl = df['level_1'].str.split(";", expand=True)
                     df['region'] = spl[0]
                     df['age'] = spl[1]
-                    return df.rename_axis(index='t').set_index(['age', 'region'], append=True).drop(columns='level_1').loc[:,0]
+                    return df.rename_axis(index='t').set_index(['region', 'age'], append=True).drop(columns='level_1').loc[:,0]
                 self.actual_vacc_df = pd.concat({k: vacc_load_fun(v) for k, v in json.loads(row['vacc_actual']).items()}, axis=1)
                 self.set_vacc_proj(json.loads(row['vacc_proj_params']))
                 self.timeseries_effects = json.loads(row['timeseries_effects'])
