@@ -344,13 +344,18 @@ class ODEBuilder:
             scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
             constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None)
 
-        self.terms.append(term)
+        if not (isinstance(term, ConstantODEFlowTerm)) and all([c == 0 for c in term.coef_by_t.values()]):
+            pass
+        elif isinstance(term, ConstantODEFlowTerm) and all([c == 0 for c in term.constant_by_t.values()]):
+            pass
+        else:
+            self.terms.append(term)
 
-        # add term to matrices
-        for t in self.trange:
-            term.add_to_linear_matrix(self.linear_matrix[t], t)
-            term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
-            term.add_to_constant_vector(self.constant_vector[t], t)
+            # add term to matrices
+            for t in self.trange:
+                term.add_to_linear_matrix(self.linear_matrix[t], t)
+                term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
+                term.add_to_constant_vector(self.constant_vector[t], t)
 
     # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
     # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
@@ -397,14 +402,15 @@ class ODEBuilder:
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y and solution_ydf
     # TODO: try Julia ODE package, to improve performance
-    def solve_ode(self, y0_dict, method='RK45'):
+    def solve_ode(self, y0_dict, method='RK45', max_step=1.0):
         t_eval = range(min(self.trange), max(self.trange))
         self.solution = spi.solve_ivp(
             fun=self.ode,
             t_span=[min(self.trange), max(self.trange)],
             y0=self.y0_from_dict(y0_dict),
             t_eval=t_eval,
-            method=method)
+            method=method,
+            max_step=max_step)
         if not self.solution.success:
             raise RuntimeError(f'ODE solver failed with message: {self.solution.message}')
         self.solution_y = np.transpose(self.solution.y)

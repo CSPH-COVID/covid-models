@@ -13,14 +13,14 @@ from covid_model.cli_specs import ModelSpecsArgumentParser
 
 
 def region_fit(args):
-    region, region_params, fit_params, specs_args, look_back, batch_size, increment_size, window_size, write_batch_output = args
+    region, region_definitions, fit_params, specs_args, look_back, batch_size, increment_size, window_size, write_batch_output = args
     rname = all_regions[region]
     print(f'Region: {rname}')
     try:
         engine = db_engine()
-        region_county_ids = json.load(open(region_params))[region]['county_fips']
+        region_county_ids = json.load(open(region_definitions))[region]['county_fips']
         print(f'{rname}: Creating fit object and loading hospitalizations')
-        fit = CovidModelFit(engine=engine, region_params=fit_params.region_params, region=region,
+        fit = CovidModelFit(engine=engine, region_definitions=fit_params.region_definitions, region=region,
                             tc_min=fit_params.tc_min, tc_max=fit_params.tc_max, **specs_args)
         fit.set_actual_hosp(engine, county_ids=region_county_ids)
 
@@ -28,7 +28,7 @@ def region_fit(args):
         print(f'{rname}: Fitting')
         fit.run(engine, look_back=look_back, batch_size=batch_size,
                 increment_size=increment_size, window_size=window_size,
-                region_params=region_params, region=region,
+                region_definitions=region_definitions, region=region,
                 write_batch_output=write_batch_output,
                 model_class=RegionalCovidModel,
                 model_args={"region": region},
@@ -58,7 +58,7 @@ def run():
     parser.add_argument("-ws", "--window_size", type=int, help="the number of days in each TC-window; default to 14")
     parser.add_argument("-tmn", "--tc_min", type=float, default=0, help="The lowest tc to allow")
     parser.add_argument("-tmx", "--tc_max", type=float, default=0.99, help="The lowest tc to allow")
-    parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
+    parser.add_argument("-rp", "--region_definitions", type=str, default="input/region_definitions.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_definitions.json'")
     parser.add_argument("-rg", "--regions", nargs="+", choices=all_regions.keys(), required=False, help="Specify the regions to be run, default is all regions (not counties)")
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
     parser.add_argument("-plt", "--plot", action="store_true", default=False, help="open a plot when fitting is complete, comparing modeled hosp to actual; default False")
@@ -69,12 +69,12 @@ def run():
     increment_size = fit_params.increment_size if fit_params.increment_size is not None else 1
     window_size = fit_params.window_size if fit_params.window_size is not None else 14
     regions = fit_params.regions
-    region_params = fit_params.region_params
+    region_definitions = fit_params.region_definitions
     write_batch_output = fit_params.write_batch_output
     multiprocess = int(fit_params.multiprocess) if fit_params.multiprocess else None
     specs_args = parser.specs_args_as_dict()
 
-    args = [region_params, fit_params, specs_args, look_back, batch_size, increment_size, window_size, write_batch_output]
+    args = [region_definitions, fit_params, specs_args, look_back, batch_size, increment_size, window_size, write_batch_output]
 
     if multiprocess:
         p = Pool(multiprocess)

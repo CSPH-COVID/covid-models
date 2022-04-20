@@ -7,7 +7,7 @@ import matplotlib.ticker as mtick
 from covid_model.analysis.charts import modeled
 from covid_model.db import db_engine
 import covid_model
-from covid_model import CovidModel, RegionalCovidModel
+from covid_model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
 
 
@@ -24,8 +24,7 @@ if __name__ == '__main__':
 
     args = argparser.parse_args()
     model_class = getattr(covid_model, args.model_class)
-    model_args = {"region": args.region} if model_class == RegionalCovidModel else {}
-    model = model_class(engine=engine, **model_args, **argparser.specs_args_as_dict())
+    model = model_class(engine=engine, **argparser.specs_args_as_dict())
     model.prep()
     model.solve_seir()
 

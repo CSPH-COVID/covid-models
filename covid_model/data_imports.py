@@ -50,26 +50,26 @@ class ExternalData:
 class ExternalHosps(ExternalData):
     def fetch_from_db(self, county_ids):
         if county_ids is None:
-            sql = open('sql/emresource_hospitalizations.sql', 'r').read()
+            sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date'])
         else:
-            sql = open('sql/hospitalized_county_subset.sql', 'r').read()
+            sql = open('covid_model/sql/hospitalized_county_subset.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
 
 
 class ExternalVacc(ExternalData):
     def fetch_from_db(self, county_ids=None):
         if county_ids is None:
-            sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open('sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 
 class ExternalVaccWithProjections(ExternalData):
     def fetch_from_db(self, proj_params=None, group_pop=None):
-        sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+        sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
 
         proj_params = proj_params if type(proj_params) == dict else json.load(open(proj_params))
         proj_lookback = proj_params['lookback'] if 'lookback' in proj_params.keys() else 7
