@@ -20,7 +20,7 @@ class MyTestCase(unittest.TestCase):
                   f" --params input/params.json " \
                   f" --refresh_actual_vacc "
         if region is not None:
-            run_str += f"--region {region} --region_params input/region_params.json"
+            run_str += f"--region {region} --region_definitions input/region_definitions.json"
             #run_str += f" --hosp_data ../../data/processed_lpha_hospbycounty_20220128.csv"
         if write_batch_output:
             run_str += " --write_batch_output"

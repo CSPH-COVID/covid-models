@@ -5,6 +5,7 @@ from time import perf_counter
 from matplotlib import pyplot as plt
 import scipy.optimize as spo
 ### Local Imports ###
+from covid_model.utils import get_file_prefix
 from covid_model.data_imports import ExternalHosps
 from covid_model import CovidModel
 from covid_model.model_specs import CovidModelSpecifications
@@ -51,7 +52,7 @@ class CovidModelFit:
     # method = 'curve_fit' or 'minimize'
     def run(self, engine, method='curve_fit', window_size=14, look_back=None,
             last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, model_class=CovidModel,
-            model_args=dict(), forward_sim_each_batch=False, use_base_specs_end_date=False, **spec_args):
+            model_args=dict(), forward_sim_each_batch=False, use_base_specs_end_date=False, print_prefix="", outdir=None, **unused_args):
         # get the end date from actual hosps
         end_t = (self.base_specs.end_date - self.base_specs.start_date).days if use_base_specs_end_date else self.actual_hosp.index.max() + 1
         end_date = self.base_specs.start_date + dt.timedelta(end_t)
@@ -67,7 +68,7 @@ class CovidModelFit:
         base_model.apply_tc(tc=tc, tslices=tslices)
         base_model.prep()
         t1 = perf_counter()
-        print(f'Model prepped for fitting in {t1-t0} seconds.')
+        print(f'{print_prefix}: Model prepped for fitting in {t1-t0} seconds.')
 
         # run fit
         fitted_tc_cov = None
@@ -75,7 +76,7 @@ class CovidModelFit:
             look_back = len(tslices) + 1
 
         # if there's no batch size, set the batch size to be the total number of windows to be fit
-        if batch_size is None:
+        if batch_size is None or batch_size > look_back:
             batch_size = look_back
 
         trim_off_end_list = list(range(look_back - batch_size, 0, -increment_size)) + [0]
@@ -88,16 +89,16 @@ class CovidModelFit:
             model = model_class(base_model=base_model, end_date=this_end_date, deepcopy_params=False, **model_args)
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
             t02 = perf_counter()
-            print(f'Model copied in {t02-t01} seconds.')
+            print(f'{print_prefix}: Model copied in {t02-t01} seconds.')
 
             fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()
-            print(f'Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds.')
+            print(f'{print_prefix}: Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {t1 - t0} seconds: {fitted_tc}')
             if write_batch_output:
                 model.tags['run_type'] = 'intermediate-fit'
-                model.write_to_db(engine)
+                model.write_specs_to_db(engine)
 
             # simulate the model and save a picture of the output
             if forward_sim_each_batch:
@@ -105,16 +106,21 @@ class CovidModelFit:
                 model.solve_seir()
                 fig = plt.figure(figsize=(10, 10), dpi=300)
                 ax = fig.add_subplot(211)
-                hosps_df = self.actual_hosp[:len(model.daterange)]
-                hosps_df.index = model.daterange
-                hosps_df.plot(**{'color': 'red', 'label': 'Actual Hosps.'})
-                modeled(model, compartments='Ih', c='blue', ax=ax)
+                hosps_df = self.modeled_vs_actual_hosps(model).reset_index('region').drop(columns='region')
+                hosps_df.plot(ax=ax)
                 ax = fig.add_subplot(212)
                 transmission_control(model, ax=ax)
-                plt.savefig(f'output/{dt.datetime.now().strftime("%Y%m%d_%H%M%S")}_forward_sim_{i}.png')
+                plt.savefig(get_file_prefix(outdir) + f'{print_prefix}_model_fit_batch_{i}.png')
                 plt.close()
 
         self.fitted_tc = tc
         self.fitted_tc_cov = fitted_tc_cov
         self.fitted_model = model
         self.fitted_model.tc_cov = self.fitted_tc_cov
+
+    def modeled_vs_actual_hosps(self, model=None):
+        model = self.fitted_model if model is None else model
+        df = model.solution_sum(['seir', 'region'], index_with_model_dates=True)['Ih'].stack('region').rename('modeled').to_frame()
+        df['actual'] = self.actual_hosp[:len(model.daterange)].to_numpy()
+        df = df.reindex(columns=['actual', 'modeled'])
+        return df

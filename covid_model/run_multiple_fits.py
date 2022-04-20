@@ -44,7 +44,7 @@ def run():
     parser.add_argument("-bs", "--batch_size", type=int, help="the number of (default 14-day) windows to fit in each batch; default to running everything in one batch")
     parser.add_argument("-is", "--increment_size", type=int, help="the number of windows to shift forward for each subsequent fit; default to 1")
     parser.add_argument("-ws", "--window_size", type=int, help="the number of days in each TC-window; default to 14")
-    parser.add_argument("-rp", "--region_params", type=str, default="input/region_params.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_params.json'")
+    parser.add_argument("-rd", "--region_definitions", type=str, default="input/region_definitions.json", help="the path to the region-specific params file to use for fitting; default to 'input/region_definitions.json'")
     parser.add_argument("-rg", "--region", choices=regions.keys(), required=False, help="Specify the region to be run, if not specified, just runs default parameters")
     parser.add_argument("-rh", "--hosp_data", type=str, help="the path to the hospitalizations data for regions (temporary fix)")
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
@@ -57,7 +57,7 @@ def run():
     batch_size = fit_params.batch_size if fit_params.batch_size is not None else look_back
     increment_size = fit_params.increment_size if fit_params.increment_size is not None else 1
     window_size = fit_params.window_size if fit_params.window_size is not None else 14
-    region_params = fit_params.region_params
+    region_definitions = fit_params.region_definitions
     region = fit_params.region
     write_batch_output = fit_params.write_batch_output
 
@@ -72,13 +72,13 @@ def run():
         print(f'Running fit for scenario: "{scen}"')
         attr_mults = common_attr_mults + scen_attr_mults
         specs_args = {**parser.specs_args_as_dict(), 'attribute_multipliers': attr_mults}
-        fit = CovidModelFit(engine=engine, region_params=fit_params.region_params, region=fit_params.region, **specs_args)
+        fit = CovidModelFit(engine=engine, region_definitions=fit_params.region_definitions, region=fit_params.region, **specs_args)
 
         # extract county IDs for the provided region; if statewide, set counties=None
         if region is not None:
-            counties = json.load(open(region_params))[region]['county_names']
+            counties = json.load(open(region_definitions))[region]['county_names']
             counties = counties if type(counties) == list else [counties]
-            county_ids = json.load(open(region_params))[region]['county_fips']
+            county_ids = json.load(open(region_definitions))[region]['county_fips']
             county_ids = county_ids if type(county_ids) == list else [county_ids]
         else:
             counties, county_ids = (None, None)
@@ -101,7 +101,7 @@ def run():
         else:
             fit.run(engine, look_back=look_back, batch_size=batch_size,
                     increment_size=increment_size, window_size=window_size,
-                    region_params=region_params, region=region,
+                    region_definitions=region_definitions, region=region,
                     write_batch_output=write_batch_output)
 
         print(fit.fitted_model.tslices)

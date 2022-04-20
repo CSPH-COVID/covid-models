@@ -45,10 +45,10 @@ class MyTestCase(unittest.TestCase):
             ("sw", "Southwest"),
             ("wcp", "West Central Partnership")
         ])
-        # get region-to-county mapping by loading the region_params.json file
-        with open('input/region_params.json', 'r') as f:
-            region_params = json.loads(f.read())
-        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_params.items() if key in regions.keys()])
+        # get region-to-county mapping by loading the region_definitions.json file
+        with open('input/region_definitions.json', 'r') as f:
+            region_definitions = json.loads(f.read())
+        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_definitions.items() if key in regions.keys()])
         cm = RegionalCovidModel.construct_region_contact_matrices(regions, fpath='../contact_matrices/mobility.csv')
         dates = list(cm['dwell_matrices'].keys())
 

@@ -1,4 +1,6 @@
 ### Python Standard Library ###
+from os.path import join
+import datetime as dt
 ### Third Party Imports ###
 import numpy as np
 ### Local Imports ###
@@ -48,3 +50,10 @@ def calc_multiple_multipliers(transitions, multipliers, starting_prevalences):
         mults[label], prevs[to] = calc_multipliers(np.array([m[label] for m in multipliers]), np.array(prevs[fr]))
 
     return mults, {k: v[:-1].sum() for k, v in prevs.items()}
+
+
+def get_file_prefix(outdir = None):
+    if outdir:
+        return join(outdir, dt.datetime.now().strftime('%Y%m%d_%H%M%S') + '_')
+    else:
+        return dt.datetime.now().strftime('%Y%m%d_%H%M%S') + '_'

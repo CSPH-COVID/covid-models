@@ -26,12 +26,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     default_end_date = dt.date(2022, 5, 31)
 
     def __init__(self, base_model=None, deepcopy_params=True, increment=None, **spec_args):
-
         # update region attribute levels using base model, then spec_args as appropriate
-        if base_model:
-            self.attr['region'] = base_model.attr['region']
-        if 'regions' in spec_args.keys():
-            self.attr['region'] = spec_args['regions']
 
         # if a base model is provided, use its specifications
         if base_model is not None:
@@ -39,6 +34,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # initiate CovidModelSpecifications parent class; dates will be set in CovidModelSpecifications.__init__
         CovidModelSpecifications.__init__(self, **spec_args)
+        self.attr['region'] = self.regions  # update compartment based on specifications
 
         # build trange based on the value provided in the increment argument
         tlength = (self.end_date - self.start_date).days
@@ -51,7 +47,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                         for tslice in param_specs['tslices']:
                             model_param_tslices.add((dt.datetime.strptime(tslice, "%Y-%m-%d").date() - self.start_date).days if isinstance(tslice, str) else tslice)
             trange = sorted(list(set(self.tslices).union({0}).union({tlength}).union(model_param_tslices)))
-            trange = [ts for ts in trange if ts < self.tmax]
+            trange = [ts for ts in trange if ts < self.tmax and ts >= self.tmin]
         # if increment is an integer, generate evenly spaced slices
         elif isinstance(increment, int):
             trange = list(range(0, tlength, increment)) + [tlength]
@@ -92,11 +88,11 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             vacc_per_available = self.get_vacc_per_available()
 
             # apply vacc_delay
-            vacc_per_available = vacc_per_available.groupby('age').shift(vacc_delay).fillna(0)
+            vacc_per_available = vacc_per_available.groupby(['region','age']).shift(vacc_delay).fillna(0)
 
             # group vacc_per_available by trange interval
             t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), self.trange + [self.tmax], right=False, retbins=False, labels=self.trange)
-            vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'age']).mean()
+            vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'region','age']).mean()
 
             # convert to dictionaries for performance lookup
             vacc_per_available_dict = vacc_per_available.to_dict()
@@ -106,7 +102,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
                 for age in self.attr['age']:
                     for region in self.attr['region']:
                         for t in self.trange:
-                            self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t, age)], {'age': age}, trange=[t])
+                            self.set_param(f'{shot}_per_available', vacc_per_available_dict[shot][(t, region, age)], {'age': age, 'region':region}, trange=[t])
 
         # alter parameters based on timeseries effects
         multipliers = self.get_timeseries_effect_multipliers()
@@ -118,10 +114,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         # alter parameters based on attribute multipliers
         if self.attribute_multipliers:
             for attr_mult_specs in self.attribute_multipliers:
-                if 'attrs' in attr_mult_specs.keys() and 'region' in  attr_mult_specs['attrs'].keys():
-                    pass
-                else:
-                    self.set_param(**attr_mult_specs)
+                self.set_param(**attr_mult_specs)
 
     # new exposures by day by group
     @property
@@ -192,26 +185,36 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2'}, constant='ba2_seed')
 
         # exposure
-        asymptomatic_transmission = '(1 - immunity) * betta / total_pop'
+        asymptomatic_transmission = '(1 - immunity) * kappa * betta / total_pop'
         for variant in self.attributes['variant']:
+            # No mobility between regions (or a single region)
             if self.model_mobility_mode is None or self.model_mobility_mode == "none":
                 for region in self.attributes['region']:
                     sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': region})
                     asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': region})
                     self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
                     self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
-            if self.model_mobility_mode == "population_attached":
+            # Transmission parameters attached to the susceptible population
+            elif self.model_mobility_mode == "population_attached":
                 for from_region in self.attributes['region']:
-                    # TODO: need region specific beta here.
-                    asymptomatic_transmission = f'(1 - immunity) * betta / region_pop_{from_region}'
+                    # kappa in this mobility mode is associated with the susceptible population, so no need to store every kappa in every region
+                    asymptomatic_transmission = f'(1 - immunity) * kappa_pa * betta / region_pop_{from_region}'
                     for to_region in self.attributes['region']:
                         sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                         asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
                         self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
                         self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
-
-
-
+            # Transmission parameters attached to the transmission location
+            elif self.model_mobility_mode == "location_attached":
+                for from_region in self.attributes['region']:
+                    for in_region in self.attributes['region']:
+                        # kappa in this mobility mode is associated with the in_region, so need to store every kappa in every region
+                        asymptomatic_transmission = f'(1 - immunity) * kappa_la_{in_region} * betta / region_pop_{from_region}'
+                        for to_region in self.attributes['region']:
+                            sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
+                            asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
+                            self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                            self.add_flows_by_attr({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
 
         # disease progression
         self.add_flows_by_attr({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
@@ -232,9 +235,6 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             self.add_flows_by_attr({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
 
         # immunity decay
-        # self.add_flows_by_attr({'immun': 'imm3'}, {'immun': 'imm2'}, coef='1 / imm3_decay_days')
-        # self.add_flows_by_attr({'immun': 'imm2'}, {'immun': 'imm1'}, coef='1 / imm2_decay_days')
-        # self.add_flows_by_attr({'immun': 'imm1'}, {'immun': 'imm0'}, coef='1 / imm1_decay_days')
         self.add_flows_by_attr({'immun': 'strong'}, {'immun': 'weak'}, coef='1 / imm_decay_days')
 
     # define initial state y0
@@ -282,9 +282,9 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     # write to covid_model.results
     def write_results_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
 
-        # if there's no existing fit assigned, create a new fit and assign that one
+        # if there's no existing spec_id assigned, write specs to db to get one
         if self.spec_id is None or new_spec:
-            self.write_to_db(engine)
+            self.write_specs_to_db(engine)
 
         # build data frame with index of (t, age, vacc) and one column per seir cmpt
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
@@ -322,7 +322,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             df['tc'] = json.dumps(self.tc)
 
         # write to database
-        chunksize = int(np.floor(5000.0 / df.shape[1]))
+        chunksize = int(np.floor(5000.0 / df.shape[1])) # max parameters is 10,000. Assume 1 param per column and use 5,000 for a buffer because 10,000 still doesn't work.
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
                   , index=False, if_exists='append', method='multi', chunksize=chunksize)
@@ -330,3 +330,11 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     def write_gparams_lookup_to_csv(self, fname):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}
         pd.concat(df_by_t, names=['t', 'age']).to_csv(fname)
+
+    def solution_sum(self, group_by_attr_levels, index_with_model_dates=False):
+        df = ODEBuilder.solution_sum(self, group_by_attr_levels)
+        if index_with_model_dates:
+            df['date'] = self.daterange
+            df = df.set_index('date')
+        return df
+
