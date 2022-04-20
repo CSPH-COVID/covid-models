@@ -12,7 +12,7 @@ from covid_model.utils import get_file_prefix
 
 def main():
     outdir = os.path.join("covid_model", "output", os.path.basename(__file__))
-
+    os.makedirs(outdir, exist_ok=True)
 
     fit_args = {
         'batch_size': 6,
