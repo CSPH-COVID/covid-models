@@ -105,7 +105,7 @@ if __name__ == '__main__':
     ax_hosp.set_ylabel('Hospitalized with COVID-19')
     ax_rmse_by_start_date.set_ylabel('Root-Mean-Square Error')
     ax_rmse_by_day_of_proj.set_ylabel('Root-Mean-Square Error')
-    ax_pos_neg.set_ylabel.set_ylabel('Positive and Negative Errors')
+    ax_pos_neg.set_ylabel('Positive and Negative Errors')
 
     for ax in fig.axes:
         ax.grid('lightgray')
