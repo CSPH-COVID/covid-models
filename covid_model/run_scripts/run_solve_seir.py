@@ -7,9 +7,7 @@ import matplotlib.dates as mdates
 import seaborn as sns
 ### Local Imports ###
 from covid_model.utils import get_file_prefix
-from covid_model.db import db_engine
-from covid_model import CovidModel
-from covid_model.cli_specs import ModelSpecsArgumentParser
+from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
 from covid_model.data_imports import ExternalHosps
 
 
