@@ -279,26 +279,9 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         else:
             return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
-    # write to covid_model.results
-    def write_results_to_db(self, engine=None, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('age', 'vacc'), sim_id=None, sim_result_id=None):
-
-        # if there's no existing spec_id assigned, write specs to db to get one
-        if self.spec_id is None or new_spec:
-            self.write_specs_to_db(engine)
-
-        # build data frame with index of (t, age, vacc) and one column per seir cmpt
+    def prepare_write_results_query(self, vals_json_attr='seir', cmpts_json_attrs=('region', 'age', 'vacc'), sim=False):
+        # build data frame with index of (t, region, age, vacc) and one column per seir cmpt
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
-
-        # Merge R and R2 into one column
-        if 'R2' in solution_sum_df.columns:
-            solution_sum_df['R'] += solution_sum_df['R2']
-            del solution_sum_df['R2']
-
-        # build unique parameters dataframe
-        params_df = self.params_as_df
-        grouped = params_df.groupby(['t'] + list(cmpts_json_attrs))
-        unique_params = [param for param, is_unique in (grouped.nunique() == 1).all().iteritems() if is_unique]
-        unique_params_df = grouped.max()[unique_params]
 
         # build export dataframe
         df = pd.DataFrame(index=solution_sum_df.index)
@@ -309,23 +292,49 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             df[col] = df[col].map(lambda d: json.dumps(d, ensure_ascii=False))
 
         # if a sim_id is provided, insert it as a simulation result; some fields are different
-        if sim_id is None:
-            table = 'results_v2'
-            df['spec_id'] = self.spec_id
-            df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
-            df['created_at'] = dt.datetime.now()
+        if not sim:
+            # build unique parameters dataframe
+            params_df = self.params_as_df
+            grouped = params_df.groupby(['t'] + list(cmpts_json_attrs))
+            unique_params = [param for param, is_unique in (grouped.nunique() == 1).all().iteritems() if is_unique]
+            unique_params_df = grouped.max()[unique_params]
             df['params'] = unique_params_df.apply(lambda x: json.dumps(x.to_dict(), ensure_ascii=False), axis=1)
         else:
-            table = 'simulation_results_v2'
+            df['tc'] = json.dumps(self.tc)
+        return df
+
+    @classmethod
+    def write_prepared_results_to_db(cls, df, engine, spec_id, sim_id=None, sim_result_id=None):
+        if sim_id is None:
+            table = 'results_v2'
+            df['created_at'] = dt.datetime.now()
+            df['spec_id'] = spec_id
+            df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
+        else:
             df['sim_id'] = sim_id
             df['sim_result_id'] = sim_result_id
-            df['tc'] = json.dumps(self.tc)
+            table = 'simulation_results_v2'
 
         # write to database
-        chunksize = int(np.floor(5000.0 / df.shape[1])) # max parameters is 10,000. Assume 1 param per column and use 5,000 for a buffer because 10,000 still doesn't work.
+        chunksize = int(np.floor(9000.0 / df.shape[1])) # max parameters is 10,000. Assume 1 param per column and give some wiggle room because 10,000 doesn't always work
         results = df.to_sql(table
                   , con=engine, schema='covid_model'
                   , index=False, if_exists='append', method='multi', chunksize=chunksize)
+        return df
+
+    # write to covid_model.results
+    def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('region', 'age', 'vacc'), sim_id=None, sim_result_id=None):
+
+        write_df = self.prepare_write_results_query(vals_json_attr, cmpts_json_attrs, sim=sim_id is not None)
+
+        # if there's no existing spec_id assigned, write specs to db to get one
+        if self.spec_id is None or new_spec:
+            self.write_specs_to_db(engine)
+
+        df = CovidModel.write_prepared_results_to_db(write_df, engine, self.spec_id, sim_id, sim_result_id)
+        self.result_id = df['result_id'][0][0]
+        return df
+
 
     def write_gparams_lookup_to_csv(self, fname):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}
