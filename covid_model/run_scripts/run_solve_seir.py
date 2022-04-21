@@ -11,13 +11,14 @@ from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
 from covid_model.data_imports import ExternalHosps
 
 
-def run_solve_seir(outdir=None, **specs_args):
+def run_solve_seir(outdir=None, model=None, **specs_args):
     if outdir:
         os.makedirs(outdir, exist_ok=True)
 
     engine = db_engine()
-    print("creating model")
-    model = CovidModel(engine=engine, **specs_args)
+    if model is None:
+        print("creating model")
+        model = CovidModel(engine=engine, **specs_args)
     print("prepping model")
     model.prep()
     print("solving model")
