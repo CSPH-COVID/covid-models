@@ -1,4 +1,5 @@
 ### Python Standard Library ###
+from operator import itemgetter
 import datetime as dt
 import json
 import copy
@@ -480,7 +481,7 @@ class CovidModelSpecifications:
         )
         return params
 
-    def get_kappas_as_params_using_region_fits(self, engine, region_fit_spec_ids):
+    def get_kappas_as_params_using_region_fits(self, engine, region_fit_spec_ids, region_fit_result_ids):
         # TODO: load number of infected from database to compute mobility aware kappas
         # will set TC = 0.0 for the model and scale the "kappa" parameter for each region according to its fitted TC values so the forward sim can be run.
         # This approach does not currently support fitting, since only TC can be fit and there's only one set of TC for the model.
@@ -497,16 +498,41 @@ class CovidModelSpecifications:
             results_list.append(pd.DataFrame.from_dict({'tslices': tslices, region: tc}).set_index('tslices'))
         # union all the region tslices
         df_tcs = pd.concat(results_list, axis=1)
+        tslices = df_tcs.index.drop([0]).to_list()
 
-        self.set_tc(df_tcs.index.drop([0]).to_list(), [0.0]*df_tcs.shape[0])
+        # retrieve prevalence data from db if allowing mobility
+        if self.model_mobility_mode != 'none':
+            results_list = []
+            for region, spec_id, result_id in zip(self.regions, region_fit_spec_ids, region_fit_result_ids):
+                df = pd.read_sql_query(f"SELECT t, vals FROM covid_model.results_v2 WHERE spec_id = {spec_id} AND result_id = {result_id} order by t", con=engine, coerce_float=True)
+                df['infected'] = [sum(itemgetter('I', 'Ih')(json.loads(row))) for row in df['vals']]
+                df['pop'] = [sum(json.loads(row).values()) for row in df['vals']]
+                df = df.groupby('t').sum(['infected', 'pop'])
+                df[region]=df['infected']/df['pop']
+                df = df.drop(columns=['infected', 'pop'])
+                results_list.append(df)
+            prev_df = pd.concat(results_list, axis=1)
 
-        # compute alpha parameter for each region and apply to model parameters
+        # compute kappa parameter for each region and apply to model parameters
         if self.model_mobility_mode == 'none':
-            params = {'kappa': [{'tslices': df_tcs.index.drop([0]).to_numpy().tolist(), 'attributes': {'region': region}, 'values': [(1-tc) for tc in df_tcs[region]]} for region in df_tcs.columns]}
+            self.set_tc(tslices, [0.0] * (len(tslices) + 1))
+            params = {'kappa': [{'tslices': tslices, 'attributes': {'region': region}, 'values': [(1-tc) for tc in df_tcs[region]]} for region in df_tcs.columns]}
         elif self.model_mobility_mode == 'location_attached':
-            # TODO: need to write sim results to db first
+            # TODO: Implement
             params = {}
         elif self.model_mobility_mode == 'population_attached':
-            # TODO: need to write sim results to db first
-            params = {}
+            # update tslices to include any t where mobility changes
+            mob_tslices = np.array([t for t in self.actual_mobility.keys() if t >= self.tmin and t < self.tmax])
+            prev_tslices = np.array([t for t in prev_df.index if t >= self.tmin and t < self.tmax])
+
+            combined_tslices = [t.item() if isinstance(t, np.int32) else t for t in sorted(list(set([0] + tslices).union(set(mob_tslices)).union(set(prev_tslices))))]
+            kappas = np.zeros(shape=[len(combined_tslices), len(self.regions)])
+            for i, t in enumerate(combined_tslices):
+                tc = df_tcs.iloc[df_tcs.index <= t,].iloc[-1].to_numpy()
+                prev = prev_df.iloc[prev_tslices[prev_tslices <= t][-1]].to_numpy()
+                mobs = self.actual_mobility[mob_tslices[mob_tslices <= t][-1]]
+                kappas[i,] = (1-tc) * prev / np.linalg.multi_dot([mobs['dwell_rownorm'], np.transpose(mobs['dwell_colnorm']), np.transpose(prev)])
+            np.nan_to_num(kappas, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+            self.set_tc(combined_tslices[1:], [0.0] * len(combined_tslices))
+            params = {'kappa_pa': [{'tslices': combined_tslices[1:], 'attributes': {'region': region}, 'values': kappas[:,j].tolist()} for j, region in enumerate(self.regions)]}
         return params
