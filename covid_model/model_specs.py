@@ -122,6 +122,8 @@ class CovidModelSpecifications:
 
         if end_date is not None:
             self.end_date = end_date
+        if self.end_date is None:
+            self.end_date = dt.date.today()
         if tslices or tc or end_date:
             self.set_tc(tslices=tslices, tc=tc)
         if params:
