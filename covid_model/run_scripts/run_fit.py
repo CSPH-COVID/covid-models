@@ -5,10 +5,7 @@ from multiprocessing import Pool
 import matplotlib.pyplot as plt
 ### Local Imports ###
 from covid_model.utils import get_file_prefix
-from covid_model.model_specs import CovidModelSpecifications
-from covid_model.db import db_engine
-from covid_model.model_fit import CovidModelFit
-from covid_model.cli_specs import ModelSpecsArgumentParser
+from covid_model import CovidModel, CovidModelFit, CovidModelSpecifications, ModelSpecsArgumentParser, db_engine
 
 
 # function that runs the fit on each region, can be run via multiprocessing
@@ -36,7 +33,13 @@ def do_fit_on_region(args):
         hosps_df.to_csv(f"{get_file_prefix(non_specs_args['outdir'])}fit_hospitalized.csv")
 
     fit.fitted_model.tags['run_type'] = 'fit'
-    return fit.fitted_model if return_model else fit.fitted_model.prepare_write_specs_query()
+    if return_model:
+        return fit.fitted_model
+    else:
+        specs_info = fit.fitted_model.prepare_write_specs_query()
+        results_info = fit.fitted_model.prepare_write_results_query()
+        return {"specs_info": specs_info, "results_info": results_info}
+
 
 
 def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, use_base_specs_end_date,
@@ -52,19 +55,22 @@ def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, 
     if multiprocess:
         args_list = map(lambda x: [x, specs_args, non_specs_args, False], specs_args['regions'])
         p = Pool(multiprocess)
-        write_infos = p.map(do_fit_on_region, args_list)
+        results = p.map(do_fit_on_region, args_list)
 
         # write results to database serially
-        for i, _ in enumerate(write_infos):
-            if write_infos[i] is not None:
-                write_infos[i] = CovidModelSpecifications.write_prepared_specs_to_db(write_infos[i], db_engine())
+        for i, _ in enumerate(results):
+            if results[i]['specs_info'] is not None:
+                results[i]['specs_info'] = CovidModelSpecifications.write_prepared_specs_to_db(results[i]['specs_info'], db_engine())
+            if results[i]['results_info'] is not None:
+                results[i]['results_info'] = CovidModel.write_prepared_results_to_db(results[i]['results_info'], db_engine(), results[i]['specs_info']['spec_id'])
     else:
         args_list = map(lambda x: [x, specs_args, non_specs_args, True], specs_args['regions'])
         models =list(map(do_fit_on_region, args_list))
         engine = db_engine()
         [m.write_specs_to_db(engine=engine) for m in models]
+        [m.write_results_to_db(engine=engine) for m in models]
 
-    return write_infos if multiprocess else list(models)
+    return results if multiprocess else models
 
 
 if __name__ == '__main__':
