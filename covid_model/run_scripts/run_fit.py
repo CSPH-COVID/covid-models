@@ -72,6 +72,9 @@ def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, 
         engine = db_engine()
         [m.write_specs_to_db(engine=engine) for m in models]
         [m.write_results_to_db(engine=engine) for m in models]
+        print(f'regions: {",".join(specs_args["regions"])}')
+        print(f'spec_ids: {",".join([str(m.spec_id) for m in models])}')
+        print(f'result_ids: {",".join([str(m.result_id) for m in models])}')
 
     return results if multiprocess else models
 
