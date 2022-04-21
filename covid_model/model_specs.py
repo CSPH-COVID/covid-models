@@ -38,7 +38,7 @@ class CovidModelSpecifications:
 
         self.model_region_definitions = None
         self.model_mobility_mode = None
-        self.actual_mobility = None
+        self.actual_mobility = {}
         self.mobility_proj_params = None
 
         self.actual_vacc_df = None
@@ -201,9 +201,9 @@ class CovidModelSpecifications:
         return write_info
 
     @classmethod
-    def write_prepared_specs_to_db(cls, write_info, engine, schema='covid_model', table='specifications', spec_id: int=None):
+    def write_prepared_specs_to_db(cls, write_info, engine, spec_id: int=None):
         # writes the given info to the db without needing an explicit instance
-        specs_table = get_sqa_table(engine, schema=schema, table=table)
+        specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
 
         with Session(engine) as session:
             if spec_id is None:
@@ -218,16 +218,16 @@ class CovidModelSpecifications:
             session.commit()
         return {**write_info, 'spec_id':spec_id}
 
-    def write_specs_to_db(self, engine, schema='covid_model', table='specifications', tags=None):
+    def write_specs_to_db(self, engine, tags=None):
         # get write info
         write_info = self.prepare_write_specs_query(tags=tags)
 
-        specs_table = get_sqa_table(engine, schema=schema, table=table)
+        specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
         with Session(engine) as session:
             # generate a spec_id so we can assign it to ourselves
             max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
             self.spec_id = max_spec_id + 1
-        return self.write_prepared_specs_to_db(write_info, engine, schema, table, spec_id=self.spec_id)
+        return self.write_prepared_specs_to_db(write_info, engine, spec_id=self.spec_id)
 
     @property
     def days(self):
