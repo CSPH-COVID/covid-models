@@ -3,7 +3,9 @@ from operator import itemgetter
 import math
 import copy
 from collections import OrderedDict, defaultdict
+import json
 ### Third Party Imports ###
+import numpy
 import numpy as np
 import pandas as pd
 import sympy as sym
@@ -423,3 +425,26 @@ class ODEBuilder:
     # return solution grouped by group_by_attr_levels
     def solution_sum(self, group_by_attr_levels):
         return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
+
+    def ode_terms_as_json(self, compact=False):
+        if compact:
+            cm = ", ".join([ f'[{i},{c}]' for i, c in enumerate(self.compartments)])
+            cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec!=0)]
+            cv = {t: ' ,'.join([f'({idx},{val:.2e})' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())]) for t, m in cv}
+            lm = {t: ' ,'.join([f'({idx1},{idx2},{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[0].tolist(), m.nonzero()[1].tolist(), m[m.nonzero()].A[0].tolist())])
+                  for t, m in self.linear_matrix.items() if len(m.nonzero()[0]) > 0}
+            nl = {t: {f'({",".join([f"{k}" for k in keys])})': ', '.join([f'({idx1},{idx2},{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[0].tolist(), m.nonzero()[1].tolist(), m[m.nonzero()].A[0].tolist()) if val != 0])
+                  for keys, m in mat_dict.items()} for t, mat_dict in self.nonlinear_matrices.items() if len(mat_dict)>0}
+            nlm = self.nonlinear_multiplier
+            return json.dumps({"compartments": cm, "constant_vector": cv, "linear_matrix": lm, "nonlinear_multiplier": nlm, "nonlinear_matrices": nl}, indent=2)
+        else:
+            def fcm(i):
+                return f'{",".join(self.compartments[i])}'
+            cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
+            cv = {t: {fcm(idx): f'{val:.2e}' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())} for t, m in cv}
+            lm = {t: {f'({fcm(idx1)};{fcm(idx2)}': f'{val:.2e}' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[0].tolist())}
+                  for t, m in self.linear_matrix.items() if len(m.nonzero()[0]) > 0}
+            nl = {t: {f'({";".join([f"{fcm(k)}" for k in keys])})': {f'({fcm(idx1)};{fcm(idx2)})': f'{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[0].tolist()) if val != 0}
+                      for keys, m in mat_dict.items()} for t, mat_dict in self.nonlinear_matrices.items() if len(mat_dict) > 0}
+            nlm = self.nonlinear_multiplier
+            return json.dumps({"constant_vector": cv, "linear_matrix": lm, "nonlinear_multiplier": nlm, "nonlinear_matrices": nl}, indent=2)
