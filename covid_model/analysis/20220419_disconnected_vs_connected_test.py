@@ -80,6 +80,7 @@ def main():
     df = pd.concat(dfs).reset_index(drop=True)
     dfh = pd.concat(dfhs, axis=0)
 
+    # TODO: compare kappa across mobility modes
 
     print("saving results")
     df.to_csv(get_file_prefix(outdir) + "disconnected_vs_connected_run_compartments.csv")
