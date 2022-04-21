@@ -7,9 +7,8 @@ import scipy.optimize as spo
 ### Local Imports ###
 from covid_model.utils import get_file_prefix
 from covid_model.data_imports import ExternalHosps
-from covid_model import CovidModel
-from covid_model.model_specs import CovidModelSpecifications
-from covid_model.analysis.charts import transmission_control, modeled
+from covid_model import CovidModel, CovidModelSpecifications
+from covid_model.analysis.charts import transmission_control
 
 
 class CovidModelFit:
