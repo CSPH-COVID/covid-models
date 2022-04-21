@@ -347,19 +347,14 @@ class CovidModelSpecifications:
             prevalence_df = pd.DataFrame(index=pd.date_range(self.start_date, self.end_date))
 
             for effect_specs in self.timeseries_effects[effect_type]:
-                if len(effect_specs['start_date']) == 8:
-                    effect_specs['start_date'] = '20' + effect_specs['start_date']
-                start_date = dt.datetime.strptime(effect_specs['start_date'], '%Y-%m-%d').date()
-                end_date = self.end_date
-
-                if start_date < end_date:
-                    prevalence = effect_specs['prevalence']
-                    prevalence = prevalence[:(end_date - start_date).days]
-                    while len(prevalence) < (end_date - start_date).days:
-                        prevalence.append(prevalence[-1])
-
-                    prevalence_df[effect_specs['effect_name']] = 0
-                    prevalence_df.loc[start_date:(end_date - dt.timedelta(days=1)), effect_specs['effect_name']] = prevalence
+                effect_start_date = dt.datetime.strptime(effect_specs['start_date'], '%Y-%m-%d').date()
+                effect_end_date = effect_start_date + dt.timedelta(days=len(effect_specs['prevalence'])-1)
+                effect_df = pd.DataFrame(index=pd.date_range(effect_start_date, effect_end_date))
+                effect_df[effect_specs['effect_name']] = effect_specs['prevalence']
+                # effect dates must overlap with at least one model date
+                if len(prevalence_df.index.intersection(effect_df.index)) > 0:
+                    # missing values at beginning are set to 0; missing dates at end are filled forward from last valid value
+                    prevalence_df = prevalence_df.merge(effect_df, how="left", left_index=True, right_index=True).sort_index().ffill().fillna(0)
                     multiplier_dict[effect_specs['effect_name']] = {**{param: 1.0 for param in params}, **effect_specs['multipliers']}
 
             if len(multiplier_dict) > 0:
