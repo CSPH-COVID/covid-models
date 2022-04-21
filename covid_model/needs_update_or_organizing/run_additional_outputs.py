@@ -12,7 +12,6 @@ from covid_model.data_imports import get_vaccinations_by_county, ExternalVaccWit
 if __name__ == '__main__':
     engine = db_engine()
 
-
     # export actual hospitalizations
     print('Exporting hospitalizations...')
     hosps = ExternalHosps(engine).fetch(county_ids=None)['currently_hospitalized'].reset_index().rename(columns={'currently_hospitalized': 'Iht', 'measure_date': 'date'})

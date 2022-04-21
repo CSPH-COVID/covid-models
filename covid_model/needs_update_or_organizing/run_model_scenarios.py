@@ -1,4 +1,5 @@
 ### Python Standard Library ###
+import os
 import json
 import argparse
 import datetime as dt
@@ -7,9 +8,7 @@ import dateutil.relativedelta as durel
 import pandas as pd
 import numpy as np
 ### Local Imports ###
-from covid_model.model_specs import CovidModelSpecifications
-from covid_model.model import CovidModel
-from covid_model.db import db_engine
+from covid_model import CovidModel, CovidModelSpecifications, db_engine
 
 ###################################################################################
 # TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
@@ -52,9 +51,7 @@ def build_legacy_output_df(model: CovidModel):
 
 
 def build_tc_df(model: CovidModel):
-    return pd.DataFrame.from_dict({'time': model.tslices[:-1]
-                                , 'tc_pb': model.efs
-                                , 'tc': model.obs_ef_by_slice})
+    return pd.DataFrame.from_dict({'time': model.tslices[:-1], 'tc_pb': model.efs, 'tc': model.obs_ef_by_slice})
 
 
 def tags_to_scen_label(tags):
@@ -76,15 +73,9 @@ def run_model(model, engine, legacy_output_dict=None):
         legacy_output_dict[tags_to_scen_label(model.tags)] = build_legacy_output_df(model)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-cf", "--current_fit_id", type=int, help="The current fit ID (run today)")
-    parser.add_argument("-pf", "--prior_fit_id", type=int, help="The prior fit ID (run last week)")
-    parser.add_argument("-d", "--days", type=int, help="Number of days to include in these scenarios, starting from Jan 24, 2020")
-    parser.add_argument("-tcs", "--tc_shifts", nargs='+', type=float, help="Upcoming shifts in TC to simulate (-0.05 represents a 5% reduction in TC)")
-    parser.add_argument("-p", "--params", type=str, help="the path to the params file to use for fitting; default to 'input/params.json'")
-    # parser.add_argument("-pvs", "--primary_vaccine_scen", choices=['high', 'low'], type=float, help="The name of the vaccine scenario to be used for the default model scenario.")
-    run_params = parser.parse_args()
+def run_model_scenarios():
+    if (outdir):
+        os.makedirs(outdir, exist_ok=True)
 
     engine = db_engine()
 
@@ -136,4 +127,14 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    outdir = os.path.join("covid_model", "output", os.path.basename(__file__))
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-cf", "--current_fit_id", type=int, help="The current fit ID (run today)")
+    parser.add_argument("-pf", "--prior_fit_id", type=int, help="The prior fit ID (run last week)")
+    parser.add_argument("-d", "--days", type=int, help="Number of days to include in these scenarios, starting from Jan 24, 2020")
+    parser.add_argument("-tcs", "--tc_shifts", nargs='+', type=float, help="Upcoming shifts in TC to simulate (-0.05 represents a 5% reduction in TC)")
+    parser.add_argument("-p", "--params", type=str, help="the path to the params file to use for fitting; default to 'input/params.json'")
+    # parser.add_argument("-pvs", "--primary_vaccine_scen", choices=['high', 'low'], type=float, help="The name of the vaccine scenario to be used for the default model scenario.")
+
+    run_model_scenarios()
