@@ -25,7 +25,7 @@ class CovidModelSpecifications:
         self.spec_id = None
         self.base_spec_id = None
         self.tags = {}
-        self.region_fit_spec_ids = None
+        self.result_id = None
 
         self.tslices = None
         self.tc = None
@@ -114,7 +114,7 @@ class CovidModelSpecifications:
                      attribute_multipliers=None,
                      region_definitions=None, regions=None,
                      mobility_mode='none', refresh_actual_mobility=False, mobility_proj_params=None,
-                     region_fit_spec_ids=None, **unused_args):
+                     region_fit_spec_ids=None, region_fit_result_ids=None, **unused_args):
         if regions:
             self.regions = regions
         self.model_mobility_mode = mobility_mode
@@ -125,8 +125,6 @@ class CovidModelSpecifications:
             self.set_tc(tslices=tslices, tc=tc)
         if params:
             self.set_model_params(params)
-        if region_fit_spec_ids:
-            self.model_params.update(self.get_kappas_as_params_using_region_fits(engine, region_fit_spec_ids))
         if region_definitions:
             self.set_region_definitions(region_definitions)
         if refresh_actual_vacc:
@@ -155,6 +153,9 @@ class CovidModelSpecifications:
         # add mobility data to model params.
         if self.model_mobility_mode != "none" and (refresh_actual_mobility or mobility_proj_params or end_date):
             self.model_params.update(self.get_mobility_as_params())
+
+        if region_fit_spec_ids:
+            self.model_params.update(self.get_kappas_as_params_using_region_fits(engine, region_fit_spec_ids, region_fit_result_ids))
 
     # handy properties for the beginning t, end t, and the full range of t values
     @property
