@@ -57,12 +57,12 @@ def main():
     mob_modes = ['population_attached', 'none']
 
     print('Run fit')
-    ms = run_fit(**fit_args, **run_args, outdir=outdir)
-    run_args['region_fit_spec_ids'] = [x['specs_info']['spec_id'] if isinstance(x, dict) else x.spec_id for x in ms]
-    run_args['region_fit_result_ids'] = [x['results_info']['result_id'].iloc[0].item() if isinstance(x, dict) else x.result_id for x in ms]
+    #ms = run_fit(**fit_args, **run_args, outdir=outdir)
+    #run_args['region_fit_spec_ids'] = [x['specs_info']['spec_id'] if isinstance(x, dict) else x.spec_id for x in ms]
+    #run_args['region_fit_result_ids'] = [x['results_info']['result_id'].iloc[0].item() if isinstance(x, dict) else x.result_id for x in ms]
 
-    #run_args['region_fit_spec_ids'] = [2214, 2215]
-    #run_args['region_fit_result_ids'] = [144, 145]
+    run_args['region_fit_spec_ids'] = [2265, 2266]
+    run_args['region_fit_result_ids'] = [192, 193]
 
     dfs = []
     dfhs = []
