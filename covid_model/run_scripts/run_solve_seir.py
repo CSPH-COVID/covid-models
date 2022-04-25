@@ -11,7 +11,7 @@ from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
 from covid_model.data_imports import ExternalHosps
 
 
-def run_solve_seir(outdir=None, model=None, tags={}, **specs_args):
+def run_solve_seir(outdir=None, model=None, tags={}, prep_model=True, **specs_args):
     if outdir:
         os.makedirs(outdir, exist_ok=True)
 
@@ -19,8 +19,9 @@ def run_solve_seir(outdir=None, model=None, tags={}, **specs_args):
     if model is None:
         print("creating model")
         model = CovidModel(engine=engine, **specs_args)
-    print("prepping model")
-    model.prep()
+    if prep_model:
+        print("prepping model")
+        model.prep()
     print("solving model")
     model.solve_seir()
     model.write_specs_to_db(engine=engine, tags={'regions': model.regions if model else specs_args['regions'],
@@ -57,4 +58,4 @@ if __name__ == '__main__':
     parser = ModelSpecsArgumentParser()
     specs_args = parser.specs_args_as_dict()
 
-    _ = run_solve_seir(**specs_args, outdir=outdir)
+    _ = run_solve_seir(**specs_args, outdir=outdir, prep_model=True)
