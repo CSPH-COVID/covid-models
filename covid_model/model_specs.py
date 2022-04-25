@@ -59,7 +59,7 @@ class CovidModelSpecifications:
 
                 self.regions = json.loads(row['regions'])
                 self.start_date = row['start_date']
-                self.end_date = spec_args['end_date'] if spec_args['end_date'] is not None else row['end_date']
+                self.end_date = spec_args['end_date'] if 'end_date' in spec_args and spec_args['end_date'] is not None else row['end_date']
                 self.spec_id = row['spec_id']
                 self.base_spec_id = row['base_spec_id']
                 self.set_tc(tslices=row['tslices'], tc=row['tc'], tc_cov=json.loads(row['tc_cov'].replace('{', '[').replace('}', ']')))
@@ -88,7 +88,7 @@ class CovidModelSpecifications:
                 self.timeseries_effects = copy.deepcopy(from_specs.timeseries_effects)
                 self.base_spec_id = from_specs.spec_id if from_specs.spec_id is not None else from_specs.base_spec_id
                 self.update_specs(
-                    end_date=spec_args['end_date'] if spec_args['end_date'] is not None else from_specs.end_date,
+                    end_date=spec_args['end_date'] if 'end_date' in spec_args and spec_args['end_date'] is not None else from_specs.end_date,
                     tslices=copy.deepcopy(from_specs.tslices), tc=copy.deepcopy(from_specs.tc),
                     params=copy.deepcopy(from_specs.model_params),
                     vacc_proj_params=copy.deepcopy(from_specs.vacc_proj_params),
@@ -111,7 +111,7 @@ class CovidModelSpecifications:
     def update_specs(self, engine=None, end_date=None,
                      tslices=None, tc=None, params=None,
                      refresh_actual_vacc=False, vacc_proj_params=None,
-                     timeseries_effect_multipliers=None, variant_prevalence=None, mab_prevalence=None,
+                     timeseries_effect_multipliers=None, mab_prevalence=None,
                      attribute_multipliers=None,
                      region_definitions=None, regions=None,
                      mobility_mode='none', refresh_actual_mobility=False, mobility_proj_params=None,
@@ -139,9 +139,7 @@ class CovidModelSpecifications:
 
         # TODO: make add_timeseries_effect use existing multipliers if new mults are not provided (still a todo? -af)
         if mab_prevalence:
-            self.add_timeseries_effect('mab', prevalence_data=mab_prevalence,
-                                                      param_multipliers=timeseries_effect_multipliers,
-                                                      fill_forward=True)
+            self.add_timeseries_effect('mab', prevalence_data=mab_prevalence, param_multipliers=timeseries_effect_multipliers, fill_forward=True)
 
         if attribute_multipliers:
             self.set_attr_mults(attribute_multipliers)
@@ -190,7 +188,7 @@ class CovidModelSpecifications:
             ("model_params", json.dumps(self.model_params)),
             ("vacc_actual", json.dumps({dose: {";".join(key): val for key, val in rates.unstack(level=['region', 'age']).to_dict(orient='list').items()} for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()})),
             ("vacc_proj_params", json.dumps(self.vacc_proj_params)),
-            ("vacc_proj", json.dumps({dose: rates.unstack(level=['region', 'age']).to_dict(orient='list') for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None)),
+            ("vacc_proj", json.dumps({dose: {";".join(key): val for key, val in rates.unstack(level=['region', 'age']).to_dict(orient='list').items()} for dose, rates in self.proj_vacc_df.to_dict(orient='series').items()} if self.proj_vacc_df is not None else None)),
             ("timeseries_effects", json.dumps(self.timeseries_effects)),
             ("attribute_multipliers", json.dumps(self.attribute_multipliers)),
             ("region_definitions", json.dumps(self.model_region_definitions)),
@@ -271,7 +269,7 @@ class CovidModelSpecifications:
             actual_vacc_df_list = []
             for region in self.regions:
                 county_ids = self.model_region_definitions[region]['counties_fips']
-                actual_vacc_df_list.append(ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True))
+                actual_vacc_df_list.append(ExternalVacc(engine, t0_date=self.start_date).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['t', 'region', 'age']))
             self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         if actual_vacc_df is not None:
             self.actual_vacc_df = actual_vacc_df.copy()
@@ -374,7 +372,6 @@ class CovidModelSpecifications:
         return multipliers
 
     def get_proj_vacc(self):
-        # TODO: Still works with region included in vaccine df?
         proj_lookback = self.vacc_proj_params['lookback'] if 'lookback' in self.vacc_proj_params.keys() else 7
         proj_fixed_rates = self.vacc_proj_params['fixed_rates'] if 'fixed_rates' in self.vacc_proj_params.keys() else None
         max_cumu = self.vacc_proj_params['max_cumu'] if 'max_cumu' in self.vacc_proj_params.keys() else 0
@@ -386,8 +383,8 @@ class CovidModelSpecifications:
 
         # add projections
         proj_from_t = self.actual_vacc_df.index.get_level_values('t').max() + 1
-        proj_to_t = (self.end_date - self.start_date).days
-        if proj_to_t > proj_from_t:
+        proj_to_t = (self.end_date - self.start_date).days + 1
+        if proj_to_t >= proj_from_t:
             proj_trange = range(proj_from_t, proj_to_t)
             # project rates based on the last {proj_lookback} days of data
             projected_rates = self.actual_vacc_df[self.actual_vacc_df.index.get_level_values(0) >= proj_from_t-proj_lookback].groupby(['region', 'age']).sum()/proj_lookback
