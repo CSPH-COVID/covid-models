@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 import matplotlib.dates as mdates
 ### Local Imports ###
-from covid_model.run_scripts import run_fit, run_model_scenarios
+from covid_model.run_scripts import run_fit, run_model_scenarios, run_compartment_report
 from covid_model.utils import get_file_prefix
 
 
@@ -55,6 +55,9 @@ def main():
     with open(get_file_prefix(outdir) + "________________________.txt", 'w') as f:
         f.write(json.dumps({"fit_args": fit_args, "specs_args": specs_args, "scen_args": scen_args}, default=str, indent=4))
 
+    from_date = dt.datetime.strptime('2021-10-01', "%Y-%m-%d")
+    to_date = dt.datetime.strptime('2022-08-01', "%Y-%m-%d")
+
 
 
     ####################################################################################################################
@@ -62,24 +65,31 @@ def main():
 
     # fit a statewide model up to present day to act as a baseline
     print('Run fit')
-    #model = run_fit(**fit_args, {'tc':[0.75,0.75], 'tslices':[14], **specs_args}, outdir=outdir)[0]
+    #model = run_fit(**fit_args, outdir=outdir, **{'tc':[0.75,0.75], 'tslices':[14], **specs_args})[0]
     #specs_args["from_specs"] = model.spec_id
-    specs_args["from_specs"] = 2295
+    specs_args["from_specs"] = 2339
     print('Run Scenarios')
     df, dfh, dfh2, ms = run_model_scenarios(**specs_args, **scen_args, outdir=outdir)
 
-    print('Plotting')
-    from_date = dt.datetime.strptime('2021-10-01', "%Y-%m-%d").date(),
-    p = sns.relplot(data=df, x='date', y='y', hue='scen', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
-    _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "run_model_scenarios_compartments.png", dpi=300)
+    print("running compartment report")
+    [run_compartment_report(from_date, to_date, group_by_attr_names=['age', 'vacc', 'priorinf', 'immun', 'seir', 'variant'], model=m, outdir=outdir) for m in ms]
 
-    dfh_measured = dfh[['currently_hospitalized']].rename(columns={'currently_hospitalized': 'hospitalized'}).loc[dfh['scen'] == scens[0]].assign(series='observed')
-    dfh_modeled = dfh[['modeled_hospitalized', 'scen']].rename(columns={'modeled_hospitalized': 'hospitalized', 'scen': 'scen'})
-    dfh2 = pd.concat([dfh_measured, dfh_modeled], axis=0).set_index('series', append=True)
-    p = sns.relplot(data=dfh2, x='date', y='hospitalized', hue='scen', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
+    print('Plotting')
+
+    p = sns.relplot(data=df.loc[df.index.get_level_values('date') >= from_date], x='date', y='y', hue='scen', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=3, aspect=3)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "run_model_scenarios_hospitalized.png", dpi=300)
+    plt.savefig(get_file_prefix(outdir) + "ba2_scenarios_compartments.png", dpi=300)
+
+
+    p = sns.relplot(data=df.loc[df.index.get_level_values('date') >= from_date], x='date', y='y', hue='scen', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=3, aspect=3)
+    _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
+    plt.savefig(get_file_prefix(outdir) + "ba2_scenarios_compartments.png", dpi=300)
+
+    p = sns.relplot(data=dfh2.loc[dfh2.index.get_level_values('date') >= from_date], x='date', y='hospitalized', hue='series', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=3)
+    _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
+    plt.savefig(get_file_prefix(outdir) + "ba2_scenarios_hospitalized.png", dpi=300)
+
+    # run compartment reports on each scenario
 
     print("done")
 
