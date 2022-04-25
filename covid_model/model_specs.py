@@ -384,7 +384,7 @@ class CovidModelSpecifications:
         # add projections
         proj_from_t = self.actual_vacc_df.index.get_level_values('t').max() + 1
         proj_to_t = (self.end_date - self.start_date).days + 1
-        if proj_to_t >= proj_from_t:
+        if proj_to_t > proj_from_t:
             proj_trange = range(proj_from_t, proj_to_t)
             # project rates based on the last {proj_lookback} days of data
             projected_rates = self.actual_vacc_df[self.actual_vacc_df.index.get_level_values(0) >= proj_from_t-proj_lookback].groupby(['region', 'age']).sum()/proj_lookback
