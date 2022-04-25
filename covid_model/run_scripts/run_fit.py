@@ -63,9 +63,9 @@ def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, 
                 results[i]['specs_info'] = CovidModelSpecifications.write_prepared_specs_to_db(results[i]['specs_info'], db_engine())
             if results[i]['results_info'] is not None:
                 results[i]['results_info'] = CovidModel.write_prepared_results_to_db(results[i]['results_info'], db_engine(), results[i]['specs_info']['spec_id'])
-            print(f'regions: {",".join(specs_args["regions"])}')
-            print(f'spec_ids: {",".join([r["specs_info"]["spec_id"] for r in results])}')
-            print(f'result_ids: {",".join([r["results_info"]["result_id"].iloc[0].item() for r in results])}')
+        print(f'regions: {",".join(specs_args["regions"])}')
+        print(f'spec_ids: {",".join([str(r["specs_info"]["spec_id"]) for r in results])}')
+        print(f'result_ids: {",".join([str(r["results_info"]["result_id"].iloc[0].item()) for r in results])}')
     else:
         args_list = map(lambda x: [x, specs_args, non_specs_args, True], specs_args['regions'])
         models =list(map(do_fit_on_region, args_list))
