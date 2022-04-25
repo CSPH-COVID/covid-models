@@ -1,3 +1,4 @@
 from covid_model.run_scripts.run_fit import run_fit
 from covid_model.run_scripts.run_solve_seir import run_solve_seir
 from covid_model.run_scripts.run_model_scenarios import run_model_scenarios
+from covid_model.run_scripts.run_compartment_report import run_compartment_report
