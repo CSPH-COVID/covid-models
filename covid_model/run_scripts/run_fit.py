@@ -4,7 +4,7 @@ from multiprocessing import Pool
 ### Third Party Imports ###
 import matplotlib.pyplot as plt
 ### Local Imports ###
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 from covid_model import CovidModel, CovidModelFit, CovidModelSpecifications, ModelSpecsArgumentParser, db_engine
 
 
@@ -27,10 +27,10 @@ def do_fit_on_region(args):
         print("plotting")
         hosps_df = fit.modeled_vs_actual_hosps().reset_index('region').drop(columns='region')
         hosps_df.plot()
-        plt.savefig(f"{get_file_prefix(non_specs_args['outdir'])}fit_hosps.png", dpi=300)
+        plt.savefig(f"{get_filepath_prefix(non_specs_args['outdir'])}fit_hosps_{non_specs_args['fname_extra']}.png", dpi=300)
 
         print("saving results")
-        hosps_df.to_csv(f"{get_file_prefix(non_specs_args['outdir'])}fit_hospitalized.csv")
+        hosps_df.to_csv(f"{get_filepath_prefix(non_specs_args['outdir'])}fit_hospitalized_{non_specs_args['fname_extra']}.csv")
 
     fit.fitted_model.tags['run_type'] = 'fit'
     if return_model:
@@ -41,14 +41,13 @@ def do_fit_on_region(args):
         return {"specs_info": specs_info, "results_info": results_info}
 
 
-
 def run_fit(look_back, batch_size, increment_size, window_size, tc_min, tc_max, use_base_specs_end_date,
-            write_batch_output, multiprocess, forward_sim_each_batch, outdir, **specs_args):
+            write_batch_output, multiprocess, forward_sim_each_batch, outdir=None, fname_extra="", **specs_args):
     if(outdir):
         os.makedirs(outdir, exist_ok=True)
 
     non_specs_args = {}
-    for var in ['look_back', 'batch_size', 'increment_size', 'window_size', 'tc_min', 'tc_max', 'use_base_specs_end_date', 'write_batch_output', 'multiprocess', 'forward_sim_each_batch', 'outdir']:
+    for var in ['look_back', 'batch_size', 'increment_size', 'window_size', 'tc_min', 'tc_max', 'use_base_specs_end_date', 'write_batch_output', 'multiprocess', 'forward_sim_each_batch', 'outdir', 'fname_extra']:
         non_specs_args[var] = eval(var)
 
     # regions can only be fit individually, so loop through regions if multiple are listed
@@ -94,6 +93,7 @@ if __name__ == '__main__':
     parser.add_argument("-wb", "--write_batch_output", action="store_true", default=False, help="write the output of each batch to the database")
     parser.add_argument("-mup", "--multiprocess", type=int, default=None, help="if present, indicates how many indipendent processes to spawn in a threadpool for fitting the models")
     parser.add_argument("-fs", "--forward_sim_each_batch", action='store_true', default=False, help="after each tc fit, plot the hospitalized vs. fitted, along with TC")
+    parser.add_argument("-fne", '--fname_extra', default="", help="extra info to add to all files saved to disk")
     parser.set_defaults(refresh_vacc=False, increment_size=1, window_size=14, batch_size=1)
 
     specs_args = parser.specs_args_as_dict()
