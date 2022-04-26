@@ -2,15 +2,17 @@
 from operator import attrgetter
 import os
 import json
+from datetime import date
 ### Third Party Imports ###
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
 ### Local Imports ###
-from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
+from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine, CovidModelFit
 from covid_model.run_scripts.run_solve_seir import run_solve_seir
-from covid_model.utils import get_file_prefix
+from covid_model.run_scripts.run_fit import run_fit
+from covid_model.utils import get_filepath_prefix
 
 ###################################################################################
 # TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
@@ -77,7 +79,7 @@ def run_model(model, engine, legacy_output_dict=None):
 
 
 def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_params_scens,
-                        attribute_multipliers_scens, outdir, **specs_args):
+                        attribute_multipliers_scens, outdir, fname_extra="", refit_from_date=None, fit_args=None, **specs_args):
     if (outdir):
         os.makedirs(outdir, exist_ok=True)
     engine = db_engine()
@@ -89,7 +91,7 @@ def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_para
     # initialize Base model:
     base_model = CovidModel(engine=engine, **specs_args)
 
-    ms = []
+    ms = {}
     dfs = []
     dfhs = []
     for scen in scens:
@@ -107,36 +109,41 @@ def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_para
         if scens_files[3] and scen in scens_files[3]:
             scen_base_model.attribute_multipliers.extend(scens_files[3][scen])
         scen_model = CovidModel(base_model=scen_base_model)
+        if refit_from_date is not None:
+            fit_args['look_back'] = len([t for t in scen_model.tslices if t >= (refit_from_date - scen_model.start_date).days])
+            fit = CovidModelFit(engine=engine, tc_min=fit_args['tc_min'], tc_max=fit_args['tc_max'], from_specs=scen_model)
+            fit.set_actual_hosp(engine=engine, county_ids=scen_model.get_all_county_fips())
+            fit.run(engine, **fit_args, print_prefix=f'{scen}', outdir=outdir)
+            scen_model.apply_tc(fit.fitted_model.tc, fit.fitted_model.tslices)
         print(f"Scenario: {scen}: Prepping and Solving SEIR")
-        scen_model, df, dfh = run_solve_seir(outdir=outdir, model=scen_model, tags={'scenario': scen})
-        ms.append(scen_model)
+        scen_model, df, dfh = run_solve_seir(outdir=outdir, model=scen_model, prep_model=True, tags={'scenario': scen})
+        ms[scen] = scen_model
         dfs.append(df.assign(scen=scen))
         dfhs.append(dfh.assign(scen=scen))
 
-    df = pd.concat(dfs, axis=0)
+    df = pd.concat(dfs, axis=0).set_index(['scen', 'date', 'region', 'seir'])
     dfh = pd.concat(dfhs, axis=0)
     dfh_measured = dfh[['currently_hospitalized']].rename(columns={'currently_hospitalized': 'hospitalized'}).loc[dfh['scen'] == scens[0]].assign(series='observed')
-    dfh_modeled = dfh[['modeled_hospitalized', 'scen']].rename(columns={'modeled_hospitalized': 'hospitalized', 'scen': 'scen'})
+    dfh_modeled = dfh[['modeled_hospitalized', 'scen']].rename(columns={'modeled_hospitalized': 'hospitalized', 'scen': 'series'})
     dfh2 = pd.concat([dfh_measured, dfh_modeled], axis=0).set_index('series', append=True)
 
     print("saving results")
-    df.to_csv(get_file_prefix(outdir) + "run_model_scenarios_compartments.csv")
-    dfh.to_csv(get_file_prefix(outdir) + "run_model_scenarios_hospitalized.csv")
-    dfh2.to_csv(get_file_prefix(outdir) + "run_model_scenarios_hospitalized2.csv")
+    df.to_csv(get_filepath_prefix(outdir) + f"run_model_scenarios_compartments_{fname_extra}.csv")
+    dfh.to_csv(get_filepath_prefix(outdir) + f"run_model_scenarios_hospitalized_{fname_extra}.csv")
+    dfh2.to_csv(get_filepath_prefix(outdir) + f"run_model_scenarios_hospitalized2_{fname_extra}.csv")
 
     print("plotting results")
     p = sns.relplot(data=df, x='date', y='y', hue='scen', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "run_model_scenarios_compartments.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + f"run_model_scenarios_compartments_{fname_extra}.png", dpi=300)
 
-
-    p = sns.relplot(data=dfh2, x='date', y='hospitalized', hue='scen', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
+    p = sns.relplot(data=dfh2, x='date', y='hospitalized', hue='series', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "run_model_scenarios_hospitalized.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + f"run_model_scenarios_hospitalized_{fname_extra}.png", dpi=300)
 
     print("done")
 
-    return(df, dfh, dfh2, ms)
+    return df, dfh, dfh2, ms
 
 
 if __name__ == '__main__':
@@ -147,8 +154,12 @@ if __name__ == '__main__':
     parser.add_argument("-vppsc", '--vacc_proj_params_scens', type=str, help="path to vaccine projection parameters scenario file (updates base vpp)")
     parser.add_argument("-mppsc", '--mobility_proj_params_scens', type=str, help="path to mobility projection parameters scenario file (updates base mpp)")
     parser.add_argument('-amsc', '--attribute_multipliers_scens', type=str, help="path to attribute multipliers scenario file (updates base mprev)")
+    parser.add_argument('-rfd', '--refit_from_date', type=date.fromisoformat, help="refit from this date forward for each scenario, or don't refit if None (format: YYYY-MM-DD)")
+    parser.add_argument("-fne", '--fname_extra', default="", help="extra info to add to all files saved to disk")
 
     specs_args = parser.specs_args_as_dict()
     non_specs_args = parser.non_specs_args_as_dict()
+
+    # note refitting doesn't work from CLI because we aren't collecting fit specs here. Better way to do this?
 
     run_model_scenarios(**non_specs_args, outdir=outdir, **specs_args)
