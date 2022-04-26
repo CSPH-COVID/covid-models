@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 ### Local Imports ###
 from covid_model.run_scripts import run_solve_seir, run_fit
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 from covid_model import CovidModel
 
 
@@ -43,7 +43,7 @@ def main():
         'tslices': [14],
         'max_step_size': 0.5
     }
-    with open(get_file_prefix(outdir) + "________________________.txt", 'w') as f:
+    with open(get_filepath_prefix(outdir) + "________________________.txt", 'w') as f:
         f.write(json.dumps({"fit_args": fit_args, "spec_args": specs_args}, default=str, indent=4))
 
 
@@ -73,8 +73,8 @@ def main():
 
 
     print("saving results")
-    df.to_csv(get_file_prefix(outdir) + "fit_vs_run_run_compartments.csv")
-    dfh.to_csv(get_file_prefix(outdir) + "fit_vs_run_run_forwardsim_hospitalized.csv")
+    df.to_csv(get_filepath_prefix(outdir) + "fit_vs_run_run_compartments.csv")
+    dfh.to_csv(get_filepath_prefix(outdir) + "fit_vs_run_run_forwardsim_hospitalized.csv")
 
     #print("plotting results")
     #p = sns.relplot(data=df, x='date', y='y', hue='mobility', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)

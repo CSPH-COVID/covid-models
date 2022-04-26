@@ -5,7 +5,7 @@ from time import perf_counter
 from matplotlib import pyplot as plt
 import scipy.optimize as spo
 ### Local Imports ###
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 from covid_model.data_imports import ExternalHosps
 from covid_model import CovidModel, CovidModelSpecifications
 from covid_model.analysis.charts import transmission_control
@@ -109,7 +109,7 @@ class CovidModelFit:
                 hosps_df.plot(ax=ax)
                 ax = fig.add_subplot(212)
                 transmission_control(model, ax=ax)
-                plt.savefig(get_file_prefix(outdir) + f'{print_prefix}_model_fit_batch_{i}.png')
+                plt.savefig(get_filepath_prefix(outdir) + f'{print_prefix}_model_fit_batch_{i}.png')
                 plt.close()
 
         self.fitted_tc = tc

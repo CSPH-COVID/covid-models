@@ -52,7 +52,7 @@ def calc_multiple_multipliers(transitions, multipliers, starting_prevalences):
     return mults, {k: v[:-1].sum() for k, v in prevs.items()}
 
 
-def get_file_prefix(outdir = None):
+def get_filepath_prefix(outdir = None):
     if outdir:
         return join(outdir, dt.datetime.now().strftime('%Y%m%d_%H%M%S') + '_')
     else:

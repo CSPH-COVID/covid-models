@@ -10,10 +10,10 @@ from covid_model.db import db_engine
 import covid_model
 from covid_model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 
 
-def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir, model=None, **specs_args):
+def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir, model=None, fname_extra="", **specs_args):
     if model is None:
         model = CovidModel(engine=engine, **specs_args)
         model.prep()
@@ -32,7 +32,7 @@ def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir
             ax.legend(loc='upper left')
 
     fig.tight_layout()
-    plt.savefig(get_file_prefix(outdir) + "compartment_report_" + "_".join(group_by_attr_names) + "_share_of_total.png")
+    plt.savefig(get_filepath_prefix(outdir) + "compartment_report_" + "_".join(group_by_attr_names) + f"_share_of_total_{fname_extra}.png")
     plt.close()
 
     # repeat but don't normalize to a percentage.
@@ -46,7 +46,7 @@ def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir
             ax.legend(loc='upper left')
 
     fig.tight_layout()
-    plt.savefig(get_file_prefix(outdir) + "compartment_report_" + "_".join(group_by_attr_names) + ".png")
+    plt.savefig(get_filepath_prefix(outdir) + "compartment_report_" + "_".join(group_by_attr_names) + f"_{fname_extra}.png")
     plt.close()
 
 
@@ -59,6 +59,7 @@ if __name__ == '__main__':
     parser.add_argument('-fd', '--from_date', type=dt.date.fromisoformat, default=dt.date(2020, 3, 1), help='x-axis minimum date')
     parser.add_argument('-td', '--to_date', type=dt.date.fromisoformat, default=dt.date.today(), help='x-axis maximum date')
     parser.add_argument('-gba', '--group_by_attr_names', nargs='+', type=str, choices=CovidModel.attr.keys(), default=['age', 'vacc', 'priorinf'], help=f'list of attributes name to split charts by')
+    parser.add_argument("-fne", '--fname_extra', default="", help="extra info to add to all files saved to disk")
 
     specs_args = parser.specs_args_as_dict()
     non_specs_args = parser.non_specs_args_as_dict()

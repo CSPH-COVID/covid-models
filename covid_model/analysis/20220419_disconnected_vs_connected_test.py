@@ -9,7 +9,7 @@ import seaborn as sns
 import matplotlib.dates as mdates
 ### Local Imports ###
 from covid_model.run_scripts import run_solve_seir, run_fit
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 
 
 def main():
@@ -46,7 +46,7 @@ def main():
         'tslices': [14],
         'max_step_size': 0.5
     }
-    with open(get_file_prefix(outdir) + "________________________.txt", 'w') as f:
+    with open(get_filepath_prefix(outdir) + "________________________.txt", 'w') as f:
         f.write(json.dumps({"fit_args": fit_args, "spec_args": specs_args}, default=str, indent=4))
 
 
@@ -75,7 +75,7 @@ def main():
         ms2.append(model)
         dfs.append(df.assign(mobility=mm))
         dfhs.append(dfh.assign(mobility=mm))
-        with open(get_file_prefix(outdir) + f'{mm}_ode_terms.json', 'w') as f:
+        with open(get_filepath_prefix(outdir) + f'{mm}_ode_terms.json', 'w') as f:
             f.write(model.ode_terms_as_json())
     df = pd.concat(dfs).reset_index(drop=True)
     dfh = pd.concat(dfhs, axis=0)
@@ -89,25 +89,25 @@ def main():
     # TODO: compare kappa across mobility modes
 
     print("saving results")
-    df.to_csv(get_file_prefix(outdir) + "disconnected_vs_connected_test_compartments.csv")
-    dfh.to_csv(get_file_prefix(outdir) + "disconnected_vs_connected_test_hospitalized.csv")
-    dfk.to_csv(get_file_prefix(outdir) + "disconnected_vs_connected_test_kappa.csv")
+    df.to_csv(get_filepath_prefix(outdir) + "disconnected_vs_connected_test_compartments.csv")
+    dfh.to_csv(get_filepath_prefix(outdir) + "disconnected_vs_connected_test_hospitalized.csv")
+    dfk.to_csv(get_filepath_prefix(outdir) + "disconnected_vs_connected_test_kappa.csv")
 
     print("plotting results")
     p = sns.relplot(data=df, x='date', y='y', hue='mobility', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "disconnected_vs_connected_test_compartments.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + "disconnected_vs_connected_test_compartments.png", dpi=300)
 
     dfh_measured = dfh[['currently_hospitalized']].rename(columns={'currently_hospitalized': 'hospitalized'}).loc[dfh['mobility'] == 'none'].assign(series='observed')
     dfh_modeled = dfh[['modeled_hospitalized', 'mobility']].rename(columns={'modeled_hospitalized': 'hospitalized', 'mobility': 'series'})
     dfh2 = pd.concat([dfh_measured,dfh_modeled], axis=0).set_index('series', append=True)
     p = sns.relplot(data=dfh2, x='date', y='hospitalized', hue='series', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "disconnected_vs_connected_test_hospitalized.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + "disconnected_vs_connected_test_hospitalized.png", dpi=300)
 
     p = sns.relplot(data=dfk, x='t', y='kappa', hue='mobility', style='mobility', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "disconnected_vs_connected_test_kappa.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + "disconnected_vs_connected_test_kappa.png", dpi=300)
 
     print("done")
 
