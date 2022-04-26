@@ -20,8 +20,8 @@ from covid_model.utils import get_file_prefix
 def build_legacy_output_df(model: CovidModel):
     ydf = model.solution_sum(['seir', 'age']).stack(level='age')
     dfs_by_group = []
-    for i, group in enumerate(model.attr['age']):
-        dfs_by_group.append(ydf.xs(group, level='age').rename(columns={var: var + str(i+1) for var in model.attr['seir']}))
+    for i, group in enumerate(model.attrs['age']):
+        dfs_by_group.append(ydf.xs(group, level='age').rename(columns={var: var + str(i+1) for var in model.attrs['seir']}))
     df = pd.concat(dfs_by_group, axis=1)
 
     params_df = model.params_as_df
@@ -97,7 +97,7 @@ def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_para
         scen_base_model = CovidModel(engine=engine, base_model=base_model)
         # Update params based on scenario
         if scens_files[0] and scen in scens_files[0]:
-            scen_base_model.params.update(scens_files[0][scen])
+            scen_base_model.params_by_t.update(scens_files[0][scen])
         if scens_files[1] and scen in scens_files[1]:
             scen_base_model.vacc_proj_params.update(scens_files[1][scen])
         if scens_files[2] and scen in scens_files[2]:

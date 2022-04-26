@@ -56,7 +56,7 @@ if __name__ == '__main__':
         model = build_default_model(days)
         for k, v in immunity_specs['params'].items():
             model.set_param(k, v)
-        model.build_ode()
+        model.build_ode_flows()
         model.compile()
         model.solve_ode(y0_dict={model.get_default_cmpt_by_attrs({**immunity_specs['initial_attrs'], 'age': age}): n for age, n in model.group_pops.items()})
 

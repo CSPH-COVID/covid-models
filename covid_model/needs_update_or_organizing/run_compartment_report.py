@@ -19,7 +19,7 @@ if __name__ == '__main__':
     argparser.add_argument("-mc", "--model_class", default="CovidModel", help="Name of the class to use for the model (Defaults to CovidModel)")
     argparser.add_argument("-sp", "--save_prefix", default=None, help="If specified, saves the figure with the given prefix")
     argparser.add_argument('-gba', '--group_by_attr_names', nargs='+', type=str,
-                           choices=CovidModel.attr.keys(), default=['age', 'vacc', 'priorinf'],
+                           choices=CovidModel.attrs.keys(), default=['age', 'vacc', 'priorinf'],
                            help=f'list of attributes name to split charts by')
 
     args = argparser.parse_args()

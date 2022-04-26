@@ -49,13 +49,6 @@ def modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[], sha
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
 
-def re_estimates(model, ax=None, **plot_params):
-    if ax is not None:
-        ax.plot(model.daterange[90:], model.re_estimates[90:], **plot_params)
-    else:
-        plt.plot(model.daterange[90:], model.re_estimates[90:], **plot_params)
-
-
 def modeled_by_group(model, axs, compartment='Ih', **plot_params):
     for g, ax in zip(model.groups, axs.flat):
         ax.plot(model.daterange, model.solution_ydf.xs(g, level='group')[compartment], **{'c': 'blue', 'label': 'Modeled', **plot_params})

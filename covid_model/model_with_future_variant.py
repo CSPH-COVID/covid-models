@@ -7,7 +7,7 @@ from covid_model import CovidModel
 
 class CovidModelWithFutureVariant(CovidModel):
 
-    attr = OrderedDict({**CovidModel.attr, 'variant': CovidModel.attr['variant'] + ['future']})
+    attrs = OrderedDict({**CovidModel.attrs, 'variant': CovidModel.attrs['variant'] + ['future']})
 
     def __init__(self, base_model=None, deepcopy_params=True, future_seed_date=None, **spec_args):
         super().__init__(base_model=base_model, deepcopy_params=deepcopy_params, **spec_args)
@@ -23,8 +23,8 @@ class CovidModelWithFutureVariant(CovidModel):
         # if variant_attr_mults is not None:
         #     self.attribute_multipliers += variant_attr_mults if isinstance(variant_attr_mults, list) else json.load(open(variant_attr_mults))
 
-    def build_ode(self):
-        super().build_ode()
+    def build_ode_flows(self):
+        super().build_ode_flows()
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'future'}, constant='future_seed')
 
 

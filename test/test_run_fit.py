@@ -22,7 +22,7 @@ class Test(TestCase):
         model2.solve_seir()
 
         for t in model1.trange:
-            self.assertEqual(model1.params[t], model2.params[t])
+            self.assertEqual(model1.params_by_t[t], model2.params_by_t[t])
             # np.testing.assert_array_equal(model1.linear_matrix[t], model2.linear_matrix[t])
             # np.testing.assert_array_equal(model1.nonlinear_matrices[t], model2.nonlinear_matrices[t])
             # np.testing.assert_array_equal(model1.constant_vector[t], model2.constant_vector[t])
