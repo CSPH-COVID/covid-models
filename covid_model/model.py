@@ -735,34 +735,40 @@ class CovidModel:
                         self.set_param(param=f'{shot}_per_available', attrs={'age': age, 'region': region}, vals=vpa_sub)
 
     # set TC by slice, and update non-linear multiplier; defaults to reseting the last TC values
-    def apply_tc(self, tcs=None, tslices=None):
+    def apply_tc(self, tcs=None, tslices=None, force_nlm_update=False):
         # if tslices are provided, replace any tslices >= tslices[0] with the new tslices
         if tslices is not None:
             self.tc_tslices = [tslice for tslice in self.tc_tslices if tslice < tslices[0]] + tslices
             self.tc = self.tc[:len(self.tc_tslices) + 1]  # truncate tc if longer than tslices
-            self.tc += [self.tc[-1]] * (1 + len(self.tc_tslices) - len(self.tc))  # extend tc if shorter than tslices
+            self.tc += [self.tc[-1] if len(self.tc)>0 else 0] * (1 + len(self.tc_tslices) - len(self.tc))  # extend tc if shorter than tslices
             self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
 
-        # if tc is provided, replace the
+        # if tc is provided, replace the end bit
         if tcs is not None:
             self.tc = self.tc[:-len(tcs)] + tcs
 
         # if the lengths do not match, raise an error
-        if len(self.tc) != len(self.tc_tslices) + 1:
-            raise ValueError(
-                f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.')
+        if tcs is not None and tslices is not None and len(self.tc) != len(self.tc_tslices) + 1:
+            raise ValueError(f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.')
 
         # apply the new TC values to the non-linear multiplier to update the ODE
-        # TODO: only update the nonlinear multipliers for TCs that have been changed
+        # only update the nonlinear multipliers for TCs that have been changed
         if tcs is not None:
             for tslice, tc in zip(self.tc_tslices[:len(self.tc)], tcs):
                 self.nonlinear_multiplier[self.tc_t_prev_lookup[tslice]] = 1-tc
+        # update all multipliers using stored tc's if requested
+        if force_nlm_update:
+            for tslice, tc in zip([0] + self.tc_tslices, self.tc):
+                self.nonlinear_multiplier[self.tc_t_prev_lookup[tslice]] = 1-tc
+
+    def _default_nonlinear_matrix(self):
+        return spsp.lil_matrix((self.n_compartments, self.n_compartments))
 
     # assign default values to matrices
     def reset_ode(self):
         self.terms = []
         self.linear_matrix = {t: spsp.lil_matrix((self.n_compartments, self.n_compartments)) for t in self.params_trange}
-        self.nonlinear_matrices = {t: defaultdict(lambda: spsp.lil_matrix((self.n_compartments, self.n_compartments))) for t in self.params_trange}
+        self.nonlinear_matrices = {t: defaultdict(self._default_nonlinear_matrix) for t in self.params_trange}
         self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
         self.nonlinear_multiplier = {}
 
@@ -864,7 +870,7 @@ class CovidModel:
     def build_ode_flows(self):
         logger.debug(f"{str(self.tags)} Building ode flows")
         self.reset_ode()
-        self.apply_tc()  # update the nonlinear multiplier
+        self.apply_tc(force_nlm_update=True)  # update the nonlinear multiplier
 
         # vaccination
         self.add_flows_from_attrs_to_attrs({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
@@ -953,7 +959,7 @@ class CovidModel:
                 self.nonlinear_matrices[t][k] = v.tocsr()
 
     # ODE step forward
-    def ode(self, t, y):
+    def ode(self, t: float, y: list):
         dy = [0] * self.n_compartments
         t_int = self.t_prev_lookup[math.floor(t)]
         t_nlm = self.tc_t_prev_lookup[math.floor(t)]
@@ -972,19 +978,19 @@ class CovidModel:
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y and solution_ydf
     # TODO: try Julia ODE package, to improve performance
-    def solve_seir(self, y0_dict=None, method='RK45', max_step=1.0):
-        y0_dict = y0_dict if y0_dict is not None else self.y0_dict
+    def solve_seir(self, y0=None, method='RK45'):
+        if y0 is None:
+            y0 = self.y0_from_dict(self.y0_dict)
         self.solution = spi.solve_ivp(
             fun=self.ode,
             t_span=[min(self.trange), max(self.trange)],
-            y0=self.y0_from_dict(y0_dict),
+            y0=y0,
             t_eval=self.trange,
             method=method,
-            max_step=max_step)
+            max_step=self.max_step_size
+        )
         if not self.solution.success:
             raise RuntimeError(f'ODE solver failed with message: {self.solution.message}')
-        self.solution_y = np.transpose(self.solution.y)
-        self.solution_ydf = pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
