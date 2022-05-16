@@ -61,6 +61,7 @@ class CovidModel:
         # model data
         self.__params_defs = None
         self.__region_defs = None
+        self.regions = self.attrs['region']
         self.__vacc_proj_params = None
         self.__mobility_mode = None
         self.actual_mobility = {}
@@ -187,14 +188,14 @@ class CovidModel:
         proj_from_date = self.actual_vacc_df.index.get_level_values('date').max() + dt.timedelta(days=1)
         proj_to_date = self.end_date
         if proj_to_date >= proj_from_date:
-            proj_date_range = pd.date_range(proj_from_date, proj_to_date)
+            proj_date_range = pd.date_range(proj_from_date, proj_to_date).date
             # project daily vaccination rates based on the last {proj_lookback} days of data
             projected_rates = self.actual_vacc_df[self.actual_vacc_df.index.get_level_values(0) >= proj_from_date-dt.timedelta(days=proj_lookback)].groupby(['region', 'age']).sum()/proj_lookback
             # override rates using fixed values from proj_fixed_rates, when present
             if proj_fixed_rates:
                 proj_fixed_rates_df = pd.DataFrame(proj_fixed_rates).rename_axis(index='age').reset_index().merge(region_df,how='cross').set_index(['region', 'age'])
                 for shot in shots:
-                    # TODO: currently treats all regions the same. Need to change if finer control desired
+                    # Note: currently treats all regions the same. Need to change if finer control desired
                     projected_rates[shot] = proj_fixed_rates_df[shot]
             # build projections
             projections = pd.concat({d: projected_rates for d in proj_date_range}).rename_axis(index=['date', 'region', 'age'])
@@ -203,7 +204,11 @@ class CovidModel:
             if max_cumu:
                 cumu_vacc = self.actual_vacc_df.groupby(['region', 'age']).sum()
                 groups = realloc_priority if realloc_priority else projections.groupby(['region','age']).sum().index
-                populations = [{'age': li['attributes']['age'], 'region': li['attributes']['region'], 'population': li['values']} for li in self.params_defs['group_pop'] if li['attributes']['region'] in self.regions]
+                populations = pd.DataFrame([{'param': param_dict['param'], 'region': region, 'population': list(param_dict['vals'].values())[0]} for region in self.regions for param_dict in self.params_defs if region in param_dict['param']])
+                populations['age'] = ['65+' if li[1]=='65p' else '-'.join(li[1:3]) for li in populations['param'].str.split("_")]
+                populations = populations[populations['age'] != 'pop'].drop(columns='param')
+
+
                 for d in projections.index.unique('date'):
                     this_max_cumu = get_params(max_cumu.copy(), d)
 
@@ -350,6 +355,18 @@ class CovidModel:
             params = {'kappa_pa': [{'tslices': combined_tslices[1:], 'attributes': {'region': region}, 'values': kappas[:,j].tolist()} for j, region in enumerate(self.regions)]}
         return params
 
+    # pulls hospitalizations for only the first region, since the model only fits one region at a time
+    def set_actual_hosp(self, engine):
+        logger.info(f"{str(self.tags)} Retrieving hospitalizations")
+        # makes sure we pull from EMResource if region is CO
+        county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
+        hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
+        # fill in the beginning if necessary
+        if min(hosps.index.get_level_values(0)) > self.start_date:
+            s_fill = pd.Series(index=[self.t_to_date(t) for t in range(self.tmin, self.date_to_t(min(hosps.index.get_level_values(0))))], dtype='float64').fillna(0)
+            self.actual_hosp = pd.concat([s_fill, hosps])
+        else:
+            self.actual_hosp = hosps[hosps.index.get_level_values(0) >= self.start_date]
 
     ####################################################################################################################
     ### Properites
@@ -385,6 +402,13 @@ class CovidModel:
     def tmax(self):
         return self.__tmax
 
+    @tmax.setter
+    def tmax(self, value):
+        self.__tmax = value
+        self.__end_date = self.start_date + dt.timedelta(days=value)
+        self.__trange = range(self.tmin, self.tmax + 1)
+        self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
+
     @property
     def trange(self):
         return self.__trange
@@ -393,6 +417,13 @@ class CovidModel:
     def daterange(self):
         return self.__daterange
 
+    @property
+    def attr_names(self):
+        return list(self.attrs.keys())
+
+    @property
+    def param_attr_names(self):
+        return self.attr_names[1:]
 
     ### regions
     @property
@@ -445,22 +476,31 @@ class CovidModel:
     # initial state y0, expressed as a dictionary with non-empty compartments as keys
     @property
     def y0_dict(self):
-        group_pops = {(li['attributes']['region'], li['attributes']['age']): li['values'] for li in
-                      self.params_defs['group_pop'] if li['attributes']['region'] in self.attrs['region']}
+        group_pops = {(region, age): self.params_by_t['all'][f'{region}_{age_param}_pop'][0] for region in self.regions for age, age_param in zip(['0-19', '20-39', '40-64', '65+'], ['0_19', '20_39', '40_64', '65p'])}
         y0d = {('S', age, 'none', 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
         return y0d
 
-    # return the parameters as a dataframe with t and compartments as row index and parameters as columns
+    # return the parameters as nested dictionaries
     @property
-    def params_as_df(self, params=None):
-        df = pd.DataFrame(self.trange)
-        return pd.concat({t: pd.DataFrame.from_dict(self.params_by_t[self.t_prev_lookup[t]], orient='index') for t in
-                          self.trange}).rename_axis(index=['t'] + list(self.param_attr_names))
+    def params_as_dict(self, params=None):
+        params_dict = {}
+        for cmpt, cmpt_dict in self.params_by_t.items():
+            key = f"({','.join(cmpt)})" if isinstance(cmpt, tuple) else cmpt
+            params_dict[key] = cmpt_dict
+        return params_dict
 
     # number of
     @property
     def n_compartments(self):
         return len(self.cmpt_idx_lookup)
+
+    @property
+    def solution_y(self):
+        return np.transpose(self.solution.y)
+
+    @property
+    def solution_ydf(self):
+        return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
 
     ####################################################################################################################
@@ -502,6 +542,9 @@ class CovidModel:
         df = df.set_index('date')
         return df
 
+    def solution_sum_Ih(self):
+        return pd.Series(self.solution_y[:, self.compartments_as_index.get_level_values(0) == "Ih"].sum(axis=1), index=self.daterange)
+
     # Get the immunity against a given variant
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
         params = self.params_as_df
@@ -525,6 +568,12 @@ class CovidModel:
         else:
             return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
 
+    def modeled_vs_actual_hosps(self):
+        df = self.solution_sum(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
+        df['actual'] = self.actual_hosp[:len(self.daterange)].to_numpy()
+        df = df.reindex(columns=['actual', 'modeled'])
+        return df
+
     # get a parameter for a given set of attributes and trange
     def get_param(self, param, attrs=None, trange=None):
         # pass empty dict if want all compartments listed separately
@@ -537,7 +586,7 @@ class CovidModel:
             df.index.names = ['t']
             if param in self.params_by_t[cmpt].keys():
                 for t in trange:
-                    t_left = self.params_by_t[cmpt][param].keys()[self.params_by_t[cmpt][param].bisect_left(t) - 1]
+                    t_left = self.params_by_t[cmpt][param].keys()[self.params_by_t[cmpt][param].bisect(t) - 1]
                     df.loc[t][param] = self.params_by_t[cmpt][param][t_left]
                 vals.append((cmpt, df))
         return vals
@@ -586,8 +635,7 @@ class CovidModel:
 
     # return compartments that match a dictionary of attributes
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
-        return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if
-                self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
+        return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
 
     ####################################################################################################################
@@ -641,7 +689,7 @@ class CovidModel:
                     if t > self.tmax:
                         continue
                     if not self.params_by_t[cmpt][param].__contains__(t):
-                        t_left = self.params_by_t[cmpt][param].keys()[self.params_by_t[cmpt][param].bisect_left(t) - 1]
+                        t_left = self.params_by_t[cmpt][param].keys()[self.params_by_t[cmpt][param].bisect(t) - 1]
                         self.params_by_t[cmpt][param][t] = self.params_by_t[cmpt][param][t_left]
                 # set val or multiply
                 for d, mult in mults.items():
@@ -652,6 +700,7 @@ class CovidModel:
 
     # combine param_defs, vaccine_defs, etc. into a time indexed parameters dictionary
     def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
+        logger.debug(f"{str(self.tags)} Building param lookups")
         self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attrs.keys())
         self.compartments = list(self.compartments_as_index)
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
@@ -676,7 +725,6 @@ class CovidModel:
             vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'region', 'age']).mean()
             vacc_per_available['date'] = [self.t_to_date(d) for d in vacc_per_available.index.get_level_values(0)]
             vacc_per_available = vacc_per_available.reset_index().set_index(['region', 'age']).sort_index()
-
 
             # set the fail rate and vacc per unvacc rate for each dose
             for shot in self.attrs['vacc'][1:]:
