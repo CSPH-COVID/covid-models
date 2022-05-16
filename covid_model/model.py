@@ -35,7 +35,9 @@ class CovidModel:
     ####################################################################################################################
     ### Initialization and Updating
 
-    def __init__(self, engine=None, base_model=None, update_derived_properties=True, **margs):
+    def __init__(self, engine=None, base_model=None, update_derived_properties=True, base_spec_id=None, **margs):
+        # margs can be any model property, but don't set self.tc or self.tc_tslices this way. Use self.apply_tc() instead
+
         # basic model data
         self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                              'age': ['0-19', '20-39', '40-64', '65+'],
@@ -44,8 +46,7 @@ class CovidModel:
                              'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
                              'immun': ['none', 'weak', 'strong'],
                              'region': ['co']})
-        self.attr_names = list(self.attrs.keys())
-        self.param_attr_names = self.attr_names[1:]
+
         self.tags = {}
 
         self.__start_date = dt.datetime.strptime("2020-01-01", "%Y-%m-%d").date()
@@ -56,8 +57,6 @@ class CovidModel:
         self.tc_cov = None
 
         self.solution = None
-        self.solution_y = None
-        self.solution_ydf = None
 
         # model data
         self.__params_defs = None
@@ -68,27 +67,32 @@ class CovidModel:
         self.mobility_proj_params = None
         self.actual_vacc_df = None
         self.proj_vacc_df = None
+        self.recently_updated_properties = []
+        self.actual_hosp = None
 
-        self.spec_ids = None
+        self.base_spec_id = None
+        self.spec_id = None
         self.region_fit_spec_ids = None
         self.region_fit_result_ids = None
 
         # ode data
         self.t_prev_lookup = None
         self.terms = None
-        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attrs.keys())
-        self.compartments = list(self.compartments_as_index)
+        self.compartments_as_index = None
+        self.compartments = None
         self.param_compartments = None
         self.params_by_t = None
         self.cmpt_idx_lookup = list()
-        self.max_step_size = None
 
         self.linear_matrix = None
         self.nonlinear_matrices = None
         self.constant_vector = None
-        self.nonlinear_multiplier = None
-        self.recently_updated_properties = []
+        self.nonlinear_multiplier = {}
+        self.max_step_size = np.inf
 
+
+        if base_model is not None and base_spec_id is not None:
+            raise ValueError("Cannot pass both a base_model and base_spec_id")
 
         # if there is a base model, take all its properties
         if base_model is not None:
@@ -96,7 +100,15 @@ class CovidModel:
             for key, val in vars(base_model).items():
                 setattr(self, key, copy.deepcopy(val))
 
-        # update any attributes with items in margs
+        # if a base_spec_id provided, load from the database
+        if base_spec_id is not None:
+            logger.debug(f"{str(self.tags)} Copying base specifications")
+            self.base_spec_id = base_spec_id
+            self.read_from_base_spec_id(engine)
+
+        # update any attributes with items in **margs
+        if len(margs.keys()) > 0:
+            logger.debug(f"{str(self.tags)} Applying model arguments")
         for key, val in margs.items():
             setattr(self, key, copy.deepcopy(val))
             self.recently_updated_properties.append(key)
@@ -104,7 +116,7 @@ class CovidModel:
         if update_derived_properties:
             self.update(engine)
 
-    # some properties are derived / computed / constructed from the non-derived properties. If the non-derived
+    # some properties are derived / computed / constructed from other properties. If the non-derived
     # properties are updated, the derived properties may need recomputing
     def update(self, engine):
         if any([p in self.recently_updated_properties for p in ['regions', 'region_defs']]):
@@ -935,133 +947,135 @@ class CovidModel:
         self.compile()
 
     ####################################################################################################################
-    ### Saving Writing Data
+    ### Reading and Writing Data
 
-    def prepare_write_specs_query(self, tags=None):
-        # returns all the data you would need to write to the database but doesn't actually write to the database
-        if tags is not None:
-            self.tags.update(tags)
-
-        write_info = OrderedDict([
-            ("created_at", dt.datetime.now()),
-            ("base_spec_id", int(self.base_spec_id) if self.base_spec_id is not None else None),
-            ("tags", json.dumps(self.tags)),
-            ("start_date", self.start_date),
-            ("end_date", self.end_date),
-            ("tslices", self.tc_tslices),
-            ("tc", self.tc),
-            ("tc_cov", json.dumps(self.tc_cov.tolist() if isinstance(self.tc_cov,
-                                                                     np.ndarray) else self.tc_cov) if self.tc_cov is not None else None),
-            ("model_params", json.dumps(self.model_params)),
-            ("vacc_actual", json.dumps({dose: {";".join(key): val for key, val in
-                                               rates.unstack(level=['region', 'age']).to_dict(orient='list').items()}
-                                        for dose, rates in self.actual_vacc_df.to_dict(orient='series').items()})),
-            ("vacc_proj_params", json.dumps(self.vacc_proj_params)),
-            ("vacc_proj", json.dumps({dose: {";".join(key): val for key, val in
-                                             rates.unstack(level=['region', 'age']).to_dict(orient='list').items()} for
-                                      dose, rates in self.proj_vacc_df.to_dict(
-                    orient='series').items()} if self.proj_vacc_df is not None else None)),
-            ("region_definitions", json.dumps(self.region_defs)),
-            ("mobility_actual", json.dumps(self.actual_mobility)),
-            ("mobility_proj_params", json.dumps(self.mobility_proj_params)),
-            ("mobility_proj", json.dumps(self.proj_mobility)),
-            ("mobility_mode", self.mobility_mode),
-            ("regions", json.dumps(self.regions))
-        ])
-
-        return write_info
+    def serialize_vacc(self, df):
+        df = df.reset_index()
+        df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
+        return df.to_dict('records')
 
     @classmethod
-    def write_prepared_specs_to_db(cls, write_info, engine, spec_id: int = None):
-        # TODO: placeholder for debugging
-        return {**write_info, 'spec_id': -999}
-        # writes the given info to the db without needing an explicit instance
-        specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
+    def unserialize_vacc(cls, vdict):
+        df = pd.DataFrame.from_dict(vdict)
+        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d") for d in df['date']]
+        return df.set_index(['date', 'region', 'age'])
 
-        with Session(engine) as session:
-            if spec_id is None:
-                max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
-                spec_id = max_spec_id + 1
+    def serialize_hosp(self, df):
+        df = pd.DataFrame({'date': df.index, 'hosps': df.values})
+        df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
+        return df.to_dict('records')
 
-            stmt = specs_table.insert().values(
-                spec_id=spec_id,
-                **write_info
-            )
-            session.execute(stmt)
-            session.commit()
-        return {**write_info, 'spec_id': spec_id}
+    @classmethod
+    def unserialize_hosp(cls, hdict):
+        df = pd.DataFrame.from_dict(hdict)
+        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d") for d in df['date']]
+        return df.set_index(['date'])['hosps']
 
-    def write_specs_to_db(self, engine, tags=None):
-        # get write info
-        write_info = self.prepare_write_specs_query(tags=tags)
-        # TODO: debugging
-        self.spec_id = -999
-        return self.write_prepared_specs_to_db(write_info, engine, spec_id=self.spec_id)
+    # serializes SOME of this model's properties to a json format which can be written to database
+    # model needs prepping still
+    def to_json_string(self):
+        logger.debug(f"{str(self.tags)} Serializing model to json")
+        keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', 'attrs', 'tc_tslices', 'tc', 'tc_cov', 'tc_tslices', 'tc_t_prev_lookup', '_CovidModel__params_defs',
+                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'actual_hosp']
+        #TODO: handle mobility, add in proj_mobility
+        serial_dict = OrderedDict()
+        for key in keys:
+            val = self.__dict__[key]
+            if isinstance(val, dt.date):
+                serial_dict[key] = val.strftime('%Y-%m-%d')
+            elif isinstance(val, np.ndarray):
+                serial_dict[key] = val.tolist()
+            elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
+                serial_dict[key] = self.serialize_vacc(val)
+            elif key == 'actual_hosp' and val is not None:
+                serial_dict[key] = self.serialize_hosp(val)
+            else:
+                serial_dict[key] = val
+        return json.dumps(serial_dict)
 
-        specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
+    def from_json_string(self, s):
+        logger.debug(f"{str(self.tags)} repopulating model from serialized json")
+        # TODO: handle mobility, add in proj_mobility
+        raw = json.loads(s)
+        for key, val in raw.items():
+            if val in ['_CovidModel__start_date', '_CovidModel__end_date']:
+                self.__dict__[key] = dt.datetime.strptime(val, "%Y-%m-%d").date()
+            elif key == "tc_cov":
+                #TODO
+                pass
+            elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
+                self.__dict__[key] = CovidModel.unserialize_vacc(val)
+            elif key == 'actual_hosp' and val is not None:
+                self.__dict__[key] = CovidModel.unserialize_hosp(val)
+            else:
+                self.__dict__[key] = val
+
+        # triggers updating of tmax, trange, etc.
+        self.end_date = self.end_date
+
+    def write_specs_to_db(self, engine):
+        logger.debug(f"{str(self.tags)} writing specs to db")
+        # returns all the data you would need to write to the database but doesn't actually write to the database
+
         with Session(engine) as session:
             # generate a spec_id so we can assign it to ourselves
+            specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
             max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
             self.spec_id = max_spec_id + 1
-        return self.write_prepared_specs_to_db(write_info, engine, spec_id=self.spec_id)
 
-    def prepare_write_results_query(self, vals_json_attr='seir', cmpts_json_attrs=('region', 'age', 'vacc'), sim=False):
+            stmt = specs_table.insert().values(OrderedDict([
+                ("base_spec_id", int(self.base_spec_id) if self.base_spec_id is not None else None),
+                ("spec_id", self.spec_id),
+                ("created_at", dt.datetime.now()),
+                ("start_date", self.start_date),
+                ("end_date", self.end_date),
+                ("tags", json.dumps(self.tags)),
+                ("regions", json.dumps(self.regions)),
+                ("tslices", self.tc_tslices),
+                ("tc", self.tc),
+                ("serialized_model", self.to_json_string())
+            ]))
+            session.execute(stmt)
+            session.commit()
+
+    def read_from_base_spec_id(self, engine):
+        df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {self.base_spec_id}", con=engine, coerce_float=True)
+        if len(df) == 0:
+            raise ValueError(f'{self.base_spec_id} is not a valid spec ID.')
+        row = df.iloc[0]
+        self.from_json_string(row['serialized_model'])
+
+    def _col_to_json(self, d):
+        return json.dumps(d, ensure_ascii=False)
+
+    def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('region', 'age', 'vacc')):
+        logger.debug(f"{str(self.tags)} writing results to db")
+        table = 'results_v2'
+        # if there's no existing spec_id assigned, write specs to db to get one
+        if self.spec_id is None or new_spec:
+            self.write_specs_to_db(engine)
+
         # build data frame with index of (t, region, age, vacc) and one column per seir cmpt
         solution_sum_df = self.solution_sum([vals_json_attr] + list(cmpts_json_attrs)).stack(cmpts_json_attrs)
 
         # build export dataframe
         df = pd.DataFrame(index=solution_sum_df.index)
-        df['t'] = solution_sum_df.index.get_level_values('t')
-        df['cmpt'] = solution_sum_df.index.droplevel('t').to_frame().to_dict(
+        df['date'] = solution_sum_df.index.get_level_values('date')
+        df['cmpt'] = solution_sum_df.index.droplevel('date').to_frame().to_dict(
             orient='records') if solution_sum_df.index.nlevels > 1 else None
         df['vals'] = solution_sum_df.to_dict(orient='records')
         for col in ['cmpt', 'vals']:
-            df[col] = df[col].map(lambda d: json.dumps(d, ensure_ascii=False))
+            df[col] = df[col].map(self._col_to_json)
 
         # if a sim_id is provided, insert it as a simulation result; some fields are different
-        if not sim:
-            # build unique parameters dataframe
-            params_df = self.params_as_df
-            grouped = params_df.groupby(['t'] + list(cmpts_json_attrs))
-            unique_params = [param for param, is_unique in (grouped.nunique() == 1).all().iteritems() if is_unique]
-            unique_params_df = grouped.max()[unique_params]
-            df['params'] = unique_params_df.apply(lambda x: json.dumps(x.to_dict(), ensure_ascii=False), axis=1)
-        else:
-            df['tc'] = json.dumps(self.tc)
-        return df
-
-    @classmethod
-    def write_prepared_results_to_db(cls, df, engine, spec_id, sim_id=None, sim_result_id=None):
-        if sim_id is None:
-            table = 'results_v2'
-            df['created_at'] = dt.datetime.now()
-            df['spec_id'] = spec_id
-            df['result_id'] = -888
-            #df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
-        else:
-            df['sim_id'] = sim_id
-            df['sim_result_id'] = sim_result_id
-            table = 'simulation_results_v2'
-
-        #TODO: debugging
-        return df
+        # build unique parameters dataframe
+        df['created_at'] = dt.datetime.now()
+        df['spec_id'] = self.spec_id
+        df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
 
         # write to database
         chunksize = int(np.floor(9000.0 / df.shape[1]))  # max parameters is 10,000. Assume 1 param per column and give some wiggle room because 10,000 doesn't always work
-        results = df.to_sql(table
-                            , con=engine, schema='covid_model'
-                            , index=False, if_exists='append', method='multi', chunksize=chunksize)
-        return df
+        results = df.to_sql(table, con=engine, schema='covid_model', index=False, if_exists='append', method='multi', chunksize=chunksize)
 
-    # write to covid_model.results
-    def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir',
-                            cmpts_json_attrs=('region', 'age', 'vacc'), sim_id=None, sim_result_id=None):
-        write_df = self.prepare_write_results_query(vals_json_attr, cmpts_json_attrs, sim=sim_id is not None)
-
-        # if there's no existing spec_id assigned, write specs to db to get one
-        if self.spec_id is None or new_spec:
-            self.write_specs_to_db(engine)
-
-        df = CovidModel.write_prepared_results_to_db(write_df, engine, self.spec_id, sim_id, sim_result_id)
-        self.result_id = df['result_id'][0][0]
+        self.result_id = df['result_id'][0]
         return df
