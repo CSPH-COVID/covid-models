@@ -489,7 +489,6 @@ class CovidModel:
             params_dict[key] = cmpt_dict
         return params_dict
 
-    # number of
     @property
     def n_compartments(self):
         return len(self.cmpt_idx_lookup)
