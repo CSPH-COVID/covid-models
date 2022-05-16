@@ -5,6 +5,7 @@ import datetime as dt
 import copy
 from operator import itemgetter
 from collections import OrderedDict, defaultdict
+import logging
 ### Third Party Imports ###
 import numpy as np
 import pandas as pd
@@ -18,8 +19,11 @@ from sortedcontainers import SortedDict
 ### Local Imports ###
 from covid_model.db import get_sqa_table
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
-from covid_model.data_imports import ExternalVacc, get_region_mobility_from_db
-from covid_model.utils import get_params
+from covid_model.data_imports import ExternalVacc, ExternalHosps, get_region_mobility_from_db
+from covid_model.utils import get_params, IndentLogger
+logger = IndentLogger(logging.getLogger(''), {})
+
+
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
@@ -88,6 +92,7 @@ class CovidModel:
 
         # if there is a base model, take all its properties
         if base_model is not None:
+            logger.debug(f"{str(self.tags)} Copying from base model")
             for key, val in vars(base_model).items():
                 setattr(self, key, copy.deepcopy(val))
 
@@ -102,32 +107,48 @@ class CovidModel:
     # some properties are derived / computed / constructed from the non-derived properties. If the non-derived
     # properties are updated, the derived properties may need recomputing
     def update(self, engine):
-        if 'end_date' in self.recently_updated_properties:
-            self.set_actual_vacc(engine, self.actual_vacc_df)
+        if any([p in self.recently_updated_properties for p in ['regions', 'region_defs']]):
+            logger.debug(f"{str(self.tags)} Updating actual vaccines")
+            self.set_actual_vacc(engine)
 
         if any([p in self.recently_updated_properties for p in ['end_date', 'vacc_proj_params']]) and self.vacc_proj_params is not None:
+            logger.debug(f"{str(self.tags)} Updating Projected Vaccines")
             self.set_proj_vacc()
 
         if any([p in self.recently_updated_properties for p in ['end_date', 'mobility_mode']]) and self.mobility_mode is not None:
+            logger.debug(f"{str(self.tags)} Updating Actual Mobility")
             self.set_actual_mobility(engine)
 
         if any([p in self.recently_updated_properties for p in ['end_date', 'mobility_mode', 'mobility_proj_params']]) and self.mobility_mode is not None:
+            logger.debug(f"{str(self.tags)} Updating Projected Mobility")
             self.set_proj_mobility()
 
         if any([p in self.recently_updated_properties for p in ['end_date', 'model_mobility_mode', 'mobility_proj_params']]):
             if self.mobility_mode is not None and self.mobility_mode != "none":
+                logger.debug(f"{str(self.tags)} Getting Mobility As Parameters")
                 self.params_defs.update(self.get_mobility_as_params())
 
         if any([p in self.recently_updated_properties for p in ['region_fit_spec_ids', 'region_fit_result_ids']]):
+            logger.debug(f"{str(self.tags)} Getting kappas as parameters using region fits")
             self.params_defs.update(self.get_kappas_as_params_using_region_fits(engine))
+
+        if any([p in self.recently_updated_properties for p in ['tc', 'tc_tslices']]):
+            logger.debug(f"{str(self.tags)} Updating tc_t_prev_lookup and applying TC")
+            self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
+            self.apply_tc(force_nlm_update=True)
+
+        if any([p in self.recently_updated_properties for p in ['start_date', 'regions', 'region_defs']]):
+            logger.debug(f"{str(self.tags)} Setting Actual Hospitalizations")
+            self.set_actual_hosp(engine)
 
         self.recently_updated_properties = []
 
     ####################################################################################################################
-    ### Functions to Update Derived Properites
+    ### Functions to Update Derived Properites and Retrieve Data
 
     def set_actual_vacc(self, engine, actual_vacc_df=None):
         if engine is not None:
+            logger.debug(f"{str(self.tags)} getting vaccines from db")
             actual_vacc_df_list = []
             for region in self.regions:
                 county_ids = self.region_defs[region]['counties_fips']
@@ -135,7 +156,10 @@ class CovidModel:
             self.actual_vacc_df = pd.concat(actual_vacc_df_list)
             self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
         if actual_vacc_df is not None:
+            logger.debug(f"{str(self.tags)} copying vaccines from file")
             self.actual_vacc_df = actual_vacc_df.copy()
+        if actual_vacc_df is None and engine is None:
+            logger.warning(f"{str(self.tags)} no engine or vacc file provided, not updating vaccines")
 
     def set_proj_vacc(self):
         proj_lookback = self.vacc_proj_params['lookback']
@@ -171,7 +195,7 @@ class CovidModel:
                 for d in projections.index.unique('date'):
                     this_max_cumu = get_params(max_cumu.copy(), d)
 
-                    # TODO: currently treats all regions the same. Need to change if finer control desired
+                    # Note: currently treats all regions the same. Need to change if finer control desired
                     max_cumu_df = pd.DataFrame(this_max_cumu).rename_axis(index='age').reset_index().merge(region_df, how='cross').set_index(['region', 'age']).sort_index()
                     max_cumu_df = max_cumu_df.mul(pd.DataFrame(populations).set_index(['region', 'age'])['population'], axis=0)
                     for i in range(len(groups)):
@@ -778,6 +802,7 @@ class CovidModel:
 
     # build ODE
     def build_ode_flows(self):
+        logger.debug(f"{str(self.tags)} Building ode flows")
         self.reset_ode()
         self.apply_tc()  # update the nonlinear multiplier
 
@@ -861,6 +886,7 @@ class CovidModel:
 
     # convert ODE matrices to CSR format, to (massively) improve performance
     def compile(self):
+        logger.debug(f"{str(self.tags)} compiling ODE")
         for t in self.params_trange:
             self.linear_matrix[t] = self.linear_matrix[t].tocsr()
             for k, v in self.nonlinear_matrices[t].items():
@@ -902,6 +928,7 @@ class CovidModel:
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
+        logger.info(f"{str(self.tags)} Prepping Model")
         if rebuild_param_lookups:
             self.build_param_lookups(**build_param_lookup_args)
         self.build_ode_flows()
