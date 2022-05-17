@@ -24,8 +24,6 @@ from covid_model.utils import get_params, IndentLogger
 logger = IndentLogger(logging.getLogger(''), {})
 
 
-
-
 # class used to run the model given a set of parameters, including transmission control (ef)
 class CovidModel:
     ####################################################################################################################
@@ -36,7 +34,7 @@ class CovidModel:
     ### Initialization and Updating
 
     def __init__(self, engine=None, base_model=None, update_derived_properties=True, base_spec_id=None, **margs):
-        # margs can be any model property, but don't set self.tc or self.tc_tslices this way. Use self.apply_tc() instead
+        # margs can be any model property
 
         # basic model data
         self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
@@ -93,7 +91,9 @@ class CovidModel:
 
 
         if base_model is not None and base_spec_id is not None:
-            raise ValueError("Cannot pass both a base_model and base_spec_id")
+            ermsg = "Cannot pass both a base_model and base_spec_id"
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise ValueError(ermsg)
 
         # if there is a base model, take all its properties
         if base_model is not None:
@@ -288,7 +288,9 @@ class CovidModel:
                 for j, in_region in enumerate(self.regions):
                     params[f"mob_{in_region}_fracfrom_{from_region}"] = [{'tslices': tslices[1:], 'attributes': {},  'values': [m[i,j] for m in dwell_colnorm_list]}]
         else:
-            raise ValueError(f'Mobility mode {self.mobility_mode} not supported')
+            ermsg = f'Mobility mode {self.mobility_mode} not supported'
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise ValueError(ermsg)
         # add in region populations as parameters for use later
         region_pops = {params_list['attributes']['region']: params_list['values'] for params_list in self.params_defs['total_pop'] }
         params.update(
@@ -748,7 +750,9 @@ class CovidModel:
 
         # if the lengths do not match, raise an error
         if tcs is not None and tslices is not None and len(self.tc) != len(self.tc_tslices) + 1:
-            raise ValueError(f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.')
+            ermsg = f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.'
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise ValueError(ermsg)
 
         # apply the new TC values to the non-linear multiplier to update the ODE
         # only update the nonlinear multipliers for TCs that have been changed
@@ -815,13 +819,19 @@ class CovidModel:
     # add a flow term, and add new flow to ODE matrices
     def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         if len(from_cmpt) < len(self.attrs.keys()):
-            raise ValueError(f'Origin compartment `{from_cmpt}` does not have the right number of attributes.')
+            ermsg = f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.'
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise ValueError(ermsg)
         if len(to_cmpt) < len(self.attrs.keys()):
-            raise ValueError(f'Destination compartment `{to_cmpt}` does not have the right number of attributes.')
+            ermsg = f'Destination compartment `{to_cmpt}` does not have the right number of attributes.'
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise ValueError(ermsg)
         if scale_by_cmpts is not None:
             for cmpt in scale_by_cmpts:
                 if len(cmpt) < len(self.attrs.keys()):
-                    raise ValueError(f'Scaling compartment `{cmpt}` does not have the right number of attributes.')
+                    ermsg = f'Scaling compartment `{cmpt}` does not have the right number of attributes.'
+                    logger.exception(f"{str(self.tags)}" + ermsg)
+                    raise ValueError(ermsg)
 
         if coef is not None:
             if scale_by_cmpts_coef:
@@ -989,7 +999,9 @@ class CovidModel:
             max_step=self.max_step_size
         )
         if not self.solution.success:
-            raise RuntimeError(f'ODE solver failed with message: {self.solution.message}')
+            ermsg = f'ODE solver failed with message: {self.solution.message}'
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise RuntimeError(ermsg)
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
@@ -1094,7 +1106,9 @@ class CovidModel:
     def read_from_base_spec_id(self, engine):
         df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {self.base_spec_id}", con=engine, coerce_float=True)
         if len(df) == 0:
-            raise ValueError(f'{self.base_spec_id} is not a valid spec ID.')
+            ermsg = f'{self.base_spec_id} is not a valid spec ID.'
+            logger.exception(f"{str(self.tags)}" + ermsg)
+            raise ValueError(ermsg)
         row = df.iloc[0]
         self.from_json_string(row['serialized_model'])
 
@@ -1127,7 +1141,8 @@ class CovidModel:
         df['result_id'] = pd.read_sql(f'select coalesce(max(result_id), 0) from covid_model.{table}', con=engine).values[0][0] + 1
 
         # write to database
-        chunksize = int(np.floor(9000.0 / df.shape[1]))  # max parameters is 10,000. Assume 1 param per column and give some wiggle room because 10,000 doesn't always work
+        chunksize = int(np.floor(5000.0 / df.shape[1]))  # max parameters is 10,000. Assume 1 param per column and give some wiggle room because 10,000 doesn't always work
+
         results = df.to_sql(table, con=engine, schema='covid_model', index=False, if_exists='append', method='multi', chunksize=chunksize)
 
         self.result_id = df['result_id'][0]
