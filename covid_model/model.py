@@ -757,7 +757,7 @@ class CovidModel:
         # apply the new TC values to the non-linear multiplier to update the ODE
         # only update the nonlinear multipliers for TCs that have been changed
         if tcs is not None:
-            for tslice, tc in zip(self.tc_tslices[:len(self.tc)], tcs):
+            for tslice, tc in zip(([0] + self.tc_tslices)[-len(self.tc):], tcs):
                 self.nonlinear_multiplier[self.tc_t_prev_lookup[tslice]] = 1-tc
         # update all multipliers using stored tc's if requested
         if force_nlm_update:
