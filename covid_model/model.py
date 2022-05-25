@@ -17,7 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sortedcontainers import SortedDict
 ### Local Imports ###
-from covid_model.db import get_sqa_table
+from covid_model.db import get_sqa_table, db_engine
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports import ExternalVacc, ExternalHosps, get_region_mobility_from_db
 from covid_model.utils import get_params, IndentLogger
@@ -29,6 +29,11 @@ class CovidModel:
     ####################################################################################################################
     ### Setup
     __tmin = 0
+
+    def log_and_raise(self, ermsg, ErrorType):
+        logger.exception(f"{str(self.tags)}" + ermsg)
+        raise ErrorType(ermsg)
+
 
     ####################################################################################################################
     ### Initialization and Updating
@@ -91,9 +96,7 @@ class CovidModel:
 
 
         if base_model is not None and base_spec_id is not None:
-            ermsg = "Cannot pass both a base_model and base_spec_id"
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise ValueError(ermsg)
+            self.log_and_raise("Cannot pass both a base_model and base_spec_id", ValueError)
 
         # if there is a base model, take all its properties
         if base_model is not None:
@@ -139,11 +142,11 @@ class CovidModel:
         if any([p in self.recently_updated_properties for p in ['end_date', 'model_mobility_mode', 'mobility_proj_params']]):
             if self.mobility_mode is not None and self.mobility_mode != "none":
                 logger.debug(f"{str(self.tags)} Getting Mobility As Parameters")
-                self.params_defs.update(self.get_mobility_as_params())
+                self.params_defs.extend(self.get_mobility_as_params())
 
         if any([p in self.recently_updated_properties for p in ['region_fit_spec_ids', 'region_fit_result_ids']]):
             logger.debug(f"{str(self.tags)} Getting kappas as parameters using region fits")
-            self.params_defs.update(self.get_kappas_as_params_using_region_fits(engine))
+            self.params_defs.extend(self.get_kappas_as_params_using_region_fits(engine))
 
         if any([p in self.recently_updated_properties for p in ['tc', 'tc_tslices']]):
             logger.debug(f"{str(self.tags)} Updating tc_t_prev_lookup and applying TC")
@@ -159,20 +162,16 @@ class CovidModel:
     ####################################################################################################################
     ### Functions to Update Derived Properites and Retrieve Data
 
-    def set_actual_vacc(self, engine, actual_vacc_df=None):
-        if engine is not None:
-            logger.debug(f"{str(self.tags)} getting vaccines from db")
-            actual_vacc_df_list = []
-            for region in self.regions:
-                county_ids = self.region_defs[region]['counties_fips']
-                actual_vacc_df_list.append(ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age']))
-            self.actual_vacc_df = pd.concat(actual_vacc_df_list)
-            self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
-        if actual_vacc_df is not None:
-            logger.debug(f"{str(self.tags)} copying vaccines from file")
-            self.actual_vacc_df = actual_vacc_df.copy()
-        if actual_vacc_df is None and engine is None:
-            logger.warning(f"{str(self.tags)} no engine or vacc file provided, not updating vaccines")
+    def set_actual_vacc(self, engine=None, actual_vacc_df=None):
+        if engine is None:
+            engine = db_engine()
+        logger.debug(f"{str(self.tags)} getting vaccines from db")
+        actual_vacc_df_list = []
+        for region in self.regions:
+            county_ids = self.region_defs[region]['counties_fips']
+            actual_vacc_df_list.append(ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age']))
+        self.actual_vacc_df = pd.concat(actual_vacc_df_list)
+        self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
 
     def set_proj_vacc(self):
         proj_lookback = self.vacc_proj_params['lookback']
@@ -232,7 +231,9 @@ class CovidModel:
         else:
             self.proj_vacc_df = None
 
-    def set_actual_mobility(self, engine):
+    def set_actual_mobility(self, engine=None):
+        if engine is None:
+            engine = db_engine()
         regions = self.regions
         county_ids = [fips for region in regions for fips in self.region_defs[region]['counties_fips']]
         df = get_region_mobility_from_db(engine, county_ids=county_ids).reset_index('measure_date')
@@ -274,91 +275,101 @@ class CovidModel:
         mobility_dict = self.actual_mobility
         mobility_dict.update(self.proj_mobility)
         tslices = list(mobility_dict.keys())
-        params = {}
+        params = []
         if self.mobility_mode == "population_attached":
             matrix_list = [np.dot(mobility_dict[t]['dwell_rownorm'], np.transpose(mobility_dict[t]['dwell_colnorm'])) for t in tslices]
             for j, from_region in enumerate(self.regions):
-                params[f"mob_{from_region}"] = [{'tslices': tslices[1:], 'attributes': {'region': to_region}, 'values': [m[i,j] for m in matrix_list]} for i, to_region in enumerate(self.regions)]
+                params.extend([{'param': f"mob_{from_region}", 'attrs': {'region': to_region}, 'vals': dict(zip(tslices, [m[i,j] for m in matrix_list])), 'desc':''} for i, to_region in enumerate(self.regions)])
         elif self.mobility_mode == "location_attached":
             dwell_rownorm_list = [mobility_dict[t]['dwell_rownorm'] for t in tslices]
             dwell_colnorm_list = [mobility_dict[t]['dwell_colnorm'] for t in tslices]
             for j, in_region in enumerate(self.regions):
-                params[f"mob_fracin_{in_region}"] = [{'tslices': tslices[1:], 'attributes': {'seir': 'S', 'region': to_region}, 'values': [m[i,j] for m in dwell_rownorm_list]} for i, to_region in enumerate(self.regions)]
+                params.extend([{'param': f"mob_fracin_{in_region}", 'attrs': {'seir': 'S', 'region': to_region}, 'vals': dict(zip(tslices,[m[i,j] for m in dwell_rownorm_list])), 'desc': ''} for i, to_region in enumerate(self.regions)])
             for i, from_region in enumerate(self.regions):
                 for j, in_region in enumerate(self.regions):
-                    params[f"mob_{in_region}_fracfrom_{from_region}"] = [{'tslices': tslices[1:], 'attributes': {},  'values': [m[i,j] for m in dwell_colnorm_list]}]
+                    params.extend([{'param': f"mob_{in_region}_fracfrom_{from_region}", 'attrs': {}, 'vals': dict(zip(tslices,[m[i,j] for m in dwell_colnorm_list]))}])
         else:
-            ermsg = f'Mobility mode {self.mobility_mode} not supported'
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise ValueError(ermsg)
-        # add in region populations as parameters for use later
-        region_pops = {params_list['attributes']['region']: params_list['values'] for params_list in self.params_defs['total_pop'] }
-        params.update(
-            {f"region_pop_{region}": [{'tslices': None, 'attributes': {}, 'values': region_pops[region] }] for region in self.regions}
-        )
+            self.log_and_raise(f'Mobility mode {self.mobility_mode} not supported', ValueError)
         return params
 
-    def get_kappas_as_params_using_region_fits(self, engine):
+    def get_kappas_as_params_using_region_fits(self, engine=None):
+        if engine is None:
+            engine = db_engine()
         # will set TC = 0.0 for the model and scale the "kappa" parameter for each region according to its fitted TC values so the forward sim can be run.
         # This approach does not currently support fitting, since only TC can be fit and there's only one set of TC for the model.
         results_list = []
-        for i, tup in enumerate(zip(self.regions, self.region_fit_spec_ids)):
-            region, spec_id = tup
+        for i, (region, spec_id) in enumerate(zip(self.regions, self.region_fit_spec_ids)):
             # load tslices and tcs from the database
-            df = pd.read_sql_query(f"select regions, start_date, end_date, tslices, tc, from covid_model.specifications where spec_id = {spec_id}", con=engine, coerce_float=True)
+            df = pd.read_sql_query(f"select regions, start_date, end_date, tslices, tc, from covid_model.specifications where spec_id = {spec_id}", con=engine, coerce_float=True).loc[0]
             # make sure region in run spec matches our region
-            if json.loads(df['regions'][0])[0] != region:
-                ValueError(f'spec_id {spec_id} has region {json.loads(df["regions"][0])[0]} which does not match model\'s {i}th region: {region}')
-            tslices = [(df['start_date'][0] + dt.timedelta(days=d).days - self.start_date).days for d in [0] + df['tslices'][0]]
-            tc = df['tc'][0]
+            if json.loads(df['regions'])[0] != region:
+                self.log_and_raise(f'spec_id {spec_id} has region {json.loads(df["regions"])[0]} which does not match model\'s {i}th region: {region}', ValueError)
+            tslices = [(df['start_date'] + dt.timedelta(days=d) - self.start_date).days for d in [0] + df['tslices']]
+            tc = df['tc']
             results_list.append(pd.DataFrame.from_dict({'tslices': tslices, region: tc}).set_index('tslices'))
         # union all the region tslices
         df_tcs = pd.concat(results_list, axis=1)
-        tslices = df_tcs.index.drop([0]).to_list()
+        tslices = df_tcs.index.to_list()
 
         # retrieve prevalence data from db if allowing mobility
         prev_df = None
-        if self.mobility_mode != 'none':
+        if self.mobility_mode is not None:
             results_list = []
             for region, spec_id, result_id in zip(self.regions, self.region_fit_spec_ids, self.region_fit_result_ids):
-                df = pd.read_sql_query(f"SELECT t, vals FROM covid_model.results_v2 WHERE spec_id = {spec_id} AND result_id = {result_id} order by t", con=engine, coerce_float=True)
+                df = pd.read_sql_query(f"SELECT date, vals FROM covid_model.results_v2 WHERE spec_id = {spec_id} AND result_id = {result_id} order by t", con=engine, coerce_float=True)
                 df['infected'] = [sum(itemgetter('I', 'Ih')(json.loads(row))) for row in df['vals']]
                 df['pop'] = [sum(json.loads(row).values()) for row in df['vals']]
-                df = df.groupby('t').sum(['infected', 'pop'])
+                df = df.groupby('date').sum(['infected', 'pop'])
                 df[region]=df['infected']/df['pop']
                 df = df.drop(columns=['infected', 'pop'])
                 results_list.append(df)
             prev_df = pd.concat(results_list, axis=1)
+            prev_df['t'] = [self.date_to_t(d) for d in prev_df.index]
 
         # compute kappa parameter for each region and apply to model parameters
         params = {}
-        if self.mobility_mode == 'none':
+        if self.mobility_mode is None:
             self.tc_tslices = tslices
             self.tc = [0.0] * (len(tslices) + 1)
-            params = {'kappa': [{'tslices': tslices, 'attributes': {'region': region}, 'values': [(1-tc) for tc in df_tcs[region]]} for region in df_tcs.columns]}
+            params = [{'param': 'kappa', 'attrs': {'region':region}, 'vals': dict(zip(tslices, [(1-tc) for tc in df_tcs[region]]))} for region in df_tcs.columns]
         elif self.mobility_mode == 'location_attached':
             # TODO: Implement
-            params = {}
+            params = []
         elif self.mobility_mode == 'population_attached':
-            # update tslices to include any t where mobility changes
-            mob_tslices = np.array([t for t in self.actual_mobility.keys() if t >= self.tmin and t < self.tmax])
-            prev_tslices = np.array([t for t in prev_df.index if t >= self.tmin and t < self.tmax])
+            # average the mobility over each tc window from the region tc fits
+            zero_mat = np.zeros_like(list(self.actual_mobility.values())[0]['dwell'])
+            mobility_ave_for_tc_interval = {t: {'dwell': zero_mat.copy(), 'dwell_rownorm': zero_mat.copy(), 'dwell_colnorm': zero_mat.copy()} for t in df_tcs.index}
+            for t0, t1 in zip(list(self.actual_mobility.keys())[:-1], list(self.actual_mobility.keys())[1:]):
+                if t0 > max(df_tcs.index):
+                    break
+                t_tc0 = [t for t in df_tcs.index if t <= t0][-1]
+                t_tc1 = [t for t in df_tcs.index if t_tc0 < t][0]
+                t_tc2 = [t for t in df_tcs.index if t_tc1 < t][0] if t_tc1 != max(df_tcs.index) else None
+                days_in_t_tc0 = min(t_tc1, t1) - max(t_tc0, t0)
+                days_in_t_tc1 = t1 - t0 - days_in_t_tc0
+                for key in ['dwell', 'dwell_rownorm', 'dwell_colnorm']:
+                    mobility_ave_for_tc_interval[t_tc0][key] += np.array(self.actual_mobility[t0][key]) * days_in_t_tc0 / (t_tc1-t_tc0)
+                    mobility_ave_for_tc_interval[t_tc1][key] += np.array(self.actual_mobility[t0][key]) * [days_in_t_tc1 / (t_tc2-t_tc1) if t_tc2 is not None else 1][0]
+            # average the prevalence over each tc window from the region tc fits
+            prev_t_rounded_down_to_mob_tslices = pd.cut(prev_df['t'], list(df_tcs.index) + [self.tmax], right=False, retbins=False, labels=df_tcs.index)
+            prev_df_binned = prev_df.groupby(prev_t_rounded_down_to_mob_tslices).mean().drop(columns=['t'])
 
-            combined_tslices = [t.item() if isinstance(t, np.int32) else t for t in sorted(list(set([0] + tslices).union(set(mob_tslices)).union(set(prev_tslices))))]
-            kappas = np.zeros(shape=[len(combined_tslices), len(self.regions)])
-            for i, t in enumerate(combined_tslices):
-                tc = df_tcs.iloc[df_tcs.index <= t,].iloc[-1].to_numpy()
-                prev = prev_df.iloc[prev_tslices[prev_tslices <= t][-1]].to_numpy()
-                mobs = self.actual_mobility[mob_tslices[mob_tslices <= t][-1]]
-                kappas[i,] = (1-tc) * prev / np.linalg.multi_dot([mobs['dwell_rownorm'], np.transpose(mobs['dwell_colnorm']), np.transpose(prev)])
+            kappas = np.zeros(shape=df_tcs.shape)
+            for i, t in enumerate(df_tcs.index):
+                tc = df_tcs.loc[t].to_numpy()
+                prev = prev_df_binned.loc[t]
+                mobs = mobility_ave_for_tc_interval[t]
+                kappas[i, :] = (1-tc) * prev / np.linalg.multi_dot([mobs['dwell_rownorm'], np.transpose(mobs['dwell_colnorm']), np.transpose(prev)])
             np.nan_to_num(kappas, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
-            self.tc_tslices = combined_tslices[1:]
-            self.tc = [0.0] * len(combined_tslices)
-            params = {'kappa_pa': [{'tslices': combined_tslices[1:], 'attributes': {'region': region}, 'values': kappas[:,j].tolist()} for j, region in enumerate(self.regions)]}
+            self.apply_tc([0.0]*len(self.tc))
+            dates = [self.t_to_date(d) for d in df_tcs.index]
+            params = [{'param': 'kappa_pa', 'attrs': {'region': region}, 'vals': dict(zip(dates, kappas[:, j].tolist())), 'desc': ''} for j, region in enumerate(self.regions)]
         return params
 
     # pulls hospitalizations for only the first region, since the model only fits one region at a time
-    def set_actual_hosp(self, engine):
+    def set_actual_hosp(self, engine=None):
+        if engine is None:
+            engine = db_engine()
         logger.info(f"{str(self.tags)} Retrieving hospitalizations")
         # makes sure we pull from EMResource if region is CO
         county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
@@ -750,9 +761,7 @@ class CovidModel:
 
         # if the lengths do not match, raise an error
         if tcs is not None and tslices is not None and len(self.tc) != len(self.tc_tslices) + 1:
-            ermsg = f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.'
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise ValueError(ermsg)
+            self.log_and_raise(f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.', ValueError)
 
         # apply the new TC values to the non-linear multiplier to update the ODE
         # only update the nonlinear multipliers for TCs that have been changed
@@ -819,19 +828,13 @@ class CovidModel:
     # add a flow term, and add new flow to ODE matrices
     def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         if len(from_cmpt) < len(self.attrs.keys()):
-            ermsg = f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.'
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise ValueError(ermsg)
+            self.log_and_raise(f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.', ValueError)
         if len(to_cmpt) < len(self.attrs.keys()):
-            ermsg = f'Destination compartment `{to_cmpt}` does not have the right number of attributes.'
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise ValueError(ermsg)
+            self.log_and_raise(f'Destination compartment `{to_cmpt}` does not have the right number of attributes.', ValueError)
         if scale_by_cmpts is not None:
             for cmpt in scale_by_cmpts:
                 if len(cmpt) < len(self.attrs.keys()):
-                    ermsg = f'Scaling compartment `{cmpt}` does not have the right number of attributes.'
-                    logger.exception(f"{str(self.tags)}" + ermsg)
-                    raise ValueError(ermsg)
+                    self.log_and_raise(f'Scaling compartment `{cmpt}` does not have the right number of attributes.', ValueError)
 
         if coef is not None:
             if scale_by_cmpts_coef:
@@ -999,9 +1002,7 @@ class CovidModel:
             max_step=self.max_step_size
         )
         if not self.solution.success:
-            ermsg = f'ODE solver failed with message: {self.solution.message}'
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise RuntimeError(ermsg)
+            self.log_and_raise(f'ODE solver failed with message: {self.solution.message}', RuntimeError)
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
@@ -1079,6 +1080,8 @@ class CovidModel:
         self.end_date = self.end_date
 
     def write_specs_to_db(self, engine):
+        if engine is None:
+            engine = db_engine()
         logger.debug(f"{str(self.tags)} writing specs to db")
         # returns all the data you would need to write to the database but doesn't actually write to the database
 
@@ -1104,11 +1107,11 @@ class CovidModel:
             session.commit()
 
     def read_from_base_spec_id(self, engine):
+        if engine is None:
+            engine = db_engine()
         df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {self.base_spec_id}", con=engine, coerce_float=True)
         if len(df) == 0:
-            ermsg = f'{self.base_spec_id} is not a valid spec ID.'
-            logger.exception(f"{str(self.tags)}" + ermsg)
-            raise ValueError(ermsg)
+            self.log_and_raise(f'{self.base_spec_id} is not a valid spec ID.', ValueError)
         row = df.iloc[0]
         self.from_json_string(row['serialized_model'])
 
@@ -1116,6 +1119,8 @@ class CovidModel:
         return json.dumps(d, ensure_ascii=False)
 
     def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('region', 'age', 'vacc')):
+        if engine is None:
+            engine = db_engine()
         logger.debug(f"{str(self.tags)} writing results to db")
         table = 'results_v2'
         # if there's no existing spec_id assigned, write specs to db to get one
