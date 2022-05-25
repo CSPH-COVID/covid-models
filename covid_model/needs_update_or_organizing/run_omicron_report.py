@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
-from covid_model.analysis.charts import modeled, actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
@@ -73,11 +73,11 @@ if __name__ == '__main__':
             ax_hosp = ax
             ax.set_ylabel('Hospitalized with COVID-19')
             ax.legend(loc='best')
-            actual_hosps(engine, ax=ax, color='black')
+            plot_actual_hosps(engine, ax=ax, color='black')
             # data added below under tc scenarios section
         if plot == "var":
             # variants
-            modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=ax)
+            plot_modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=ax)
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylabel('Variant Share of Infections')
             # ax.lines.pop(0)
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     if ("prev" in plots) or ("hosp" in plots):
         # tc shift scenarios
-        base_tslices = model.tslices.copy()
+        base_tslices = model.tc_tslices.copy()
         base_tc = model.tc.copy()
         if "hosp" in plots:
             hosps_df = pd.DataFrame(index=model.t_eval)
@@ -117,14 +117,14 @@ if __name__ == '__main__':
             start_t = 749
             future_tslices = list(range(start_t, start_t + tc_shift_days))
             future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
-            model.apply_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
+            model.apply_tc(tcs=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
             model.solve_seir()
             label = f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Current trajectory'
             if "hosp" in plots:
-                modeled(model, 'Ih', ax=ax_hosp, label=label)
+                plot_modeled(model, 'Ih', ax=ax_hosp, label=label)
                 hosps_df[label] = model.solution_sum('seir')['Ih']
             if "prev" in plots:
-                modeled(model, ['I', 'A'], share_of_total=True, ax=ax_prev, label=label)
+                plot_modeled(model, ['I', 'A'], share_of_total=True, ax=ax_prev, label=label)
         if "hosp" in plots:
             hosps_df.index = model.daterange
             hosps_df.loc[:'2022-02-28'].round(1).to_csv('output/omicron_report_hospitalization_scenarios.csv')

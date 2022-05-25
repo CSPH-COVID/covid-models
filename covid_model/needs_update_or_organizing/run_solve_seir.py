@@ -24,7 +24,7 @@ def run_solve_seir(outdir=None, model=None, tags={}, **specs_args):
     print("solving model")
     model.solve_seir()
     model.write_specs_to_db(engine=engine, tags={'regions': model.regions if model else specs_args['regions'],
-                                                 'mobility_mode': model.model_mobility_mode if model else specs_args['mobility_mode'], **tags})
+                                                 'mobility_mode': model.mobility_mode if model else specs_args['mobility_mode'], **tags})
     model.write_results_to_db(engine=engine)
 
     df = model.solution_sum(['seir', 'region']).assign(**{'date':model.daterange}).set_index('date').stack([0, 1]).reset_index(name='y')

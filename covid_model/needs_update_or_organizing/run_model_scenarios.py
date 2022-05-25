@@ -51,31 +51,6 @@ def build_legacy_output_df(model: CovidModel):
     df.index.names = ['t']
     return df
 
-
-def build_tc_df(model: CovidModel):
-    return pd.DataFrame.from_dict({'time': model.tslices[:-1], 'tc_pb': model.efs, 'tc': model.obs_ef_by_slice})
-
-
-def tags_to_scen_label(tags):
-    if tags['run_type'] == 'Current':
-        return 'Current Fit'
-    elif tags['run_type'] == 'Prior':
-        return 'Prior Fit'
-    elif tags['run_type'] == 'Vaccination Scenario':
-        return f'Vaccine Scenario: {tags["vacc_cap"]}'
-    elif tags['run_type'] == 'TC Shift Projection':
-        return f'TC Shift Scenario: {tags["tc_shift"]} on {tags["tc_shift_date"]} ({tags["vacc_cap"]})'
-
-
-def run_model(model, engine, legacy_output_dict=None):
-    print('Scenario tags: ', model.tags)
-    model.solve_seir()
-    model.write_results_to_db(engine, new_spec=True)
-    if legacy_output_dict is not None:
-        legacy_output_dict[tags_to_scen_label(model.tags)] = build_legacy_output_df(model)
-
-
-
 def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_params_scens,
                         attribute_multipliers_scens, outdir, **specs_args):
     if (outdir):

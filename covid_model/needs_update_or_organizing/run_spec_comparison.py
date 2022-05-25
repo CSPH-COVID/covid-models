@@ -6,7 +6,7 @@ import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
 ### Local Imports ###
-from covid_model.analysis.charts import modeled, actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
 from covid_model.db import db_engine
 from covid_model.model_with_future_variant import CovidModelWithFutureVariant
 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     engine = db_engine()
 
     fig, axs = plt.subplots(2)
-    actual_hosps(engine, ax=axs[1], color='black')
+    plot_actual_hosps(engine, ax=axs[1], color='black')
 
     for spec_id in run_args.spec_ids:
 
@@ -43,8 +43,8 @@ if __name__ == '__main__':
             window_size = 14
             change_over_n_windows = 6
             future_tcs = list(np.linspace(model.tc[-1], run_args.future_tc, change_over_n_windows + 1))[1:]
-            future_tslices = list(range(model.tslices[-1], model.tslices[-1] + window_size*change_over_n_windows + 1, window_size))[1:]
-            model.apply_tc(tc=future_tcs, tslices=future_tslices)
+            future_tslices = list(range(model.tc_tslices[-1], model.tc_tslices[-1] + window_size * change_over_n_windows + 1, window_size))[1:]
+            model.apply_tc(tcs=future_tcs, tslices=future_tslices)
 
         # add winter TC shift starting on November 25
         if run_args.winter_tc_shift:
@@ -52,15 +52,15 @@ if __name__ == '__main__':
             # shift TC at winter start date
             winter_start_date = dt.date(today.year, 11, 25) if today.strftime('%m%d') < '1125' else dt.date(today.year + 1, 11, 25)
             winter_start_t = (winter_start_date - model.start_date).days
-            winter_tslices = [winter_start_t, *(tslice for tslice in model.tslices if tslice > winter_start_t)]
+            winter_tslices = [winter_start_t, *(tslice for tslice in model.tc_tslices if tslice > winter_start_t)]
             winter_tc = [tc + run_args.winter_tc_shift for tc in model.tc[-len(winter_tslices):]]
-            model.apply_tc(tc=winter_tc, tslices=winter_tslices)
+            model.apply_tc(tcs=winter_tc, tslices=winter_tslices)
             # shift TC back at winter end date
             winter_end_date = dt.date(today.year, 2, 1) if today.strftime('%m%d') < '0201' else dt.date(today.year + 1, 2, 1)
             winter_end_t = (winter_end_date - model.start_date).days
-            post_winter_tslices = [winter_end_t, *(tslice for tslice in model.tslices if tslice > winter_end_t)]
+            post_winter_tslices = [winter_end_t, *(tslice for tslice in model.tc_tslices if tslice > winter_end_t)]
             post_winter_tc = [tc - run_args.winter_tc_shift for tc in model.tc[-len(post_winter_tslices):]]
-            model.apply_tc(tc=post_winter_tc, tslices=post_winter_tslices)
+            model.apply_tc(tcs=post_winter_tc, tslices=post_winter_tslices)
 
         # prep model
         model.prep()
@@ -71,8 +71,8 @@ if __name__ == '__main__':
         # solve and plot
         model.solve_seir()
         label = model.tags['scenario'] if 'scenario' in model.tags else 'unknown'
-        modeled(model, ['I', 'A'], ax=axs[0], label=label, share_of_total=True)
-        modeled(model, 'Ih', ax=axs[1], label=label)
+        plot_modeled(model, ['I', 'A'], ax=axs[0], label=label, share_of_total=True)
+        plot_modeled(model, 'Ih', ax=axs[1], label=label)
 
     for ax in axs:
         format_date_axis(ax, interval_months=1)

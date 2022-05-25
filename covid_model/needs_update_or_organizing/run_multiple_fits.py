@@ -102,9 +102,9 @@ def run():
             fit.run(engine, look_back=look_back, batch_size=batch_size,
                     increment_size=increment_size, window_size=window_size,
                     region_definitions=region_definitions, region=region,
-                    write_batch_output=write_batch_output)
+                    write_batch_output_to_db=write_batch_output)
 
-        print(fit.fitted_model.tslices)
+        print(fit.fitted_model.tc_tslices)
         print(fit.fitted_tc)
 
         fit.fitted_model.tags['run_type'] = 'scenario fit'

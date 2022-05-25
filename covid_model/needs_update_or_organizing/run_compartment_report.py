@@ -4,7 +4,7 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
-from covid_model.analysis.charts import modeled
+from covid_model.analysis.charts import plot_modeled
 from covid_model.db import db_engine
 import covid_model
 from covid_model import CovidModel
@@ -34,7 +34,7 @@ if __name__ == '__main__':
     for i, (seir_label, seir_attrs) in enumerate(seir.items()):
         for j, attr_name in enumerate(args.group_by_attr_names):
             ax = axs[i, j]
-            modeled(model, seir_attrs, groupby=attr_name, share_of_total=True, ax=ax)
+            plot_modeled(model, seir_attrs, groupby=attr_name, share_of_total=True, ax=ax)
             ax.set_xlim(args.from_date, args.to_date)
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylabel(f'{seir_label} by {attr_name}')
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     for i, (seir_label, seir_attrs) in enumerate(seir.items()):
         for j, attr_name in enumerate(args.group_by_attr_names):
             ax = axs[i, j]
-            modeled(model, seir_attrs, groupby=attr_name, share_of_total=False, ax=ax)
+            plot_modeled(model, seir_attrs, groupby=attr_name, share_of_total=False, ax=ax)
             ax.set_xlim(args.from_date, args.to_date)
             #ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylabel(f'{seir_label} by {attr_name}')
