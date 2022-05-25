@@ -143,23 +143,26 @@ def do_single_fit(tc_0=0.75,  # default value for TC
     return model
 
 
-def do_single_fit_parallel(args):
+def do_single_fit_wrapper_parallel(args):
     setup(os.path.basename(__file__), 'info')
     logger = IndentLogger(logging.getLogger(''), {})
     return do_single_fit(**args, write_results=False)
 
 
-def do_multiple_fits(specs_args_list, fit_args, multiprocess = None):
-    if 'outdir' in fit_args:
-        os.makedirs(fit_args['outdir'], exist_ok=True)
+def do_single_fit_wrapper_nonparallel(args):
+    return do_single_fit(**args, write_results=False)
+
+
+def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
     # generate list of arguments
-    args_list = map(lambda x: {'specs_args': x, 'fit_args': fit_args}, specs_args_list)
+    args_list = list(map(lambda x: {**x, **fit_args}, model_args_list))
+    # run each scenario
     if multiprocess:
         install_mp_handler()
         p = Pool(multiprocess)
-        models = p.map(do_single_fit_parallel, args_list)
+        models = p.map(do_single_fit_wrapper_parallel, args_list)
     else:
-        models = list(map(do_single_fit_parallel, args_list))
+        models = list(map(do_single_fit_wrapper_nonparallel, args_list))
 
     # write to database serially
     engine = db_engine()
@@ -169,3 +172,11 @@ def do_multiple_fits(specs_args_list, fit_args, multiprocess = None):
     logger.info(f'result_ids: {",".join([str(m.result_id) for m in models])}')
 
     return models
+
+
+def do_regions_fit(model_args, fit_args, multiprocess=None):
+    regions = model_args['regions']
+    non_region_model_args = {key: val for key, val in model_args.items() if key != 'regions'}
+    model_args_list = list(map(lambda x: {'regions': [x], **non_region_model_args, 'tags':{'region': x}}, regions))
+    do_multiple_fits(model_args_list, fit_args, multiprocess=multiprocess)
+
