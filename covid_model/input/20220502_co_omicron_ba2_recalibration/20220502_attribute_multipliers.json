@@ -9,16 +9,18 @@
   {"attrs": {"variant": "delta"}, "param": "dh", "mult": 1.3225, "desc": "Delta is more severe than wildtype."},
   {"attrs": {"variant": "delta"}, "param": "dnh", "mult": 3.28, "desc": "Delta is more severe than wildtype."},
 
-  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "betta", "mult": 5.625, "desc": "Omicron is more infectious than wildtype; note that relative infecitousness is betta/gamma."},
-  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.238, "desc": "Omicron is less severe than wildtype."},
+  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "betta", "mult": 5.625, "desc": "Omicron is more infectious than wildtype; note that relative infectiousness is betta/gamma."},
+  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.833, "desc": "Omicron is less severe than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "dh", "mult": 1.3225, "desc": "Omicron has same hospital morality as Delta (THIS IS LIKELY WRONG)."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "dnh", "mult": 0.13225, "desc": "Omicron is less severe than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hlos", "mult": 0.6, "desc": "Omicron has shorter length of stay than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "alpha", "mult": 0.6, "desc": "Omicron has shorter incubation period than wildtype."},
   {"attrs": {"variant": ["omicron", "ba2"]}, "param": "gamm", "mult": 1.66667, "desc": "Omicron has shorter infectious period than wildtype."},
 
-  {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.5, "desc": "BA.2 is more infectious than BA.1.1."},
-  {"param": "ba2_seed", "mult": 0.1, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."},
+  {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 0.5, "desc": "Omicron has higher percent asymptomatic"},
+
+  {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.6, "desc": "BA.2 is more infectious than BA.1.1."},
+  {"param": "ba2_seed", "mult": 0.1, "desc": "Adjust the seed for BA.2 so that we can reach 75% BA.2 by late-March."},
 
   {"param": "imm_decay_days", "attrs": {"vacc": "shot3"}, "mult": 1.25, "desc": "Booster immunity decays more slowly than 2-dose immunity."},
 
@@ -26,10 +28,10 @@
   {"param": "immunity", "attrs": {"immun": "weak"}, "val": 0.8, "desc": "Base minimum immunity from vaccines or prior infection."},
   {"param": "immunity", "attrs": {"immun": "none"}, "val": 0, "desc": "No immunity for vaccine fails."},
   {"param": "immunity", "attrs": {"variant": "delta", "priorinf": "none", "immun": "weak"}, "val": 0.5, "desc": "Delta reduces minimum vaccine immunity."},
-  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": "non-omicron", "immun": "strong"}, "val": 0.9, "desc": "Omicron reduces maximum non-Omicron prior infection immunity."},
-  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": "non-omicron", "immun": "weak"}, "val": 0.1, "desc": "Omicron reduces minimum non-Omicron prior infection immunity."},
-  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": ["none", "non-omicron"], "immun": "weak"}, "val": 0.2, "desc": "Omicron reduces minimum vaccine immunity."},
-  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": ["none", "non-omicron"], "vacc": "dose3", "immun": "weak"}, "val": 0.4, "desc": "Omicron reduces minimum vaccine immunity, but less so with a booster."},
+  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": "other", "immun": "strong"}, "val": 0.9, "desc": "Omicron reduces maximum prior infection immunity from other types."},
+  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": "other", "immun": "weak"}, "val": 0.1, "desc": "Omicron reduces minimum prior infection immunity from other types."},
+  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": ["none", "other"], "immun": "weak"}, "val": 0.2, "desc": "Omicron reduces minimum vaccine immunity."},
+  {"param": "immunity", "attrs": {"variant": ["omicron", "ba2"], "priorinf": ["none", "other"], "vacc": "dose3", "immun": "weak"}, "val": 0.4, "desc": "Omicron reduces minimum vaccine immunity, but less so with a booster."},
 
   {"param": "severe_immunity", "attrs": {"immun": ["strong", "weak"]}, "val": 0.975, "desc": "Vaccinated immunity vs severe disease is very high (among vacc. successes)."},
   {"param": "severe_immunity", "attrs": {"immun": ["strong", "weak"], "vacc": "none"}, "val": 0.5, "desc": "Prior infection immunity vs severe disease is much weaker."},

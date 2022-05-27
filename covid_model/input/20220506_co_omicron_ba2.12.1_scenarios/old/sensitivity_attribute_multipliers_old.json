@@ -1,0 +1,24 @@
+{
+  "baseline": {
+      "omicron_severity": [
+          [
+            {"attrs": {"variant": ["omicron", "ba2", "ba2121"], "vacc": ["none", "shot1"]}, "param": "pS", "mult": 0.836, "desc": "less symptomatic compared to delta"},
+            {"attrs": {"variant": ["omicron", "ba2", "ba2121"], "vacc": ["shot2", "shot3"]}, "param": "pS", "mult": 0.594, "desc": "even less symptomatic compared to delta if vaccinated"},
+            {"attrs": {"variant": ["omicron", "ba2", "ba2121"], "vacc": ["none", "shot1"]}, "param": "hosp", "mult": 1.99, "desc": "less hosp than delta"},
+            {"attrs": {"variant": ["omicron", "ba2", "ba2121"], "vacc": ["shot2", "shot3"]}, "param": "hosp", "mult": 1.413, "desc": "even less hosp than delta when vaccinated"}
+          ], [
+            {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 0.238, "desc": "less hosp than delta"}
+          ]
+      ],
+       "ba2121 Immune Escape": [
+          [
+            {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "weak"}, "val": 0.2, "desc": "Omicron BA2 variants reduce minimum immunity from Omicron infection."},
+            {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "strong"}, "val": 0.9, "desc": "Omicron BA2 variants reduce maximum immunity from Omicron infection."}
+          ], [
+            {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "weak"}, "val": 0.8, "desc": "Omicron BA2 variants reduce minimum immunity from Omicron infection."},
+            {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "strong"}, "val": 1.0, "desc": "Omicron BA2 variants reduce maximum immunity from Omicron infection."}
+         ]
+      ]
+  }
+}
+

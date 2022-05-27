@@ -1,0 +1,35 @@
+{
+  "5_percent": {
+    "ba2121_Immune_Escape": [
+      [{"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "weak"}, "val": 0.2, "desc": ""}, {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "strong"}, "val": 0.9, "desc": ""}],
+      [{"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "weak"}, "val": 0.8, "desc": ""}, {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "strong"}, "val": 1.0, "desc": ""}]
+    ],
+    "omicron_severity": [
+      [{"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "pS", "mult": 1.00, "desc": ""}, {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 1.00, "desc": ""}],
+      [{"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "pS", "mult": 1.05, "desc": ""}, {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 1.05, "desc": ""}],
+      [{"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "pS", "mult": 0.95, "desc": ""}, {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 0.95, "desc": ""}]
+    ],
+    "ba2121_betta": [
+      [{"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 1.00, "desc": ""}],
+      [{"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 1.05, "desc": ""}],
+      [{"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 0.95, "desc": ""}]
+    ]
+  },
+  "10_percent": {
+    "ba2121_Immune_Escape": [
+      [{"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "weak"}, "val": 0.2, "desc": ""}, {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "strong"}, "val": 0.9, "desc": ""}],
+      [{"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "weak"}, "val": 0.8, "desc": ""}, {"param": "immunity", "attrs": {"variant": ["ba2121"], "priorinf": ["omicron"], "immun": "strong"}, "val": 1.0, "desc": ""}]
+    ],
+    "omicron_severity": [
+      [{"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "pS", "mult": 1.00, "desc": ""}, {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 1.00, "desc": ""}],
+      [{"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "pS", "mult": 1.10, "desc": ""}, {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 1.10, "desc": ""}],
+      [{"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "pS", "mult": 0.90, "desc": ""}, {"attrs": {"variant": ["omicron", "ba2", "ba2121"]}, "param": "hosp", "mult": 0.90, "desc": ""}]
+    ],
+    "ba2121_betta": [
+      [{"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 1.00, "desc": ""}],
+      [{"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 1.10, "desc": ""}],
+      [{"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 0.90, "desc": ""}]
+    ]
+  }
+}
+

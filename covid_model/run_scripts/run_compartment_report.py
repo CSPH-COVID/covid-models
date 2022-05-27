@@ -20,7 +20,7 @@ def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir
         model.solve_seir()
 
     seir = {'susceptible': 'S', 'infected': ['I', 'A'], 'hospitalized': 'Ih'}
-    fig, axs = plt.subplots(len(seir), len(group_by_attr_names), figsize=(7*len(group_by_attr_names), 5*len(seir)), dpi=300)
+    fig, axs = plt.subplots(len(seir), len(group_by_attr_names) + 1, figsize=(7*len(group_by_attr_names), 5*len(seir)), dpi=300)
 
     for i, (seir_label, seir_attrs) in enumerate(seir.items()):
         for j, attr_name in enumerate(group_by_attr_names):
@@ -30,13 +30,19 @@ def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir
             ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
             ax.set_ylabel(f'{seir_label} by {attr_name}')
             ax.legend(loc='upper left')
+        ax = axs[i, len(group_by_attr_names)]
+        modeled(model, seir_attrs, groupby=None, share_of_total=True, ax=ax)
+        ax.set_xlim(from_date, to_date)
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.set_ylabel(f'{seir_label}')
+        ax.legend(loc='upper left')
 
     fig.tight_layout()
     plt.savefig(get_filepath_prefix(outdir) + "compartment_report_" + "_".join(group_by_attr_names) + f"_share_of_total_{fname_extra}.png")
     plt.close()
 
     # repeat but don't normalize to a percentage.
-    fig, axs = plt.subplots(len(seir), len(group_by_attr_names), figsize=(7*len(group_by_attr_names), 5*len(seir)), dpi=300)
+    fig, axs = plt.subplots(len(seir), len(group_by_attr_names)+1, figsize=(7*len(group_by_attr_names), 5*len(seir)), dpi=300)
     for i, (seir_label, seir_attrs) in enumerate(seir.items()):
         for j, attr_name in enumerate(group_by_attr_names):
             ax = axs[i, j]
@@ -44,6 +50,11 @@ def run_compartment_report(from_date, to_date, group_by_attr_names: list, outdir
             ax.set_xlim(from_date, to_date)
             ax.set_ylabel(f'{seir_label} by {attr_name}')
             ax.legend(loc='upper left')
+        ax = axs[i, len(group_by_attr_names)]
+        modeled(model, seir_attrs, groupby=None, share_of_total=False, ax=ax)
+        ax.set_xlim(from_date, to_date)
+        ax.set_ylabel(f'{seir_label}')
+        ax.legend(loc='upper left')
 
     fig.tight_layout()
     plt.savefig(get_filepath_prefix(outdir) + "compartment_report_" + "_".join(group_by_attr_names) + f"_{fname_extra}.png")

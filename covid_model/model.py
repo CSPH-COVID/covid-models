@@ -16,8 +16,8 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     attr = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                         'age': ['0-19', '20-39', '40-64', '65+'],
                         'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                        'priorinf': ['none', 'non-omicron', 'omicron'],
-                        'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
+                        'priorinf': ['none', 'omicron', 'other'],
+                        'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121'],
                         'immun': ['none', 'weak', 'strong'],
                         'region': ['co']})
 
@@ -56,7 +56,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
             trange = list(increment)
 
         # initiate ODEBuilder parent class
-        ODEBuilder.__init__(self, base_ode_builder=base_model, deepcopy_params=deepcopy_params, trange=trange, attributes=self.attr, param_attr_names=self.param_attr_names)
+        ODEBuilder.__init__(self, base_ode_builder=base_model, deepcopy_params=deepcopy_params, trange=trange, attributes=self.attr, param_attr_names=self.param_attr_names, max_step_size=self.max_step)
 
         # the var values for the solution; these get populated when self.solve_seir is run
         self.solution = None
@@ -119,12 +119,14 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
     # new exposures by day by group
     @property
     def new_infections(self):
-        return self.solution_sum('seir')['E'] / self.model_params['alpha']
+        #TODO: quick fix, assumes alpha is constant
+        return self.solution_sum('seir')['E'] / self.model_params['alpha'][0]['values']
 
     # estimated reproduction number (length of infection * new_exposures / current_infections
     @property
     def re_estimates(self):
-        infect_duration = 1 / self.model_params['gamm']
+        # TODO: quick fix, assumes gamm is constant
+        infect_duration = 1/ self.model_params['gamm'][0]['values']
         infected = (self.solution_sum('seir')['I'].shift(3) + self.solution_sum('seir')['A'].shift(3))
         return infect_duration * self.new_infections.groupby('t').sum() / infected
 
@@ -165,17 +167,20 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # vaccination
         # first shot
-        self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
-        self.add_flows_by_attr({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, coef=f'shot1_per_available * shot1_fail_rate')
+        non_Ih = [seir for seir in self.attr['seir'] if seir != 'Ih']
+        for seir in non_Ih:
+            self.add_flows_by_attr({'vacc': f'none', 'seir': seir}, {'vacc': f'shot1', 'immun': f'weak'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
+            self.add_flows_by_attr({'vacc': f'none', 'seir': seir}, {'vacc': f'shot1', 'immun': f'none'}, coef=f'shot1_per_available * shot1_fail_rate')
         # second and third shot
         for i in [2, 3]:
-            for immun in self.attributes['immun']:
-                # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
-                if immun == 'none':
-                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i-1}_fail_rate)')
-                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i-1}_fail_rate)')
-                else:
-                    self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available')
+            for seir in non_Ih:
+                for immun in self.attributes['immun']:
+                    # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
+                    if immun == 'none':
+                        self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun, 'seir': seir}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i-1}_fail_rate)')
+                        self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun, 'seir': seir}, {'vacc': f'shot{i}', 'immun': f'none'}, coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i-1}_fail_rate)')
+                    else:
+                        self.add_flows_by_attr({'vacc': f'shot{i-1}', "immun": immun, 'seir': seir}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available')
 
         # seed variants
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'none'}, constant='initial_seed')
@@ -183,6 +188,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'delta'}, constant='delta_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
         self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2'}, constant='ba2_seed')
+        self.add_flows_by_attr({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2121'}, constant='ba2121_seed')
 
         # exposure
         asymptomatic_transmission = '(1 - immunity) * kappa * betta / total_pop'
@@ -223,8 +229,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
 
         # disease termination
         for variant in self.attributes['variant']:
-            # TODO: Rename "non-omicron" to "other"; will need to make the change in attribute_multipliers, which will break old specifications
-            priorinf = variant if variant != 'none' and variant in self.attributes['priorinf'] else 'non-omicron'
+            priorinf = variant if variant != 'none' and variant in self.attributes['priorinf'] else 'other'
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
             self.add_flows_by_attr({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
             self.add_flows_by_attr({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - priorinf_fail_rate)')

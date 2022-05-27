@@ -28,28 +28,27 @@ class CovidModelFit:
     def set_actual_hosp(self, engine=None, county_ids=None):
         self.actual_hosp = ExternalHosps(engine, t0_date=self.base_specs.start_date).fetch(county_ids=county_ids)['currently_hospitalized']
 
-    def single_fit(self, model: CovidModel, look_back, method='curve_fit', y0d=None):
+    def single_fit(self, model: CovidModel, look_back, y0d=None):
         # define initial states
         fitted_tc, fitted_tc_cov = (None, None)
         fixed_tc = model.tc[:-look_back]
-        if method == 'curve_fit':
-            def func(trange, *test_tc):
-                combined_tc = fixed_tc + list(test_tc)
-                model.apply_tc(combined_tc)
-                model.solve_seir(y0_dict=y0d)
-                return model.solution_sum('seir')['Ih']
-            fitted_tc, fitted_tc_cov = spo.curve_fit(
-                f=func
-                , xdata=model.t_eval
-                , ydata=self.actual_hosp[:len(model.t_eval)]
-                , p0=model.tc[-look_back:]
-                , bounds=([self.tc_min] * look_back, [self.tc_max] * look_back))
+        def func(trange, *test_tc):
+            combined_tc = fixed_tc + list(test_tc)
+            model.apply_tc(combined_tc)
+            model.solve_seir(y0_dict=y0d)
+            return model.solution_sum('seir')['Ih']
+        fitted_tc, fitted_tc_cov = spo.curve_fit(
+            f=func
+            , xdata=model.t_eval
+            , ydata=self.actual_hosp[:len(model.t_eval)]
+            , p0=model.tc[-look_back:]
+            , bounds=([self.tc_min] * look_back, [self.tc_max] * look_back))
 
         return fitted_tc, fitted_tc_cov
 
     # run an optimization to minimize the cost function using scipy.optimize.minimize()
     # method = 'curve_fit' or 'minimize'
-    def run(self, engine, method='curve_fit', window_size=14, look_back=None,
+    def run(self, engine, window_size=14, look_back=None,
             last_window_min_size=21, batch_size=None, increment_size=1, write_batch_output=False, model_class=CovidModel,
             model_args=dict(), forward_sim_each_batch=False, use_base_specs_end_date=False, print_prefix="", outdir=None, **unused_args):
         # get the end date from actual hosps
@@ -89,8 +88,9 @@ class CovidModelFit:
             model.apply_tc(tc[:len(tc)-trim_off_end], tslices=tslices[:len(tslices)-trim_off_end])
             t02 = perf_counter()
             print(f'{print_prefix}: Model copied in {t02-t01} seconds.')
+            print(f'{print_prefix}: Fitting tcs for dates up to {dt.datetime.strftime(this_end_date, "%Y-%m-%d")}')
 
-            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size, method=method)
+            fitted_tc, fitted_tc_cov = self.single_fit(model, look_back=batch_size)
             tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
 
             t1 = perf_counter()

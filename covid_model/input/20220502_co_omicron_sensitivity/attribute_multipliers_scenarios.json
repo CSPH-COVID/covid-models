@@ -1,0 +1,578 @@
+{
+  "1_percent_1": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.01,
+      "desc": ""
+    }
+  ],
+  "1_percent_2": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.99,
+      "desc": ""
+    }
+  ],
+  "1_percent_3": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.01,
+      "desc": ""
+    }
+  ],
+  "1_percent_4": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.99,
+      "desc": ""
+    }
+  ],
+  "1_percent_5": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.01,
+      "desc": ""
+    }
+  ],
+  "1_percent_6": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.01,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.99,
+      "desc": ""
+    }
+  ],
+  "1_percent_7": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.01,
+      "desc": ""
+    }
+  ],
+  "1_percent_8": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.99,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.99,
+      "desc": ""
+    }
+  ],
+  "5_percent_1": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.05,
+      "desc": ""
+    }
+  ],
+  "5_percent_2": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.95,
+      "desc": ""
+    }
+  ],
+  "5_percent_3": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.05,
+      "desc": ""
+    }
+  ],
+  "5_percent_4": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.95,
+      "desc": ""
+    }
+  ],
+  "5_percent_5": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.05,
+      "desc": ""
+    }
+  ],
+  "5_percent_6": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.05,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.95,
+      "desc": ""
+    }
+  ],
+  "5_percent_7": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.05,
+      "desc": ""
+    }
+  ],
+  "5_percent_8": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.95,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.95,
+      "desc": ""
+    }
+  ],
+  "10_percent_1": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.1,
+      "desc": ""
+    }
+  ],
+  "10_percent_2": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.9,
+      "desc": ""
+    }
+  ],
+  "10_percent_3": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.1,
+      "desc": ""
+    }
+  ],
+  "10_percent_4": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.9,
+      "desc": ""
+    }
+  ],
+  "10_percent_5": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.1,
+      "desc": ""
+    }
+  ],
+  "10_percent_6": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 1.1,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.9,
+      "desc": ""
+    }
+  ],
+  "10_percent_7": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 1.1,
+      "desc": ""
+    }
+  ],
+  "10_percent_8": [
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "pS",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {
+        "variant": "omicron"
+      },
+      "param": "hosp",
+      "mult": 0.9,
+      "desc": ""
+    },
+    {
+      "attrs": {},
+      "param": "om_seed",
+      "mult": 0.9,
+      "desc": ""
+    }
+  ]
+}

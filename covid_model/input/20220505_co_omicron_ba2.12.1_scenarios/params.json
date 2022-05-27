@@ -388,14 +388,14 @@
     {"tslices": ["2021-03-07", "2021-04-11"], "attributes": {}, "values": [0, 1, 0]}
    ],
   "om_seed": [
-    {"tslices": ["2021-11-16", "2021-12-11"], "attributes": {}, "values": [0, 1, 0]}
+    {"tslices": ["2021-11-09", "2021-12-11"], "attributes": {}, "values": [0, 1, 0]}
    ],
   "ba2_seed": [
-    {"tslices": ["2021-12-08", "2022-01-02"], "attributes": {}, "values": [0, 1, 0]}
+    {"tslices": ["2021-12-23", "2022-02-02"], "attributes": {}, "values": [0, 1, 0]}
    ],
-  "future_seed": [
-    {"tslices": null, "attributes":  {}, "values": 0}
-  ],
+  "ba2121_seed": [
+    {"tslices": ["2022-02-27", "2022-04-08"], "attributes": {}, "values": [0, 1, 0]}
+   ],
   "immunity": [
     {"tslices": null, "attributes": {}, "values": 0}
    ],

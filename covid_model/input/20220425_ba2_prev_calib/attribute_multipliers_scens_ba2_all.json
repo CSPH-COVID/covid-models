@@ -1,0 +1,89 @@
+{
+  "BA.2 is 1.3x as infectious, A": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 0.867, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 15, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+  ],
+  "BA.2 is 1.3x as infectious, B": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 0.867, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 20, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+  ],
+  "BA.2 is 1.5x as infectious, A": [
+    {"param": "ba2_seed", "mult": 2, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+  ],
+  "BA.2 is 1.5x as infectious, B": [
+    {"param": "ba2_seed", "mult": 5, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+  ],
+  "BA.2 is 1.5x as infectious, C": [
+    {"param": "ba2_seed", "mult": 10, "desc": "Adjust the seed for BA.2 so that we can reach 25% BA.2 by mid-March."}
+  ],
+    "BA.2 is 1.6x as infectious, C": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.9, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.07, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 1.5, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, C": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.9, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 1.0, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, D": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.9, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 1.5, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+    "BA.2 is 1.6x as infectious, E": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.8, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.07, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 1.0, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, E": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.8, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.8, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, F": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.8, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.5, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+    "BA.2 is 1.6x as infectious, G": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.8, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.07, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.5, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, G": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.8, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.2, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, H": [
+    {"attrs": {"variant": "omicron"}, "param": "betta", "mult": 0.8, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.05, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.6x as infectious, I": [
+    {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 2.0, "desc": ""},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.07, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.1, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.6x as infectious, J": [
+    {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 3.0, "desc": ""},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.07, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.1, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, I": [
+    {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 2.0, "desc": ""},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.02, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, J": [
+    {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 3.0, "desc": ""},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.02, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ],
+  "BA.2 is 1.7x as infectious, K": [
+    {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 2.0, "desc": ""},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.13, "desc": "BA.2 is more infectious than BA.1.1."},
+    {"param": "ba2_seed", "mult": 0.1, "desc": "Adjust the seed for BA.2 so that we see a full ramp up through March"}
+  ]
+}

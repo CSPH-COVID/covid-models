@@ -15,7 +15,7 @@ class CovidModelWithFutureVariant(CovidModel):
         # set future seed
         if future_seed_date is not None:
             future_seed_t = (future_seed_date - self.start_date).days
-            self.model_params['future_seed'] = {"tslices": [future_seed_t, future_seed_t + 25], "value": [0, 5, 0]}
+            self.model_params['future_seedmodel_with_future_variant.py'] = {"tslices": [future_seed_t, future_seed_t + 25], "value": [0, 5, 0]}
         elif 'future_seed':
             self.model_params['future_seed'] = 0
 

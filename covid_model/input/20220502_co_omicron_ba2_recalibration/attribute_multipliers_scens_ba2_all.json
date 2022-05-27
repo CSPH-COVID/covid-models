@@ -1,0 +1,27 @@
+{
+  "baseline": [],
+  "BA.2 1.8x infectious": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.9, "desc": ""}
+  ],
+     "BA.2 1.8x infectious A": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.7, "desc": ""}
+  ],
+    "BA.2 1.8x infectious B": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.5, "desc": ""}
+  ],
+    "BA.2 1.8x infectious C": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.3, "desc": ""}
+  ],
+    "BA.2 1.8x infectious D": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.1, "desc": ""}
+  ],
+    "BA.2 1.8x infectious E": [
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.05, "desc": ""}
+  ]
+}

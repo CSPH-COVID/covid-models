@@ -18,6 +18,7 @@ from covid_model.utils import get_params
 
 class CovidModelSpecifications:
     def __init__(self, start_date=None, engine=None, from_specs=None, **spec_args):
+        self.max_step = None
 
         self.regions = None
         self.start_date = None
@@ -47,7 +48,6 @@ class CovidModelSpecifications:
 
         # base specs can be provided via a database spec_id or an CovidModelSpecifications object
         if from_specs is not None:
-            # TODO: copy region model parameters, mobility projection params, etc.
             # if from_specs is an int, get specs from the database
             if isinstance(from_specs, int):
                 if engine is None:
@@ -115,7 +115,9 @@ class CovidModelSpecifications:
                      attribute_multipliers=None,
                      region_definitions=None, regions=None,
                      mobility_mode='none', refresh_actual_mobility=False, mobility_proj_params=None,
-                     region_fit_spec_ids=None, region_fit_result_ids=None, **unused_args):
+                     region_fit_spec_ids=None, region_fit_result_ids=None, max_step=np.inf, **unused_args):
+        self.max_step = max_step
+
         if regions:
             self.regions = regions
         self.model_mobility_mode = mobility_mode

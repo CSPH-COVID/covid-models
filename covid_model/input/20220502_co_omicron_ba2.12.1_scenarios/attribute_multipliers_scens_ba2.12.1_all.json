@@ -1,0 +1,16 @@
+{
+  "BA.2.12.1 2x infectious as BA.2": [
+    {"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 2, "desc": ""},
+    {"param": "ba2121_seed", "mult": 20, "desc": ""}
+  ],
+  "BA.2.12.1 3x infectious as BA.2": [
+    {"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 3, "desc": ""},
+    {"param": "ba2121_seed", "mult": 10, "desc": ""}
+  ],
+  "BA.2.12.1 5x infectious as BA.2": [
+    {"attrs": {"variant": "ba2121"}, "param": "betta", "mult": 5, "desc": ""}
+  ],
+  "baseline": [
+    {"param": "ba2121_seed", "mult": 0.0, "desc": ""}
+  ]
+}

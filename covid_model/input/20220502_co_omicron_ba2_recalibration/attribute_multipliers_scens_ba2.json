@@ -1,0 +1,12 @@
+{
+  "BA.2 1.8x infectious D, lower pS": [
+    {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 0.9, "desc": "0.9*0.5=0.45 overall"},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.1, "desc": ""}
+  ],
+  "BA.2 1.8x infectious E, lower pS": [
+    {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 0.9, "desc": "0.9*0.5=0.45 overall"},
+    {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.125, "desc": ""},
+    {"param": "ba2_seed", "mult": 0.05, "desc": ""}
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "5_percent": {
+    "omicron_pS": [
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 1.05, "desc": ""},
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 0.95, "desc": ""}
+    ],
+    "omicron_hosp": [
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 1.05, "desc": ""},
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.95, "desc": ""}
+    ],
+    "ba2_betta": [
+      {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 1.05, "desc": ""},
+      {"attrs": {"variant": "ba2"}, "param": "betta", "mult": 0.95, "desc": ""}
+    ]
+  },
+    "10_percent": {
+    "omicron_pS": [
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 1.10, "desc": ""},
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 0.90, "desc": ""}
+    ],
+    "omicron_hosp": [
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 1.10, "desc": ""},
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.90, "desc": ""}
+    ]
+  },
+  "15_percent": {
+    "omicron_pS": [
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 1.15, "desc": ""},
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "pS", "mult": 0.85, "desc": ""}
+    ],
+    "omicron_hosp": [
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 1.15, "desc": ""},
+      {"attrs": {"variant": ["omicron", "ba2"]}, "param": "hosp", "mult": 0.85, "desc": ""}
+    ]
+  }
+}
+

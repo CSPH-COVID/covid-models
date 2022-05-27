@@ -134,8 +134,10 @@ class ODEBuilder:
         levels in param_attr_levels.
 
     """
-    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None, deepcopy_params=True):
+    def __init__(self, base_ode_builder=None, trange=None, attributes: OrderedDict = None, param_attr_names=None, deepcopy_params=True, max_step_size=np.inf):
         # TODO: self.terms is actually not used anymore, since we have the matrices; should it be removed or adjusted?
+
+        self.max_step_size = None
 
         self.trange = trange if trange is not None else base_ode_builder.trange
         self.t_prev_lookup = None
@@ -172,8 +174,10 @@ class ODEBuilder:
             self.nonlinear_matrices = {t: m.copy() for t, m in base_ode_builder.nonlinear_matrices.items() if t in self.trange}
             self.constant_vector = {t: m.copy() for t, m in base_ode_builder.constant_vector.items() if t in self.trange}
             self.nonlinear_multiplier = base_ode_builder.nonlinear_multiplier.copy()
+            self.max_step_size = base_ode_builder.max_step_size
         else:
             self.params = {t: {pcmpt: {} for pcmpt in self.param_compartments} for t in self.trange}
+            self.max_step_size = max_step_size
             self.reset_ode()
 
     # the t-values at which the model results will be evaluated in outputs (and for fitting)
@@ -404,7 +408,7 @@ class ODEBuilder:
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y and solution_ydf
     # TODO: try Julia ODE package, to improve performance
-    def solve_ode(self, y0_dict, method='RK45', max_step=1.0):
+    def solve_ode(self, y0_dict, method='RK45'):
         t_eval = range(min(self.trange), max(self.trange))
         self.solution = spi.solve_ivp(
             fun=self.ode,
@@ -412,7 +416,7 @@ class ODEBuilder:
             y0=self.y0_from_dict(y0_dict),
             t_eval=t_eval,
             method=method,
-            max_step=max_step)
+            max_step=self.max_step)
         if not self.solution.success:
             raise RuntimeError(f'ODE solver failed with message: {self.solution.message}')
         self.solution_y = np.transpose(self.solution.y)

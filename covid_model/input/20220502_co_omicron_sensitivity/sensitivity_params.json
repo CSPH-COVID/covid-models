@@ -1,0 +1,9 @@
+{
+  "om_seed_date": [
+    {"om_seed": [{"tslices": ["2021-11-16", "2021-12-11"], "attributes": {}, "values": [0, 1, 0]}]},
+    {"om_seed": [{"tslices": ["2021-11-11", "2021-12-06"], "attributes": {}, "values": [0, 1, 0]}]},
+    {"om_seed": [{"tslices": ["2021-11-06", "2021-12-01"], "attributes": {}, "values": [0, 1, 0]}]},
+    {"om_seed": [{"tslices": ["2021-11-21", "2021-12-16"], "attributes": {}, "values": [0, 1, 0]}]},
+    {"om_seed": [{"tslices": ["2021-11-26", "2021-12-21"], "attributes": {}, "values": [0, 1, 0]}]}
+  ]
+}

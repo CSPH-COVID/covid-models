@@ -1,6 +1,7 @@
 ### Python Standard Library ###
 import os
 ### Third Party Imports ###
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
@@ -11,7 +12,7 @@ from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
 from covid_model.data_imports import ExternalHosps
 
 
-def run_solve_seir(outdir=None, fname_extra="", model=None, tags={}, prep_model=True, **specs_args):
+def run_solve_seir(outdir=None, fname_extra="", model=None, tags={}, prep_model=True, write_model_to_db=True, **specs_args):
     if outdir:
         os.makedirs(outdir, exist_ok=True)
 
@@ -24,9 +25,12 @@ def run_solve_seir(outdir=None, fname_extra="", model=None, tags={}, prep_model=
         model.prep()
     print("solving model")
     model.solve_seir()
-    model.write_specs_to_db(engine=engine, tags={'regions': model.regions if model else specs_args['regions'],
-                                                 'mobility_mode': model.model_mobility_mode if model else specs_args['mobility_mode'], **tags})
-    model.write_results_to_db(engine=engine)
+    model.tags.update({'regions': model.regions if model else specs_args['regions'],
+                       'mobility_mode': model.model_mobility_mode if model else specs_args['mobility_mode'], **tags})
+    if write_model_to_db:
+        print("writing model to db")
+        model.write_specs_to_db(engine=engine)
+        model.write_results_to_db(engine=engine)
 
     df = model.solution_sum(['seir', 'region']).assign(**{'date':model.daterange}).set_index('date').stack([0, 1]).reset_index(name='y')
     dfh = model.solution_sum(['seir', 'region'], index_with_model_dates=True)['Ih'].stack('region').rename('modeled_hospitalized')
@@ -38,17 +42,31 @@ def run_solve_seir(outdir=None, fname_extra="", model=None, tags={}, prep_model=
     if outdir:
         # plot
         print("plotting results")
-        p = sns.relplot(data=df, x='date', y='y', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
+        p = sns.relplot(data=df, x='date', y='y', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=3, aspect=3)
         _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
         plt.savefig(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_compartments_{fname_extra}.png", dpi=300)
+        plt.close()
 
-        p = sns.relplot(data=dfh_melt, x='date', y='hospitalized', hue='model', col='region', col_wrap=min(3, len(model.regions)), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
+        p = sns.relplot(data=dfh_melt, x='date', y='hospitalized', hue='model', col='region', col_wrap=min(3, len(model.regions)), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=3, aspect=3)
         _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-        plt.savefig(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_sier_hospitalized{fname_extra}.png", dpi=300)
+        plt.savefig(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_hospitalized_{fname_extra}.png", dpi=300)
+        plt.close()
+
+        dfhtc = dfh.join(pd.DataFrame({'date': model.tslices_dates, 'tc': model.tc}).set_index('date'))
+        dfhtc['tc'] = dfhtc['tc'].ffill()
+        dfhtc1 = dfhtc[['currently_hospitalized', 'modeled_hospitalized']].assign(row=1).set_index('row', append=True).melt(value_vars=['currently_hospitalized', 'modeled_hospitalized'], var_name='series', value_name='val', ignore_index=False).set_index('series', append=True)
+        dfhtc2 = dfhtc[['tc']].assign(row=2, series='tc').set_index(['row', 'series'], append=True).rename(columns={'tc': 'val'})
+        dfhtc = pd.concat([dfhtc1, dfhtc2])
+
+        p = sns.relplot(data=dfhtc, x='date', y='val', hue='series', col='region', row='row', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=3, aspect=3)
+        _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
+        plt.savefig(get_filepath_prefix(outdir) + f'run_solve_sier_hospitalized_with_tc_{fname_extra}.png', dpi=300)
+        plt.close()
 
         print("saving results")
         df.to_csv(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_compartments_{fname_extra}.csv")
         dfh.to_csv(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_hospitalized_{fname_extra}.csv")
+        dfhtc.to_csv(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_hospitalized_with_tc_{fname_extra}.csv")
     return model, df, dfh
 
 

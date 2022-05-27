@@ -3,20 +3,19 @@ from operator import attrgetter
 import os
 import json
 from datetime import date
+import datetime as dt
+from multiprocessing import Pool
 ### Third Party Imports ###
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
 ### Local Imports ###
-from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine, CovidModelFit
+from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine, CovidModelFit, CovidModelSpecifications
 from covid_model.run_scripts.run_solve_seir import run_solve_seir
-from covid_model.run_scripts.run_fit import run_fit
+from covid_model.run_scripts.run_compartment_report import run_compartment_report
+from covid_model.run_scripts.run_omicron_report import run_omicron_report
 from covid_model.utils import get_filepath_prefix
-
-###################################################################################
-# TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
-###################################################################################
 
 
 def build_legacy_output_df(model: CovidModel):
@@ -46,83 +45,95 @@ def build_legacy_output_df(model: CovidModel):
     df['date'] = model.daterange
     df['Ilag'] = totals['I'].shift(3)
     df['Re'] = model.re_estimates
-    df['prev'] = 100000.0 * df['Itotal'] / model.model_params['total_pop']
-    df['oneinX'] = model.model_params['total_pop'] / df['Itotal']
+    df['prev'] = 100000.0 * df['Itotal'] / model.model_params['total_pop'][0]['values']
+    df['oneinX'] = model.model_params['total_pop'][0]['values'] / df['Itotal']
     df['Exposed'] = 100.0 * df['Einc'].cumsum()
 
     df.index.names = ['t']
     return df
 
 
-def build_tc_df(model: CovidModel):
-    return pd.DataFrame.from_dict({'time': model.tslices[:-1], 'tc_pb': model.efs, 'tc': model.obs_ef_by_slice})
+def run_single_scenario(args):
+    engine = db_engine()
+    scen, outdir, base_specs, scens_files, refit_from_date, fit_args, plot_from_date, plot_to_date, return_model = args
+    print(f"Scenario: {scen}: Copying / Modifying Model")
+    scen_base_model = CovidModel(engine=engine, **base_specs)
+    # Update params based on scenario
+    if 'params_scens' in scens_files.keys():
+        scen_base_model.model_params.update(scens_files['params_scens'])
+    if 'vacc_proj_params_scens' in scens_files.keys():
+        scen_base_model.vacc_proj_params.update(scens_files['vacc_proj_params_scens'])
+    if 'mobility_proj_params_scens' in scens_files.keys():
+        scen_base_model.mobility_proj_params.update(scens_files['mobility_proj_params_scens'])
+    # Note: attribute multipliers is a list, so our easiest option is to append. So you probably want to remove
+    # something from the base attribute multipliers file if the scenarios are exploring different settings for those.
+    if 'attribute_multipliers_scens' in scens_files.keys():
+        scen_base_model.attribute_multipliers.extend(scens_files['attribute_multipliers_scens'])
+    scen_model = CovidModel(base_model=scen_base_model)
+    if refit_from_date is not None:
+        fit_args['look_back'] = len(
+            [t for t in scen_model.tslices if t >= (refit_from_date - scen_model.start_date).days])
+        fit = CovidModelFit(engine=engine, tc_min=fit_args['tc_min'], tc_max=fit_args['tc_max'], from_specs=scen_model)
+        fit.set_actual_hosp(engine=engine, county_ids=scen_model.get_all_county_fips())
+        fit.run(engine, **fit_args, print_prefix=f'{scen}', outdir=outdir)
+        scen_model.apply_tc(fit.fitted_model.tc, fit.fitted_model.tslices)
+    print(f"Scenario: {scen}: Prepping and Solving SEIR")
+    scen_model, df, dfh = run_solve_seir(outdir=outdir, model=scen_model, prep_model=True, write_model_to_db=return_model, tags={'scenario': scen}, fname_extra=scen)
+    dflo = build_legacy_output_df(scen_model)
+    print("running omicron report")
+    run_omicron_report(plots=['prev', 'hosp','var','imm'], from_date=dt.datetime.strptime('2021-07-01', "%Y-%m-%d").date(), model=scen_model, outdir=outdir, fname_extra=scen)
+    print("running compartment report")
+    run_compartment_report(plot_from_date, plot_to_date, group_by_attr_names=['age', 'vacc', 'priorinf', 'immun', 'seir', 'variant'], model=scen_model, outdir=outdir, fname_extra=scen)
 
 
-def tags_to_scen_label(tags):
-    if tags['run_type'] == 'Current':
-        return 'Current Fit'
-    elif tags['run_type'] == 'Prior':
-        return 'Prior Fit'
-    elif tags['run_type'] == 'Vaccination Scenario':
-        return f'Vaccine Scenario: {tags["vacc_cap"]}'
-    elif tags['run_type'] == 'TC Shift Projection':
-        return f'TC Shift Scenario: {tags["tc_shift"]} on {tags["tc_shift_date"]} ({tags["vacc_cap"]})'
-
-
-def run_model(model, engine, legacy_output_dict=None):
-    print('Scenario tags: ', model.tags)
-    model.solve_seir()
-    model.write_results_to_db(engine, new_spec=True)
-    if legacy_output_dict is not None:
-        legacy_output_dict[tags_to_scen_label(model.tags)] = build_legacy_output_df(model)
-
+    if return_model:
+        return {'df': df.assign(scen=scen), 'dfh': dfh.assign(scen=scen), 'dflo': dflo.assign(scen=scen), 'model': scen_model}
+    else:
+        return {'df': df.assign(scen=scen), 'dfh': dfh.assign(scen=scen), 'dflo': dflo.assign(scen=scen), 'specs_info': scen_model.prepare_write_specs_query(), 'results_info': scen_model.prepare_write_results_query()}
 
 
 def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_params_scens,
-                        attribute_multipliers_scens, outdir, fname_extra="", refit_from_date=None, fit_args=None, **specs_args):
+                        attribute_multipliers_scens, outdir, plot_from_date, plot_to_date, fname_extra="",
+                        refit_from_date=None, fit_args=None, multiprocess=None, **specs_args):
     if (outdir):
         os.makedirs(outdir, exist_ok=True)
     engine = db_engine()
 
     # compile scenarios:
-    scens_files = [json.load(open(sf, 'r')) if sf is not None else None for sf in [params_scens, vacc_proj_params_scens, mobility_proj_params_scens, attribute_multipliers_scens]]
-    scens = [key for sf in scens_files if sf is not None for key in sf.keys()]
+    locs = [key for key, val in locals().items() if val is not None]
+    scen_args_str = [s for s in ['params_scens', 'vacc_proj_params_scens', 'mobility_proj_params_scens', 'attribute_multipliers_scens'] if s in locs]
+    scens_files = {}
+    for sf in scen_args_str:
+        scen_dict = json.load(open(eval(sf), 'r'))
+        for scen, scen_settings in scen_dict.items():
+            if scen not in scens_files.keys():
+                scens_files[scen] = {}
+            scens_files[scen].update({sf: scen_settings})
+
+    scens = list(scens_files.keys())
 
     # initialize Base model:
     base_model = CovidModel(engine=engine, **specs_args)
 
-    ms = {}
-    dfs = []
-    dfhs = []
-    for scen in scens:
-        print(f"Scenario: {scen}: Copying / Modifying Model")
-        scen_base_model = CovidModel(engine=engine, base_model=base_model)
-        # Update params based on scenario
-        if scens_files[0] and scen in scens_files[0]:
-            scen_base_model.params.update(scens_files[0][scen])
-        if scens_files[1] and scen in scens_files[1]:
-            scen_base_model.vacc_proj_params.update(scens_files[1][scen])
-        if scens_files[2] and scen in scens_files[2]:
-            scen_base_model.mobility_proj_params.update(scens_files[2][scen])
-        # Note: attribute multipliers is a list, so our easiest option is to append. So you probably want to remove
-        # something from the base attribute multipliers file if the scenarios are exploring different settings for those.
-        if scens_files[3] and scen in scens_files[3]:
-            scen_base_model.attribute_multipliers.extend(scens_files[3][scen])
-        scen_model = CovidModel(base_model=scen_base_model)
-        if refit_from_date is not None:
-            fit_args['look_back'] = len([t for t in scen_model.tslices if t >= (refit_from_date - scen_model.start_date).days])
-            fit = CovidModelFit(engine=engine, tc_min=fit_args['tc_min'], tc_max=fit_args['tc_max'], from_specs=scen_model)
-            fit.set_actual_hosp(engine=engine, county_ids=scen_model.get_all_county_fips())
-            fit.run(engine, **fit_args, print_prefix=f'{scen}', outdir=outdir)
-            scen_model.apply_tc(fit.fitted_model.tc, fit.fitted_model.tslices)
-        print(f"Scenario: {scen}: Prepping and Solving SEIR")
-        scen_model, df, dfh = run_solve_seir(outdir=outdir, model=scen_model, prep_model=True, tags={'scenario': scen})
-        ms[scen] = scen_model
-        dfs.append(df.assign(scen=scen))
-        dfhs.append(dfh.assign(scen=scen))
+    if multiprocess:
+        args_list = map(lambda x: [x, outdir, specs_args, scens_files[x], refit_from_date, fit_args, plot_from_date, plot_to_date, False], scens)
+        p = Pool(multiprocess)
+        results = p.map(run_single_scenario, args_list)
+        # write results to database serially
+        for i, _ in enumerate(results):
+            results[i]['specs_info'] = CovidModelSpecifications.write_prepared_specs_to_db(results[i]['specs_info'], db_engine())
+            results[i]['results_info'] = CovidModel.write_prepared_results_to_db(results[i]['results_info'], db_engine(), results[i]['specs_info']['spec_id'])
+    else:
+        args_list = map(lambda x: [x, outdir, specs_args, scens_files[x], refit_from_date, fit_args, plot_from_date, plot_to_date, True], scens)
+        results = list(map(run_single_scenario, args_list))
+        # results already written to db
 
-    df = pd.concat(dfs, axis=0).set_index(['scen', 'date', 'region', 'seir'])
-    dfh = pd.concat(dfhs, axis=0)
+    df = pd.concat([r['df'] for r in results], axis=0).set_index(['scen', 'date', 'region', 'seir'])
+    dfh = pd.concat([r['dfh'] for r in results], axis=0)
+    dflo = pd.concat([r['dflo'] for r in results], axis=0)
+
+    #df = pd.concat(dfs, axis=0).set_index(['scen', 'date', 'region', 'seir'])
+    #dfh = pd.concat(dfhs, axis=0)
     dfh_measured = dfh[['currently_hospitalized']].rename(columns={'currently_hospitalized': 'hospitalized'}).loc[dfh['scen'] == scens[0]].assign(series='observed')
     dfh_modeled = dfh[['modeled_hospitalized', 'scen']].rename(columns={'modeled_hospitalized': 'hospitalized', 'scen': 'series'})
     dfh2 = pd.concat([dfh_measured, dfh_modeled], axis=0).set_index('series', append=True)
@@ -131,6 +142,7 @@ def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_para
     df.to_csv(get_filepath_prefix(outdir) + f"run_model_scenarios_compartments_{fname_extra}.csv")
     dfh.to_csv(get_filepath_prefix(outdir) + f"run_model_scenarios_hospitalized_{fname_extra}.csv")
     dfh2.to_csv(get_filepath_prefix(outdir) + f"run_model_scenarios_hospitalized2_{fname_extra}.csv")
+    dflo.to_csv(get_filepath_prefix(outdir) + f"out2_{fname_extra}.csv")
 
     print("plotting results")
     p = sns.relplot(data=df, x='date', y='y', hue='scen', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
@@ -143,7 +155,7 @@ def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_para
 
     print("done")
 
-    return df, dfh, dfh2, ms
+    return df, dfh, dfh2
 
 
 if __name__ == '__main__':

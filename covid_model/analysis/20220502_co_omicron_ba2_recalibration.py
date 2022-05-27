@@ -19,6 +19,7 @@ def main():
     fname_prefix = basename.split(".")[0]
     outdir = os.path.join("covid_model", "output", basename)
     os.makedirs(outdir, exist_ok=True)
+    subdir = "20220502_co_omicron_ba2_recalibration"
 
     fit_args = {
         'batch_size': 6,
@@ -33,11 +34,11 @@ def main():
         'write_batch_output': False
     }
     specs_args = {
-        'params': 'covid_model/input/params.json',
+        'params': f'covid_model/input/{subdir}/params.json',
         'region_definitions': 'covid_model/input/region_definitions.json',
         'timeseries_effect_multipliers': 'covid_model/input/timeseries_effects/multipliers.json',
         'mab_prevalence': 'covid_model/input/timeseries_effects/mab_prevalence.csv',
-        'attribute_multipliers': 'covid_model/input/20220501_attribute_multipliers.json',
+        'attribute_multipliers': f'covid_model/input/{subdir}/20220502_attribute_multipliers.json',
         'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
         'refresh_actual_vacc': True,
         'refrech_actual_mobility': True,
@@ -52,7 +53,7 @@ def main():
         'mobility_proj_params_scens': None,
         'timeseries_effect_multipliers_scens': None,
         'mab_prevalence_scens': None,
-        'attribute_multipliers_scens': 'covid_model/input/20220425_ba2_prev_calib/attribute_multipliers_scens_ba2.json',
+        'attribute_multipliers_scens': f'covid_model/input/{subdir}/attribute_multipliers_scens_ba2.json',
         'refit_from_date': dt.datetime.strptime('2021-11-01', "%Y-%m-%d").date()
     }
     with open(get_filepath_prefix(outdir) + "________________________.txt", 'w') as f:
@@ -68,9 +69,9 @@ def main():
 
     # fit a statewide model up to present day to act as a baseline
     print('Run fit')
-    model = run_fit(**fit_args, outdir=outdir, **{'tc':[0.75,0.75], 'tslices':[14], **specs_args})[0]
-    specs_args["from_specs"] = model.spec_id
-    #specs_args["from_specs"] = 2373
+    #model = run_fit(**fit_args, outdir=outdir, **{'tc':[0.75,0.75], 'tslices':[14], **specs_args})[0]
+    #specs_args["from_specs"] = model.spec_id
+    specs_args["from_specs"] = 2412
     print('Run Scenarios')
     df, dfh, dfh2, ms = run_model_scenarios(**specs_args, **scen_args, fit_args=fit_args, outdir=outdir)
 

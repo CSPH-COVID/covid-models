@@ -1,0 +1,45 @@
+{
+  "1_percent": {
+    "omicron_pS": [
+      {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 1.01, "desc": ""},
+      {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 0.99, "desc": ""}
+    ],
+    "omicron_hosp": [
+      {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 1.01, "desc": ""},
+      {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 0.99, "desc": ""}
+    ],
+    "om_seed": [
+      {"attrs": {}, "param": "om_seed", "mult": 1.01, "desc": ""},
+      {"attrs": {}, "param": "om_seed", "mult": 0.99, "desc": ""}
+    ]
+  },
+  "5_percent": {
+    "omicron_pS": [
+      {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 1.05, "desc": ""},
+      {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 0.95, "desc": ""}
+    ],
+    "omicron_hosp": [
+      {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 1.05, "desc": ""},
+      {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 0.95, "desc": ""}
+    ],
+    "om_seed": [
+      {"attrs": {}, "param": "om_seed", "mult": 1.05, "desc": ""},
+      {"attrs": {}, "param": "om_seed", "mult": 0.95, "desc": ""}
+    ]
+  },
+    "10_percent": {
+    "omicron_pS": [
+      {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 1.10, "desc": ""},
+      {"attrs": {"variant": "omicron"}, "param": "pS", "mult": 0.90, "desc": ""}
+    ],
+    "omicron_hosp": [
+      {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 1.10, "desc": ""},
+      {"attrs": {"variant": "omicron"}, "param": "hosp", "mult": 0.90, "desc": ""}
+    ],
+    "om_seed": [
+      {"attrs": {}, "param": "om_seed", "mult": 1.10, "desc": ""},
+      {"attrs": {}, "param": "om_seed", "mult": 0.90, "desc": ""}
+    ]
+  }
+}
+

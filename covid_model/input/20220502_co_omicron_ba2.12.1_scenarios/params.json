@@ -393,9 +393,9 @@
   "ba2_seed": [
     {"tslices": ["2021-12-08", "2022-01-02"], "attributes": {}, "values": [0, 1, 0]}
    ],
-  "future_seed": [
-    {"tslices": null, "attributes":  {}, "values": 0}
-  ],
+  "ba2121_seed": [
+    {"tslices": ["2022-02-13", "2022-03-08"], "attributes": {}, "values": [0, 1, 0]}
+   ],
   "immunity": [
     {"tslices": null, "attributes": {}, "values": 0}
    ],

@@ -1,0 +1,7 @@
+{
+  "A1": [{"param": "om_seed", "mult": 0.1, "desc": ""}],
+  "A2": [{"param": "om_seed", "mult": 0.5, "desc": ""}],
+  "A3": [{"param": "om_seed", "mult": 1, "desc": ""}],
+  "A4": [{"param": "om_seed", "mult": 2, "desc": ""}],
+  "A5": [{"param": "om_seed", "mult": 10, "desc": ""}]
+}

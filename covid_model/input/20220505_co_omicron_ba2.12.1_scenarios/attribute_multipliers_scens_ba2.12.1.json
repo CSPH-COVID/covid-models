@@ -1,0 +1,4 @@
+{
+  "m05_d0": [{"param": "ba2121_seed", "mult": 0.5, "desc": "Adjust the seed for BA.2.12.1 so that we can reach 25% BA.2 by late-April."}],
+  "m05_d7": [{"param": "ba2121_seed", "mult": 0.5, "desc": "Adjust the seed for BA.2.12.1 so that we can reach 25% BA.2 by late-April."}]
+}
