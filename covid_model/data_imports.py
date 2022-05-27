@@ -49,7 +49,7 @@ class ExternalData:
 
 class ExternalHosps(ExternalData):
     def fetch_from_db(self, county_ids):
-        if county_ids is None:
+        if county_ids is None or len(county_ids) == 64:
             sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date'])
         else:
