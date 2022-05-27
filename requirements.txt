@@ -28,7 +28,7 @@ numpy==1.22.1
 packaging==21.3
 pandas==1.4.0
 patsy==0.5.2
-Pillow==9.0.0
+Pillow==9.0.1
 pmdarima==1.8.4
 property-cached==1.6.4
 proto-plus==1.20.3
