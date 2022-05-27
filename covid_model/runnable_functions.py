@@ -64,9 +64,10 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         plt.savefig(get_file_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.png')
         plt.close()
         hosps_df.to_csv(get_file_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.csv')
+        json.dump(dict(dict(zip([0] + model.tc_tslices, model.tc))), open(get_file_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_tc.json', 'w'))
 
 #    logging.info(json.dumps({"fit_args": fit_args}, default=str))
-    logging.info(json.dumps({"model_build_args": model_args}, default=str))
+    logging.info(str({"model_build_args": model_args}))
 
     # initialize and run the fit
     if write_batch_results or write_results:
@@ -90,7 +91,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         logger.info(f'{str(base_model.tags)} Model prepped for fitting in {perf_counter() - t0} seconds.')
 
     # Apply TC
-    tslices = base_model.tc_tslices + list(range(base_model.tc_tslices[-1] + window_size, base_model.tmax - last_window_min_size, window_size))
+    tslices = base_model.tc_tslices  + list(range((base_model.tc_tslices[-1] if len(base_model.tc_tslices) > 0 else 0) + window_size, base_model.tmax - last_window_min_size, window_size))
     tc = base_model.tc + [tc_0] * (len(tslices) + 1 - len(base_model.tc))
     base_model.apply_tc(tcs=tc, tslices=tslices)
 
@@ -123,6 +124,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         if write_batch_results:
             logger.info(f'{str(model.tags)}: Uploading batch results')
             model.write_specs_to_db(engine)
+            logger.info(f'{str(model.tags)}: spec_id: {model.spec_id}')
 
         # simulate the model and save a picture of the output
         forward_sim_plot(model)
