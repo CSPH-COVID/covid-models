@@ -45,8 +45,8 @@ class CovidModel:
         self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                              'age': ['0-19', '20-39', '40-64', '65+'],
                              'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                             'priorinf': ['none', 'non-omicron', 'omicron'],
-                             'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2'],
+                             'priorinf': ['none', 'omicron', 'other'],
+                             'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121'],
                              'immun': ['none', 'weak', 'strong'],
                              'region': ['co']})
 
@@ -87,6 +87,7 @@ class CovidModel:
         self.param_compartments = None
         self.params_by_t = None
         self.cmpt_idx_lookup = list()
+        self.__y0_dict = None
 
         self.linear_matrix = None
         self.nonlinear_matrices = None
@@ -391,10 +392,18 @@ class CovidModel:
 
     @start_date.setter
     def start_date(self, value):
-        self.__start_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
+        start_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
+        tshift = (start_date-self.start_date).days
+        new_tc_tslices = [t - tshift for t in self.tc_tslices if t > tshift]
+        new_tc = [self.tc[i] for i in range(len(self.tc)-1) if self.tc_tslices[i] - tshift in new_tc_tslices] + [self.tc[-1]]
+        self.__start_date = start_date
         self.__tmax = (self.end_date - self.start_date).days
         self.__trange = range(self.tmin, self.tmax + 1)
         self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
+        # TODO: hackish: redo tc so it's a sorted dict I think.
+        self.tc_tslices = new_tc_tslices
+        self.tc = new_tc
+        self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
 
     @property
     def end_date(self):
@@ -402,10 +411,17 @@ class CovidModel:
 
     @end_date.setter
     def end_date(self, value):
-        self.__end_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
+        end_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
+        new_tc_tslices = [t for t in self.tc_tslices if t <= self.date_to_t(end_date)]
+        new_tc = self.tc[:(len(new_tc_tslices)+1)]
+        self.__end_date = end_date
         self.__tmax = (self.end_date - self.start_date).days
         self.__trange = range(self.tmin, self.tmax + 1)
         self.__daterange =  pd.date_range(self.start_date, end=self.end_date).date
+        # TODO: hackish: redo tc so it's a sorted dict I think.
+        self.tc_tslices = new_tc_tslices
+        self.tc = new_tc
+        self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
 
     @property
     def tmin(self):
@@ -489,9 +505,24 @@ class CovidModel:
     # initial state y0, expressed as a dictionary with non-empty compartments as keys
     @property
     def y0_dict(self):
-        group_pops = {(region, age): self.params_by_t['all'][f'{region}_{age_param}_pop'][0] for region in self.regions for age, age_param in zip(['0-19', '20-39', '40-64', '65+'], ['0_19', '20_39', '40_64', '65p'])}
-        y0d = {('S', age, 'none', 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
-        return y0d
+        if self.__y0_dict is None:
+            group_pops = {(region, age): self.params_by_t['all'][f'{region}_{age_param}_pop'][0] for region in self.regions for age, age_param in zip(['0-19', '20-39', '40-64', '65+'], ['0_19', '20_39', '40_64', '65p'])}
+            y0d = {('S', age, 'none', 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
+            return y0d
+        else:
+            return self.__y0_dict
+
+    @y0_dict.setter
+    def y0_dict(self, val: dict):
+        # set everything to zero at first
+        y0d = {}
+        for cmpt, v in val.items():
+            if cmpt in self.compartments:
+                y0d[cmpt] = v
+            else:
+                self.log_and_raise(f'{cmpt} not a valid compartment', ValueError)
+        self.__y0_dict = y0d
+
 
     # return the parameters as nested dictionaries
     @property
@@ -733,7 +764,8 @@ class CovidModel:
             vacc_per_available = vacc_per_available.groupby(['region', 'age']).shift(vacc_delay).fillna(0)
 
             # group vacc_per_available by trange interval
-            t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), self.params_trange + [self.tmax], right=False, retbins=False, labels=self.params_trange)
+            bins = self.params_trange + [self.tmax] if self.tmax not in self.params_trange else self.params_trange
+            t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), bins, right=False, retbins=False, labels=bins[:-1])
             vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'region', 'age']).mean()
             vacc_per_available['date'] = [self.t_to_date(d) for d in vacc_per_available.index.get_level_values(0)]
             vacc_per_available = vacc_per_available.reset_index().set_index(['region', 'age']).sort_index()
@@ -743,7 +775,11 @@ class CovidModel:
                 for age in self.attrs['age']:
                     for region in self.attrs['region']:
                         vpa_sub = vacc_per_available[['date', shot]].loc[region, age]
-                        vpa_sub = vpa_sub.reset_index(drop=True).set_index('date').sort_index().drop_duplicates().to_dict()[shot]
+                        # TODO: hack for when there's only one date. Is there a better way?
+                        if isinstance(vpa_sub, pd.Series):
+                            vpa_sub = {vpa_sub[0]: vpa_sub[1]}
+                        else:
+                            vpa_sub = vpa_sub.reset_index(drop=True).set_index('date').sort_index().drop_duplicates().to_dict()[shot]
                         self.set_param(param=f'{shot}_per_available', attrs={'age': age, 'region': region}, vals=vpa_sub)
 
     # set TC by slice, and update non-linear multiplier; defaults to reseting the last TC values
@@ -896,12 +932,11 @@ class CovidModel:
                 else:
                     self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available')
 
-        # seed variants
-        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'none'}, constant='initial_seed')
-        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'alpha'}, constant='alpha_seed')
-        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'delta'}, constant='delta_seed')
-        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'omicron'}, constant='om_seed')
-        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': 'none', 'immun': 'none'}, {'seir': 'E', 'variant': 'ba2'}, constant='ba2_seed')
+        # seed variants (only seed the ones in our attrs)
+        for variant in self.attrs['variant']:
+            seed_param = f'{variant}_seed'
+            from_variant = self.attrs['variant'][0]
+            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': from_variant, 'immun': 'none'}, {'seir': 'E', 'variant': variant}, constant=seed_param)
 
         # exposure
         for variant in self.attrs['variant']:
@@ -911,8 +946,8 @@ class CovidModel:
                     asymptomatic_transmission = f'(1 - immunity) * kappa * betta / {region}_pop'
                     sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': region})
                     asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'variant': 'none', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
             # Transmission parameters attached to the susceptible population
             elif self.mobility_mode == "population_attached":
                 for from_region in self.attrs['region']:
@@ -921,8 +956,8 @@ class CovidModel:
                     for to_region in self.attrs['region']:
                         sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                         asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
             # Transmission parameters attached to the transmission location
             elif self.mobility_mode == "location_attached":
                 for from_region in self.attrs['region']:
@@ -932,32 +967,32 @@ class CovidModel:
                         for to_region in self.attrs['region']:
                             sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                             asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'variant': 'none', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
 
         # disease progression
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'A'}, coef='1 / alpha * (1 - pS)')
-        # assume noone is receiving both pax and mab
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * ((1-mab_prev) + (1-pax_prev))')
+        # assume no one is receiving both pax and mab
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * (1 - mab_prev - pax_prev)')
         self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * mab_prev * mab_hosp_adj')
         self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * pax_prev * pax_hosp_adj')
 
         # disease termination
         for variant in self.attrs['variant']:
-            priorinf = variant if variant != 'none' and variant in self.attrs['priorinf'] else 'non-omicron'
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
-            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - priorinf_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * priorinf_fail_rate')
+            priorinf = 'omicron' if variant != 'none' and variant in ['omicron', 'ba2', 'ba2121'] else 'other'
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
+            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - priorinf_fail_rate)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='gamm * priorinf_fail_rate')
 
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / hlos * (1 - dh) * (1 - priorinf_fail_rate) * (1-mab_prev)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * (1 - dh) * priorinf_fail_rate * (1-mab_prev)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * (1 - priorinf_fail_rate) * mab_prev')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'variant': 'none', 'priorinf': priorinf}, coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * priorinf_fail_rate * mab_prev')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / hlos * (1 - dh) * (1 - priorinf_fail_rate) * (1-mab_prev)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='1 / hlos * (1 - dh) * priorinf_fail_rate * (1-mab_prev)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * (1 - priorinf_fail_rate) * mab_prev')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * priorinf_fail_rate * mab_prev')
 
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='gamm * dnh * (1 - severe_immunity)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'variant': 'none', 'priorinf': priorinf}, coef='1 / hlos * dh')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'D', 'priorinf': priorinf}, coef='gamm * dnh * (1 - severe_immunity)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'priorinf': priorinf}, coef='1 / hlos * dh')
 
         # immunity decay
         self.add_flows_from_attrs_to_attrs({'immun': 'strong'}, {'immun': 'weak'}, coef='1 / imm_decay_days')
@@ -1023,7 +1058,7 @@ class CovidModel:
     @classmethod
     def unserialize_vacc(cls, vdict):
         df = pd.DataFrame.from_dict(vdict)
-        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d") for d in df['date']]
+        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
         return df.set_index(['date', 'region', 'age'])
 
     def serialize_hosp(self, df):
@@ -1034,15 +1069,28 @@ class CovidModel:
     @classmethod
     def unserialize_hosp(cls, hdict):
         df = pd.DataFrame.from_dict(hdict)
-        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d") for d in df['date']]
+        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
         return df.set_index(['date'])['hosps']
+
+    @classmethod
+    def unserialize_tc_t_prev_lookup(cls, tct_dict):
+        # JSON can't handle numbers as dict keys
+        return {int(key): val for key, val in tct_dict.items()}
+
+    def serialize_y0_dict(self, y0_dict):
+        return [list(key) + [val] for key, val in y0_dict.items()]
+
+    @classmethod
+    def unserialize_y0_dict(cls, y0_list):
+        return {tuple(li[:-1]): float(li[-1]) for li in y0_list}
 
     # serializes SOME of this model's properties to a json format which can be written to database
     # model needs prepping still
     def to_json_string(self):
         logger.debug(f"{str(self.tags)} Serializing model to json")
         keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', 'attrs', 'tc_tslices', 'tc', 'tc_cov', 'tc_tslices', 'tc_t_prev_lookup', '_CovidModel__params_defs',
-                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'actual_hosp']
+                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'actual_hosp',
+                '_CovidModel__y0_dict']
         #TODO: handle mobility, add in proj_mobility
         serial_dict = OrderedDict()
         for key in keys:
@@ -1055,6 +1103,8 @@ class CovidModel:
                 serial_dict[key] = self.serialize_vacc(val)
             elif key == 'actual_hosp' and val is not None:
                 serial_dict[key] = self.serialize_hosp(val)
+            elif key == '_CovidModel__y0_dict' and self.__y0_dict is not None:
+                serial_dict[key] = self.serialize_y0_dict(val)
             else:
                 serial_dict[key] = val
         return json.dumps(serial_dict)
@@ -1064,7 +1114,7 @@ class CovidModel:
         # TODO: handle mobility, add in proj_mobility
         raw = json.loads(s)
         for key, val in raw.items():
-            if val in ['_CovidModel__start_date', '_CovidModel__end_date']:
+            if key in ['_CovidModel__start_date', '_CovidModel__end_date']:
                 self.__dict__[key] = dt.datetime.strptime(val, "%Y-%m-%d").date()
             elif key == "tc_cov":
                 #TODO
@@ -1073,6 +1123,10 @@ class CovidModel:
                 self.__dict__[key] = CovidModel.unserialize_vacc(val)
             elif key == 'actual_hosp' and val is not None:
                 self.__dict__[key] = CovidModel.unserialize_hosp(val)
+            elif key == 'tc_t_prev_lookup':
+                self.__dict__[key] = self.unserialize_tc_t_prev_lookup(val)
+            elif key == '_CovidModel__y0_dict':
+                self.__dict__[key] = self.unserialize_y0_dict(val)
             else:
                 self.__dict__[key] = val
 
@@ -1105,6 +1159,7 @@ class CovidModel:
             ]))
             session.execute(stmt)
             session.commit()
+        logger.debug(f"{str(self.tags)} spec_id: {self.spec_id}")
 
     def read_from_base_spec_id(self, engine):
         if engine is None:
@@ -1114,6 +1169,9 @@ class CovidModel:
             self.log_and_raise(f'{self.base_spec_id} is not a valid spec ID.', ValueError)
         row = df.iloc[0]
         self.from_json_string(row['serialized_model'])
+        # The spec ID we pulled from the DB becomes the base_spec_id (will match what self.base_spec_id was before calling this function)
+        self.base_spec_id = self.spec_id
+        self.spec_id = None
 
     def _col_to_json(self, d):
         return json.dumps(d, ensure_ascii=False)
