@@ -57,11 +57,11 @@ class CovidModelSimulation:
     def __init__(self, specs, engine, end_date=None):
         self.model = CovidModel(end_date=end_date, from_specs=specs, engine=engine)
         self.base_tc = self.model.tc.copy()
-        self.window_size = self.model.tslices[-1] - self.model.tslices[-2]
-        self.simulation_horizon = int(np.ceil((self.model.tmax - self.model.tslices[-1]) / self.window_size)) - 1
+        self.window_size = self.model.tc_tslices[-1] - self.model.tc_tslices[-2]
+        self.simulation_horizon = int(np.ceil((self.model.tmax - self.model.tc_tslices[-1]) / self.window_size)) - 1
 
-        if self.model.tmax - self.model.tslices[-1] > self.window_size:
-            self.model.apply_tc(tslices=list(range(self.model.tslices[-1] + self.window_size, self.model.tmax, self.window_size)))
+        if self.model.tmax - self.model.tc_tslices[-1] > self.window_size:
+            self.model.apply_tc(tslices=list(range(self.model.tc_tslices[-1] + self.window_size, self.model.tmax, self.window_size)))
         self.model.prep()
 
         self.engine = engine
@@ -118,7 +118,7 @@ class CovidModelSimulation:
         return [list(self.base_tc[:-fitted_count]) + list(sample if hasattr(sample, '__iter__') else [sample]) for sample in (fitted_efs_samples if sample_n > 1 else [fitted_efs_samples])]
 
     def sample_simulated_tcs(self, sample_n=1, sims_per_fitted_sample=5, arima_order='auto', skip_early_tcs=8):
-        if len(np.unique(np.diff(self.model.tslices[skip_early_tcs-1:]))) > 1:
+        if len(np.unique(np.diff(self.model.tc_tslices[skip_early_tcs - 1:]))) > 1:
             raise ValueError('Window-sizes for TCs used for prediction must be evenly spaced.')
 
         simulated_tcs = []

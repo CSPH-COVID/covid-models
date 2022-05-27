@@ -1,8 +1,10 @@
 ### Python Standard Library ###
 from os.path import join
 import datetime as dt
+import logging
+import traceback
+import os
 ### Third Party Imports ###
-import numpy as np
 ### Local Imports ###
 
 
@@ -32,24 +34,54 @@ def get_params(input_params, t, tslices=None):
         return input_params
 
 
-def calc_multipliers(multipliers, prevalences):
-    flow = prevalences * multipliers
-    combined_mult = flow.sum()
-    next_prev = flow / combined_mult
-    return combined_mult, next_prev
+# Formatter class which indents based on how deep in the frame stack we are.
+class IndentLogger(logging.LoggerAdapter):
+    """
+    use this adapter with:
+        import logging
+        logger = IndentLogger(logging.getLogger(''), {})
+        logger.info(...)
+    """
+    @staticmethod
+    def indent():
+        indentation_level = len(traceback.extract_stack())
+        return indentation_level-5
+
+    def process(self, msg, kwargs):
+        return "{}{}".format('-' * self.indent() + "|", msg), kwargs
 
 
-def calc_multiple_multipliers(transitions, multipliers, starting_prevalences):
-    starting_prevalences = np.array(starting_prevalences)
-    if starting_prevalences.sum() != 1:
-        starting_prevalences = np.append(starting_prevalences, 1 - starting_prevalences.sum())
-        multipliers = multipliers + [{label: 1 for label in multipliers[0].keys()}]
-    mults = {}
-    prevs = {transitions[0][0]: starting_prevalences}
-    for fr, to, label in transitions:
-        mults[label], prevs[to] = calc_multipliers(np.array([m[label] for m in multipliers]), np.array(prevs[fr]))
+def setup(name, log_level="info"):
+    outdir = os.path.join("covid_model", "output", name)
+    os.makedirs(outdir, exist_ok=True)
 
-    return mults, {k: v[:-1].sum() for k, v in prevs.items()}
+    # parse arguments
+    log_dict = {'debug': logging.DEBUG,
+                'info': logging.INFO,
+                'warning': logging.WARNING,
+                'error': logging.ERROR,
+                'critical': logging.CRITICAL}
+
+    #log_choices = ['debug', 'info', 'warning', 'error', 'critical']
+    #parser.add_argument('-l', '--log', nargs='?', choices=log_choices, default='info', const='info', help="logging level for console")
+
+    # set up logging to file
+    # set up logging to file (file always does debug)
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)-4s|%(message)s',
+                        datefmt='%Y/%m/%d %H:%M:%S',
+                        filename=get_file_prefix(outdir) + name + "________________________________________.log",
+                        filemode='a')
+    # set up logging to console (only do this if there are no handlers)
+    if len(logging.getLogger('').handlers) < 2:
+        console = logging.StreamHandler()
+        console.setLevel(log_dict[log_level])
+        formatter = logging.Formatter('%(asctime)s %(levelname)-4s|%(message)s', '%Y/%m/%d %H:%M:%S')
+        console.formatter = formatter
+        logging.getLogger('').addHandler(console)
+    logging.info("============================================================")
+
+    return outdir
 
 
 def get_filepath_prefix(outdir = None):

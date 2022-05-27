@@ -2,7 +2,7 @@ from covid_model.cli_specs import ModelSpecsArgumentParser
 from covid_model.model import CovidModel
 from covid_model.db import db_engine
 from covid_model.data_imports import ExternalHosps
-from covid_model.analysis.charts import modeled, actual_hosps
+from covid_model.analysis.charts import plot_modeled, plot_actual_hosps
 from covid_model.model_sims import forecast_timeseries
 
 import datetime as dt
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     print('Running retroactive projections...')
     projections = dict()
-    for last_tc, projection_start_t in zip(base_model.tc[run_args.skip_first_increments:], base_model.tslices[run_args.skip_first_increments:]):
+    for last_tc, projection_start_t in zip(base_model.tc[run_args.skip_first_increments:], base_model.tc_tslices[run_args.skip_first_increments:]):
         # shorten model to end tslice + projection_days
         projection_end_t = min(projection_start_t + run_args.projection_days, base_model.tmax)
         projection_start_date = base_model.start_date + dt.timedelta(days=projection_start_t)
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         model = CovidModel(base_model=base_model, end_date=projection_end_date)
 
         # set tc after tslice to the tc value immediately before tslice
-        projected_tc_count = len([ts for ts in model.tslices if ts >= projection_start_t])
+        projected_tc_count = len([ts for ts in model.tc_tslices if ts >= projection_start_t])
         fixed_tc = model.tc[:-projected_tc_count]
         projected_tc_dict = dict()
         projected_tc_dict['(1) Hold TC Constant'] = [last_tc] * projected_tc_count
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         print(f'Fixed TCs: {fixed_tc}')
         for i, (tc_projection_method, projected_tc) in enumerate(projected_tc_dict.items()):
             print(f'{tc_projection_method}: projected TC from {projection_start_date} to {projection_end_date} is {projected_tc})')
-            model.apply_tc(tc=projected_tc)
+            model.apply_tc(tcs=projected_tc)
 
             # run model
             model.solve_seir()
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     for i, (proj_method, data) in enumerate(df.groupby(['Projection Method', 'Projection Start Date'])['Actual Hospitalizations (14-Day) at Projection Start Date', 'Trend (14-Day) at Projection Start Date', 'Error'].mean().groupby('Projection Method')):
         sns.regplot(data=data, x='Actual Hospitalizations (14-Day) at Projection Start Date', y='Error', ax=ax_hosp_scatter, label=proj_method, color=colors[i])
         sns.regplot(data=data, x='Trend (14-Day) at Projection Start Date', y='Error', ax=ax_trend_scatter, label=proj_method,   color=colors[i])
-    actual_hosps(engine, color='black', ax=ax_hosp)
+    plot_actual_hosps(engine, color='black', ax=ax_hosp)
 
     ax_hosp.set_ylim(0, 3000)
 
