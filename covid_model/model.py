@@ -676,7 +676,7 @@ class CovidModel:
     # check if a cmpt matches a dictionary of attributes
     def does_cmpt_have_attrs(self, cmpt, attrs, is_param_cmpts=False):
         return all(
-            cmpt[self.param_attr_names.index(attr_name) if is_param_cmpts else list(self.attrs.keys()).index(attr_name)]
+            cmpt[self.param_attr_names.index(attr_name) if is_param_cmpts else list(self.attr_names).index(attr_name)]
             in ([attr_val] if isinstance(attr_val, str) else attr_val)
             for attr_name, attr_val in attrs.items())
 
@@ -942,7 +942,7 @@ class CovidModel:
                 to_cmpt_list[list(self.attrs.keys()).index(attr_name)] = new_attr_val
             to_cmpt = tuple(to_cmpt_list)
             self.add_flow_from_cmpt_to_cmpt(from_cmpt, to_cmpt, from_coef=from_coef, to_coef=to_coef, scale_by_cmpts=scale_by_cmpts,
-                                            scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant)
+                                            scale_by_cmpts_coef=scale_by_coef, constant=constant)
 
     # build ODE
     def build_ode_flows(self):
