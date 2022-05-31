@@ -538,10 +538,6 @@ class CovidModel:
         return len(self.cmpt_idx_lookup)
 
     @property
-    def solution_y(self):
-        return np.transpose(self.solution.y)
-
-    @property
     def solution_ydf(self):
         return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
