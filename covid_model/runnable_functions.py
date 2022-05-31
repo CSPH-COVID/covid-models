@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 ### Local Imports ###
 from covid_model import CovidModel, db_engine
 from covid_model.analysis.charts import plot_transmission_control
-from covid_model.utils import IndentLogger, setup, get_file_prefix
+from covid_model.utils import IndentLogger, setup, get_filepath_prefix
 logger = IndentLogger(logging.getLogger(''), {})
 
 
@@ -62,10 +62,10 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         hosps_df.plot(ax=ax)
         ax = fig.add_subplot(212)
         plot_transmission_control(model, ax=ax)
-        plt.savefig(get_file_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.png')
+        plt.savefig(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.png')
         plt.close()
-        hosps_df.to_csv(get_file_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.csv')
-        json.dump(dict(dict(zip([0] + model.tc_tslices, model.tc))), open(get_file_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_tc.json', 'w'))
+        hosps_df.to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.csv')
+        json.dump(dict(dict(zip([0] + model.tc_tslices, model.tc))), open(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_tc.json', 'w'))
 
 #    logging.info(json.dumps({"fit_args": fit_args}, default=str))
     logging.info(str({"model_build_args": model_args}))
