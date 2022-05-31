@@ -145,6 +145,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         logger.info(f'{str(base_model.tags)}: Uploading final results')
         model.write_specs_to_db(engine)
         model.write_results_to_db(engine)
+        logger.info(f'{str(model.tags)}: spec_id: {model.spec_id}')
 
     return model
 
