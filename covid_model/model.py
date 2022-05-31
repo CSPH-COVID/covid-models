@@ -579,8 +579,10 @@ class CovidModel:
         return pd.Series(index=self.compartments_as_index, data=y)
 
     # give the counts for all compartments over time, but group by the compartment attributes listed
-    def solution_sum(self, group_by_attr_levels):
-        df = self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
+    def solution_sum(self, group_by_attr_levels=None):
+        df = self.solution_ydf
+        if group_by_attr_levels is not None:
+            df = df.groupby(group_by_attr_levels, axis=1).sum()
         df['date'] = self.daterange
         df = df.set_index('date')
         return df
