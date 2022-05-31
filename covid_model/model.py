@@ -613,7 +613,9 @@ class CovidModel:
 
     def modeled_vs_actual_hosps(self):
         df = self.solution_sum(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
-        df['actual'] = self.actual_hosp[:len(self.daterange)].to_numpy()
+        df['actual'] = np.nan
+        hosps = self.actual_hosp[:len(self.daterange)].to_numpy()
+        df['actual'][:len(hosps)] = hosps
         df = df.reindex(columns=['actual', 'modeled'])
         return df
 
