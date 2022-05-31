@@ -5,6 +5,7 @@ import logging
 import traceback
 import os
 ### Third Party Imports ###
+import matplotlib
 ### Local Imports ###
 
 
@@ -80,6 +81,9 @@ def setup(name, log_level="info"):
         console.formatter = formatter
         logging.getLogger('').addHandler(console)
     logging.info("============================================================")
+
+    # stop the incessant warning messages about missing fonts from matplotlib
+    logging.getLogger('matplotlib.font_manager').disabled = True
 
     return outdir
 
