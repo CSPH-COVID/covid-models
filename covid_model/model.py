@@ -87,6 +87,7 @@ class CovidModel:
         self.params_by_t = None
         self.cmpt_idx_lookup = list()
         self.__y0_dict = None
+        self.flows_string = '(' + ','.join(self.attr_names) + ')'
 
         self.linear_matrix = None
         self.nonlinear_matrices = None
@@ -912,7 +913,26 @@ class CovidModel:
 
     # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
     # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
-    def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+    def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
+        # Create string summarizing the flow
+        from_attrs_str = '(' + ','.join(from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
+        to_attrs_str = '(' + ','.join(to_attrs[p] if p in to_attrs.keys() else from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
+        flow_str = f'{from_attrs_str} -> {to_attrs_str}:'
+        if constant is not None:
+            flow_str += f' x {constant}'
+        if from_coef is not None:
+            flow_str += f' x [from comp params: {from_coef}]'
+        if to_coef is not None:
+            flow_str += f' x [to comp params: {to_coef}]'
+        if scale_by_attrs:
+            scale_by_attrs_str = '(' + ','.join(scale_by_attrs[p] if p in scale_by_attrs.keys() else "*" for p in self.attrs) + ')'
+            if scale_by_coef:
+                flow_str += f' x [scale by comp: {scale_by_attrs_str}, weighted by {scale_by_coef}]'
+            else:
+                flow_str += f' x [scale by comp: {scale_by_attrs_str}]'
+        self.flows_string += '\n' + flow_str
+
+        scale_by_cmpts = self.filter_cmpts_by_attrs(scale_by_attrs) if scale_by_attrs is not None else None
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
         for from_cmpt in from_cmpts:
             to_cmpt_list = list(from_cmpt)
@@ -925,6 +945,7 @@ class CovidModel:
     # build ODE
     def build_ode_flows(self):
         logger.debug(f"{str(self.tags)} Building ode flows")
+        self.flows_string = self.flows_string = '(' + ','.join(self.attr_names) + ')'
         self.reset_ode()
         self.apply_tc(force_nlm_update=True)  # update the nonlinear multiplier
 

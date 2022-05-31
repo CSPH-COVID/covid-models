@@ -89,6 +89,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         logger.info(f'{str(base_model.tags)} Prepping Model')
         t0 = perf_counter()
         base_model.prep()
+        logger.debug(f'{str(base_model.tags)} Model flows {base_model.flows_string}')
         logger.info(f'{str(base_model.tags)} Model prepped for fitting in {perf_counter() - t0} seconds.')
 
     # Apply TC
