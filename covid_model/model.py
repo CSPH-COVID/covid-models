@@ -59,7 +59,7 @@ class CovidModel:
         self.tc = list()
         self.tc_cov = None
 
-        self.solution = None
+        self.solution_y = None
 
         # model data
         self.__params_defs = None
@@ -562,6 +562,10 @@ class CovidModel:
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
         return df
 
+    # get the state at time t as a dictionary
+    def y_dict(self, t):
+        return {cmpt: y for cmpt, y in zip(self.compartments, self.solution_y[t, :])}
+
     # create a y0 vector with all values as 0, except those designated in y0_dict
     def y0_from_dict(self, y0_dict):
         y0 = [0] * self.n_compartments
@@ -585,8 +589,8 @@ class CovidModel:
         df = df.set_index('date')
         return df
 
-    def solution_sum_Ih(self):
-        return pd.Series(self.solution_y[:, self.compartments_as_index.get_level_values(0) == "Ih"].sum(axis=1), index=self.daterange)
+    def solution_sum_Ih(self, tstart=0):
+        return pd.Series(self.solution_y[tstart:, self.compartments_as_index.get_level_values(0) == "Ih"].sum(axis=1), index=pd.date_range(self.t_to_date(tstart), end=self.end_date).date)
 
     # Get the immunity against a given variant
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
@@ -1024,20 +1028,26 @@ class CovidModel:
         return dy
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y and solution_ydf
-    # TODO: try Julia ODE package, to improve performance
-    def solve_seir(self, y0=None, method='RK45'):
+    def solve_seir(self, y0=None, t0=None, method='RK45'):
+        if t0 is None:
+            t0 = self.tmin
+        trange = range(t0, self.tmax+1)
         if y0 is None:
             y0 = self.y0_from_dict(self.y0_dict)
-        self.solution = spi.solve_ivp(
+        solution = spi.solve_ivp(
             fun=self.ode,
-            t_span=[min(self.trange), max(self.trange)],
+            t_span=[min(trange), max(trange)],
             y0=y0,
-            t_eval=self.trange,
+            t_eval=trange,
             method=method,
             max_step=self.max_step_size
         )
-        if not self.solution.success:
-            self.log_and_raise(f'ODE solver failed with message: {self.solution.message}', RuntimeError)
+        if not solution.success:
+            self.log_and_raise(f'ODE solver failed with message: {solution.message}', RuntimeError)
+        if t0 > 0:
+            self.solution_y = np.vstack((self.solution_y[:t0, ], np.transpose(solution.y)))
+        else:
+            self.solution_y = np.transpose(solution.y)
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
@@ -1082,7 +1092,7 @@ class CovidModel:
 
     @classmethod
     def unserialize_y0_dict(cls, y0_list):
-        return {tuple(li[:-1]): float(li[-1]) for li in y0_list}
+        return {tuple(li[:-1]): float(li[-1]) for li in y0_list} if y0_list is not None else None
 
     # serializes SOME of this model's properties to a json format which can be written to database
     # model needs prepping still
