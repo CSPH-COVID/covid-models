@@ -45,8 +45,7 @@ class CovidModel:
         self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                              'age': ['0-19', '20-39', '40-64', '65+'],
                              'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                             'priorinf': ['none', 'omicron', 'other'],
-                             'variant': ['none', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121'],
+                             'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121'],
                              'immun': ['none', 'weak', 'strong'],
                              'region': ['co']})
 
@@ -507,7 +506,7 @@ class CovidModel:
     def y0_dict(self):
         if self.__y0_dict is None:
             group_pops = {(region, age): self.params_by_t['all'][f'{region}_{age_param}_pop'][0] for region in self.regions for age, age_param in zip(['0-19', '20-39', '40-64', '65+'], ['0_19', '20_39', '40_64', '65p'])}
-            y0d = {('S', age, 'none', 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
+            y0d = {('S', age, 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
             return y0d
         else:
             return self.__y0_dict
