@@ -824,7 +824,7 @@ class CovidModel:
         self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
         self.nonlinear_multiplier = {}
 
-     # takes a symbolic expression (coef), and looks up variable names in params to provide a computed output for each t in trange
+    # takes a symbolic expression (coef), and looks up variable names in params to provide a computed output for each t in params_trange
     def calc_coef_by_t(self, coef, cmpt):
         if len(cmpt) > len(self.param_attr_names):
             param_cmpt = tuple(attr for attr, level in zip(cmpt, self.attr_names) if level in self.param_attr_names)
@@ -866,7 +866,7 @@ class CovidModel:
             return {t: coef for t in self.params_trange}
 
     # add a flow term, and add new flow to ODE matrices
-    def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+    def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, from_coef=None, to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         if len(from_cmpt) < len(self.attrs.keys()):
             self.log_and_raise(f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.', ValueError)
         if len(to_cmpt) < len(self.attrs.keys()):
@@ -876,23 +876,30 @@ class CovidModel:
                 if len(cmpt) < len(self.attrs.keys()):
                     self.log_and_raise(f'Scaling compartment `{cmpt}` does not have the right number of attributes.', ValueError)
 
-        if coef is not None:
+            # retreive the weights for each compartment we are scaling by
+            coef_by_t_dl = None
             if scale_by_cmpts_coef:
                 coef_by_t_lookup = {c: self.calc_coef_by_t(c, to_cmpt) for c in set(scale_by_cmpts_coef)}
                 coef_by_t_ld = [coef_by_t_lookup[c] for c in scale_by_cmpts_coef]
                 coef_by_t_dl = {t: [dic[t] for dic in coef_by_t_ld] for t in self.params_trange}
-            else:
-                coef_by_t_dl = None
+
+        # compute coef by t for the from and to compartments
+        coef_by_t = {t: 1 for t in self.params_trange}
+        if to_coef:
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(to_coef, to_cmpt).items()}
+        if from_coef:
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(from_coef, from_cmpt).items()}
+
 
         term = ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
             to_cmpt_idx=self.cmpt_idx_lookup[to_cmpt],
-            coef_by_t=self.calc_coef_by_t(coef, to_cmpt),  # switched BACK to setting parameters use the TO cmpt
-            scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in
-                                 scale_by_cmpts] if scale_by_cmpts is not None else None,
+            coef_by_t=coef_by_t,
+            scale_by_cmpts_idxs=[self.cmpt_idx_lookup[cmpt] for cmpt in scale_by_cmpts] if scale_by_cmpts is not None else None,
             scale_by_cmpts_coef_by_t=coef_by_t_dl if scale_by_cmpts is not None else None,
             constant_by_t=self.calc_coef_by_t(constant, to_cmpt) if constant is not None else None)
 
+        # don't even add the term if all its coefficients are zero
         if not (isinstance(term, ConstantODEFlowTerm)) and all([c == 0 for c in term.coef_by_t.values()]):
             pass
         elif isinstance(term, ConstantODEFlowTerm) and all([c == 0 for c in term.constant_by_t.values()]):
@@ -908,14 +915,14 @@ class CovidModel:
 
     # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
     # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
-    def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+    def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
         for from_cmpt in from_cmpts:
             to_cmpt_list = list(from_cmpt)
             for attr_name, new_attr_val in to_attrs.items():
                 to_cmpt_list[list(self.attrs.keys()).index(attr_name)] = new_attr_val
             to_cmpt = tuple(to_cmpt_list)
-            self.add_flow_from_cmpt_to_cmpt(from_cmpt, to_cmpt, coef=coef, scale_by_cmpts=scale_by_cmpts,
+            self.add_flow_from_cmpt_to_cmpt(from_cmpt, to_cmpt, from_coef=from_coef, to_coef=to_coef, scale_by_cmpts=scale_by_cmpts,
                                             scale_by_cmpts_coef=scale_by_cmpts_coef, constant=constant)
 
     # build ODE
@@ -925,21 +932,23 @@ class CovidModel:
         self.apply_tc(force_nlm_update=True)  # update the nonlinear multiplier
 
         # vaccination
-        self.add_flows_from_attrs_to_attrs({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, coef=f'shot1_per_available * (1 - shot1_fail_rate)')
-        self.add_flows_from_attrs_to_attrs({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, coef=f'shot1_per_available * shot1_fail_rate')
+        self.add_flows_from_attrs_to_attrs({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
+        self.add_flows_from_attrs_to_attrs({'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
         for i in [2, 3]:
             for immun in self.attrs['immun']:
                 # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
                 if immun == 'none':
-                    self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i - 1}_fail_rate)')
-                    self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i - 1}_fail_rate)')
+                    self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i - 1}_fail_rate)')
+                    self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, from_coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i - 1}_fail_rate)')
                 else:
-                    self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, coef=f'shot{i}_per_available')
+                    self.add_flows_from_attrs_to_attrs({'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available')
 
         # seed variants (only seed the ones in our attrs)
         for variant in self.attrs['variant']:
+            if variant == 'none':
+                continue
             seed_param = f'{variant}_seed'
-            from_variant = self.attrs['variant'][0]
+            from_variant = self.attrs['variant'][0]   # first variant
             self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': from_variant, 'immun': 'none'}, {'seir': 'E', 'variant': variant}, constant=seed_param)
 
         # exposure
@@ -947,11 +956,13 @@ class CovidModel:
             # No mobility between regions (or a single region)
             if self.mobility_mode is None or self.mobility_mode == "none":
                 for region in self.attrs['region']:
-                    asymptomatic_transmission = f'(1 - immunity) * kappa * betta / {region}_pop'
+                    # todo: take advantage of from_coef and to_coef to simplify storage of population parameters
                     sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': region})
                     asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, coef=f'lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, coef=asymptomatic_transmission, scale_by_cmpts=asympt_cmpts)
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'(1 - immunity) * kappa / {region}_pop', scale_by_cmpts=sympt_cmpts)
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'(1 - immunity) * kappa / {region}_pop', scale_by_cmpts=asympt_cmpts)
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta * immune_escape", from_coef=f'immunity * kappa / {region}_pop', scale_by_cmpts=sympt_cmpts)
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta * immune_escape", from_coef=f'immunity * kappa / {region}_pop', scale_by_cmpts=asympt_cmpts)
             # Transmission parameters attached to the susceptible population
             elif self.mobility_mode == "population_attached":
                 for from_region in self.attrs['region']:
@@ -960,8 +971,9 @@ class CovidModel:
                     for to_region in self.attrs['region']:
                         sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                         asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
+                        # TODO: update with immune escape
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
             # Transmission parameters attached to the transmission location
             elif self.mobility_mode == "location_attached":
                 for from_region in self.attrs['region']:
@@ -971,35 +983,36 @@ class CovidModel:
                         for to_region in self.attrs['region']:
                             sympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'I', 'variant': variant, 'region': from_region})
                             asympt_cmpts = self.filter_cmpts_by_attrs({'seir': 'A', 'variant': variant, 'region': from_region})
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
+                            # TODO: take advantage of from_coef and to_coef to more efficiently store mobility parameters
+                            # TODO: update with immune escape
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_cmpts=sympt_cmpts)
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_cmpts=asympt_cmpts)
 
         # disease progression
-        self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'I'}, coef='1 / alpha * pS')
-        self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'A'}, coef='1 / alpha * (1 - pS)')
+        self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'I'}, to_coef='1 / alpha * pS')
+        self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'A'}, to_coef='1 / alpha * (1 - pS)')
         # assume no one is receiving both pax and mab
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * (1 - mab_prev - pax_prev)')
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * mab_prev * mab_hosp_adj')
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, coef='gamm * hosp * (1 - severe_immunity) * pax_prev * pax_hosp_adj')
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * (1 - mab_prev - pax_prev)')
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * mab_prev * mab_hosp_adj')
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * pax_prev * pax_hosp_adj')
 
         # disease termination
         for variant in self.attrs['variant']:
-            priorinf = 'omicron' if variant != 'none' and variant in ['omicron', 'ba2', 'ba2121'] else 'other'
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
-            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='gamm * (1 - priorinf_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='gamm * priorinf_fail_rate')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S'}, to_coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
+            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - priorinf_fail_rate)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S'}, to_coef='gamm * priorinf_fail_rate')
 
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / hlos * (1 - dh) * (1 - priorinf_fail_rate) * (1-mab_prev)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='1 / hlos * (1 - dh) * priorinf_fail_rate * (1-mab_prev)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf, 'immun': 'strong'}, coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * (1 - priorinf_fail_rate) * mab_prev')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'priorinf': priorinf}, coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * priorinf_fail_rate * mab_prev')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='1 / hlos * (1 - dh) * (1 - priorinf_fail_rate) * (1-mab_prev)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S'}, to_coef='1 / hlos * (1 - dh) * priorinf_fail_rate * (1-mab_prev)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * (1 - priorinf_fail_rate) * mab_prev')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S'}, to_coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * priorinf_fail_rate * mab_prev')
 
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'D', 'priorinf': priorinf}, coef='gamm * dnh * (1 - severe_immunity)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'D', 'priorinf': priorinf}, coef='1 / hlos * dh')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'D'}, to_coef='gamm * dnh * (1 - severe_immunity)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'D'}, to_coef='1 / hlos * dh')
 
         # immunity decay
-        self.add_flows_from_attrs_to_attrs({'immun': 'strong'}, {'immun': 'weak'}, coef='1 / imm_decay_days')
+        self.add_flows_from_attrs_to_attrs({'immun': 'strong'}, {'immun': 'weak'}, to_coef='1 / imm_decay_days')
 
     # convert ODE matrices to CSR format, to (massively) improve performance
     def compile(self):
