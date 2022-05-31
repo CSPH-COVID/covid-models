@@ -16,22 +16,23 @@ from covid_model.utils import IndentLogger, setup, get_file_prefix
 logger = IndentLogger(logging.getLogger(''), {})
 
 
-def __single_window_fit(model: CovidModel, look_back, tc_min, tc_max, y0d=None):
+def __single_window_fit(model: CovidModel, look_back, tc_min, tc_max, yd_start=None, tstart=None):
     # define initial states
     fixed_tc = model.tc[:-look_back]
-    y0d = model.y0_dict if y0d is None else y0d
-    y0 = model.y0_from_dict(y0d)
+    yd_start = model.y0_dict if yd_start is None else yd_start
+    y0 = model.y0_from_dict(yd_start)
+    trange = range(tstart, model.tmax+1)
 
     # function to be optimized
     def func(trange, *test_tc):
         combined_tc = fixed_tc + list(test_tc)
         model.apply_tc(combined_tc)
-        model.solve_seir(y0=y0, method='RK45')
-        return model.solution_sum_Ih()
+        model.solve_seir(y0=y0, t0=tstart, method='RK45')
+        return model.solution_sum_Ih(tstart)
     fitted_tc, fitted_tc_cov = spo.curve_fit(
         f=func
-        , xdata=model.trange
-        , ydata=model.actual_hosp[:len(model.trange)]
+        , xdata=trange
+        , ydata=model.actual_hosp[tstart:(tstart + len(trange))]
         , p0=model.tc[-look_back:]
         , bounds=([tc_min] * look_back, [tc_max] * look_back))
     return fitted_tc, fitted_tc_cov
@@ -116,7 +117,10 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         model.apply_tc(tc[:len(tc) - trim_off_end], tslices=tslices[:len(tslices) - trim_off_end])
         logger.info(f'{str(model.tags)}: Model copied in {perf_counter() - t01} seconds.')
 
-        fitted_tc, fitted_tc_cov = __single_window_fit(model, look_back=batch_size, tc_min=tc_min, tc_max=tc_max)
+        tstart = ([0] + model.tc_tslices)[-batch_size]
+        yd_start = model.y_dict(tstart) if tstart != 0 else model.y0_dict
+        fitted_tc, fitted_tc_cov = __single_window_fit(model, look_back=batch_size, tc_min=tc_min, tc_max=tc_max, yd_start=yd_start, tstart=tstart)
+        base_model.solution_y = model.solution_y
         tc[len(tc) - trim_off_end - batch_size:len(tc) - trim_off_end] = fitted_tc
         logger.info(f'{str(model.tags)}: Transmission control fit {i + 1}/{len(trim_off_end_list)} completed in {perf_counter() - t0} seconds: {fitted_tc}')
         model.tags['fit_batch'] = str(i)
