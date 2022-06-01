@@ -914,7 +914,7 @@ class CovidModel:
     def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
         # Create string summarizing the flow
         from_attrs_str = '(' + ','.join(from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
-        to_attrs_str = '(' + ','.join(to_attrs[p] if p in to_attrs.keys() else from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
+        to_attrs_str = '(' + ','.join(to_attrs[p] if p in to_attrs.keys() else from_attrs[p] if p in from_attrs.keys() else "\"" for p in self.attrs) + ')'
         flow_str = f'{from_attrs_str} -> {to_attrs_str}:'
         if constant is not None:
             flow_str += f' x {constant}'
@@ -948,7 +948,7 @@ class CovidModel:
         self.apply_tc(force_nlm_update=True)  # update the nonlinear multiplier
 
         # vaccination
-        for seir in [seir for seir in self.attrs['seir'] if seir != 'D']:
+        for seir in ['S', 'E', 'A']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
             for i in [2, 3]:
@@ -1011,6 +1011,8 @@ class CovidModel:
 
         # disease termination
         for variant in self.attrs['variant']:
+            if variant == 'none':
+                continue
             self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
             self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S'}, to_coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
             self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - priorinf_fail_rate)')
