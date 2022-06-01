@@ -359,7 +359,6 @@
   {"param": "immunity",	"attrs": {"immun": "strong"},	"vals": {"2020-01-01": 1},	"desc": "Base maximum immunity from vaccines or prior infection."},
   {"param": "immunity",	"attrs": {"immun": "weak"},	"vals": {"2020-01-01": 0.8},	"desc": "Base minimum immunity from vaccines or prior infection."},
   {"param": "immunity",	"attrs": {"immun": "none"},	"vals": {"2020-01-01": 0},	"desc": "No immunity for vaccine fails."},
-  {"param": "immunity",	"attrs": {"immun": "weak", "variant": ["omicron", "ba2", "ba2121"]},	"vals": {"2020-01-01": 0.22},	"desc": "Base minimum immunity from vaccines or prior infection."},
 
   {"param": "severe_immunity",	"attrs": null,	"vals": {"2020-01-01": 0},	"desc": "protection against hospitalization, given infection"},
   {"param": "severe_immunity",	"attrs": {"immun": ["strong", "weak"]},	"vals": {"2020-01-01": 0.975},	"desc": "Vaccinated immunity vs severe disease is very high (among vacc. successes)."},
@@ -367,9 +366,10 @@
   {"param": "severe_immunity",  "attrs": {"variant": ["delta", "omicron", "ba2", "ba2121"]},	"mults": {"2020-01-01": 0.9},	"desc": "Delta and Omicron reduce immunity to severe disease."},
 
   {"param": "immune_escape", "attrs": null,  "vals": {"2020-01-01": 0},  "desc":  ""},
-  {"param": "immune_escape", "attrs": {"variant":  "delta"},  "vals": {"2020-01-01": 0.1},  "desc":  ""},
-  {"param": "immune_escape", "attrs": {"variant":  ["omicron", "ba2"]},  "vals": {"2020-01-01": 0.3},  "desc":  ""},
-  {"param": "immune_escape", "attrs": {"variant":  ["ba2121"]},  "vals": {"2020-01-01": 0.3},  "desc":  ""},
+  {"param": "immune_escape", "attrs": {"immun": "none"},  "vals": {"2020-01-01": 0.0},  "desc":  "hack to ensure we can get immunity for 'none' group, based on how params are stored when attrs is null"},
+  {"param": "immune_escape", "attrs": {"immun": "strong", "variant":  ["omicron", "ba2", "ba2121"]},  "vals": {"2020-01-01": 0.1  },  "desc":  ""},
+  {"param": "immune_escape", "attrs": {"immun": "weak", "variant":  "delta"},  "vals": {"2020-01-01": 0.4},  "desc":  ""},
+  {"param": "immune_escape", "attrs": {"immun": "weak", "variant":  ["omicron", "ba2", "ba2121"]},  "vals": {"2020-01-01": 0.7},  "desc":  ""},
 
   {"param": "imm_decay_days",	"attrs": null,	"vals": {"2020-01-01": 360},	"desc": ""},
   {"param": "imm_decay_days",	"attrs": {"vacc": "shot3"},	"mults": {"2020-01-01": 1.25},	"desc": "Booster immunity decays more slowly than 2-dose immunity."},
@@ -394,8 +394,8 @@
 
   {"param": "betta",  "attrs": {"variant": "alpha"},	"mults": {"2020-01-01": 1.5},	"desc": "Alpha is more infectious than wildtype."},
   {"param": "betta",  "attrs": {"variant": "delta"},	"mults": {"2020-01-01": 2.25},	"desc": "Delta is more infectious than wildtype."},
-  {"param": "betta",  "attrs": {"variant": "omicron"}, "mults": {"2020-01-01":  5.063}, "desc": "2.25x Delta"},
-  {"param": "betta",  "attrs": {"variant": "ba2"}, "mults": {"2020-01-01": 7.594}, "desc": "1.5x Omicron"},
+  {"param": "betta",  "attrs": {"variant": "omicron"},  "mults": {"2020-01-01":  5.063}, "desc": "2.25x Delta"},
+  {"param": "betta",  "attrs": {"variant": "ba2"},  "mults": {"2020-01-01": 7.594}, "desc": "1.5x Omicron"},
   {"param": "betta",  "attrs": {"variant": "ba2121"}, "mults":  {"2020-01-01": 9.492}, "desc": "1.25x BA.2"},
 
   {"param": "alpha",	"attrs": {"variant": ["omicron", "ba2", "ba2121"]},	"mults": {"2020-01-01": 0.6},	"desc": "Omicron has shorter incubation period than wildtype."},
