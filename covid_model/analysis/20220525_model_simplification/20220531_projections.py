@@ -6,22 +6,21 @@ import json
 import logging
 import numpy as np
 ### Third Party Imports ###
-from collections import OrderedDict
 from matplotlib import pyplot as plt
 ### Local Imports ###
 from covid_model import CovidModel
-#from covid_model.runnable_functions import
 from covid_model.utils import IndentLogger, setup, get_filepath_prefix
 logger = IndentLogger(logging.getLogger(''), {})
 from covid_model.db import db_engine
 from covid_model.analysis.charts import plot_transmission_control
+
 
 def main():
     ####################################################################################################################
     # Set Up Arguments for Running
     outdir = setup(os.path.basename(__file__), 'info')
 
-    model_args = {'base_spec_id': 2645, 'end_date': "2022-09-01"}
+    model_args = {'base_spec_id': 2665, 'end_date': "2022-11-01", 'params_defs': 'covid_model/analysis/20220525_model_simplification/params_nopriorinf.json'}
     logging.info(json.dumps({"model_args": model_args}, default=str))
 
     ####################################################################################################################
