@@ -81,11 +81,11 @@ class CovidModel:
         # ode data
         self.t_prev_lookup = None
         self.terms = None
-        self.compartments_as_index = None
-        self.compartments = None
-        self.param_compartments = None
+        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attrs.keys())
+        self.compartments = list(self.compartments_as_index)
+        self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
+        self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
         self.params_by_t = None
-        self.cmpt_idx_lookup = list()
         self.__y0_dict = None
         self.flows_string = '(' + ','.join(self.attr_names) + ')'
 
@@ -204,10 +204,8 @@ class CovidModel:
             if max_cumu:
                 cumu_vacc = self.actual_vacc_df.groupby(['region', 'age']).sum()
                 groups = realloc_priority if realloc_priority else projections.groupby(['region','age']).sum().index
-                populations = pd.DataFrame([{'param': param_dict['param'], 'region': region, 'population': list(param_dict['vals'].values())[0]} for region in self.regions for param_dict in self.params_defs if region in param_dict['param']])
-                populations['age'] = ['65+' if li[1]=='65p' else '-'.join(li[1:3]) for li in populations['param'].str.split("_")]
-                populations = populations[populations['age'] != 'pop'].drop(columns='param')
-
+                # self.params_by_t hasn't necessarily been built yet, so use a workaround
+                populations = pd.DataFrame([{'region': param_dict['attrs']['region'], 'age': param_dict['attrs']['age'], 'population': list(param_dict['vals'].values())[0]} for region in self.regions for param_dict in self.params_defs if param_dict['param'] == 'region_age_pop'])
 
                 for d in projections.index.unique('date'):
                     this_max_cumu = get_params(max_cumu.copy(), d)
@@ -506,8 +504,9 @@ class CovidModel:
     @property
     def y0_dict(self):
         if self.__y0_dict is None:
-            group_pops = {(region, age): self.params_by_t['all'][f'{region}_{age_param}_pop'][0] for region in self.regions for age, age_param in zip(['0-19', '20-39', '40-64', '65+'], ['0_19', '20_39', '40_64', '65p'])}
-            y0d = {('S', age, 'none', 'none', 'none', region): n for (region, age), n in group_pops.items()}
+            group_pops = self.get_param('region_age_pop', {'vacc': 'none', 'variant': 'none', 'immun': 'none'}).loc[0].reset_index().drop(columns=['vacc', 'variant', 'immun'])
+            y0d = {('S', row['age'], 'none', 'none', 'none', row['region']): row['region_age_pop'] for i, row in group_pops.iterrows()}
+            self.__y0_dict = y0d
             return y0d
         else:
             return self.__y0_dict
@@ -592,26 +591,25 @@ class CovidModel:
 
     # Get the immunity against a given variant
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
-        params = self.params_as_df
         group_by_attr_names = [attr_name for attr_name in self.param_attr_names if attr_name != 'variant']
         n = self.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
-
         if age is not None:
-            params = params.xs(age, level='age')
             n = n.xs(age, level='age')
+
+        attrs = {'variant': variant} if age is None else {'variant': variant, 'age': age}
+        params = self.get_params(['immunity', 'severe_immunity', 'hosp', 'immune_escape'], attrs).reset_index(['variant', 't']).drop(columns='variant')
+        params['date'] = [self.t_to_date(t) for t in params['t']]
+        params = params.drop(columns='t').set_index('date', append=True).reorder_levels(n.index.names)
 
         if vacc_only:
             params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
             params.loc[params.index.get_level_values('vacc') == 'none', 'severe_immunity'] = 0
 
-        variant_params = params.xs(variant, level='variant')
         if to_hosp:
-            weights = variant_params['hosp'] * n
-            return (weights * (
-                        1 - (1 - variant_params['immunity']) * (1 - variant_params['severe_immunity']))).groupby(
-                't').sum() / weights.groupby('t').sum()
+            weights = params['hosp'] * n
+            return (weights * (1 - (1 - params['immunity'] * (1-params['immune_escape']) ) * (1 - params['severe_immunity']))).groupby('date').sum() / weights.groupby('date').sum()
         else:
-            return (n * variant_params['immunity']).groupby('t').sum() / n.groupby('t').sum()
+            return (n * params['immunity'] * (1-params['immune_escape']) ).groupby('date').sum() / n.groupby('date').sum()
 
     def modeled_vs_actual_hosps(self):
         df = self.solution_sum(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
@@ -622,21 +620,22 @@ class CovidModel:
         return df
 
     # get a parameter for a given set of attributes and trange
-    def get_param(self, param, attrs=None, trange=None):
+    def get_param(self, param, attrs=None):
         # pass empty dict if want all compartments listed separately
-        if trange is None:
-            trange = self.trange
         cmpt_list = ['all'] if attrs is None else self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments
-        vals = []
+        df_list = []
         for cmpt in cmpt_list:
-            df = pd.DataFrame(index=trange, columns=[param])
-            df.index.names = ['t']
             if param in self.params_by_t[cmpt].keys():
-                for t in trange:
-                    t_left = self.params_by_t[cmpt][param].keys()[self.params_by_t[cmpt][param].bisect(t) - 1]
-                    df.loc[t][param] = self.params_by_t[cmpt][param][t_left]
-                vals.append((cmpt, df))
-        return vals
+                df = pd.DataFrame(index=self.trange, columns=self.param_attr_names, data=[cmpt for t in self.trange]).rename_axis('t').set_index(self.param_attr_names, append=True)
+                df[param] = np.nan
+                for t, val in self.params_by_t[cmpt][param].items():
+                    df[param][t] = val
+                df_list.append(df.ffill())
+        df = pd.concat(df_list)
+        return df
+
+    def get_params(self, params: list, attrs=None):
+        return pd.concat([self.get_param(param, attrs) for param in params], axis=1)
 
     # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
@@ -684,7 +683,6 @@ class CovidModel:
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
-
     ####################################################################################################################
     ### Prepping and Running
 
@@ -695,8 +693,10 @@ class CovidModel:
         vacc_rates = pd.concat([missing_shots, vacc_rates])
         vacc_rates['t'] = [self.date_to_t(d) for d in vacc_rates.index.get_level_values('date')]
         vacc_rates = vacc_rates.set_index('t', append=True)
-        populations = pd.concat([self.get_param(f'{region}_{grp}_pop', trange=vacc_rates.index.get_level_values('t').unique())[0][1].rename(columns={f'{region}_{grp}_pop':'population'}).assign(age=grp_lab, region=region) for grp, grp_lab in zip(['0_19', '20_39', '40_64', '65p'], ['0-19', '20-39', '40-64', '65+']) for region in self.regions])
-        populations = populations.reset_index().set_index(['region', 'age', 't'])
+        populations = self.get_param('region_age_pop', {'vacc': 'none', 'variant': 'none', 'immun': 'none'}).reset_index([an for an in self.param_attr_names if an not in ['region', 'age']])[['region_age_pop']]
+        vacc_rates_ts = vacc_rates.index.get_level_values('t').unique()
+        populations = populations.iloc[[t in vacc_rates_ts for t in populations.index.get_level_values('t')]].reorder_levels(['region', 'age', 't'])
+        populations.rename(columns={'region_age_pop': 'population'}, inplace=True)
         cumu_vacc = vacc_rates.groupby(['region', 'age']).cumsum()
         cumu_vacc_final_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.join(populations)
@@ -748,10 +748,6 @@ class CovidModel:
     # combine param_defs, vaccine_defs, etc. into a time indexed parameters dictionary
     def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
         logger.debug(f"{str(self.tags)} Building param lookups")
-        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attrs.keys())
-        self.compartments = list(self.compartments_as_index)
-        self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
-        self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
         self.params_by_t = {pcmpt: {} for pcmpt in ['all'] + self.param_compartments}
 
         for param_def in self.params_defs:
@@ -979,15 +975,15 @@ class CovidModel:
             # No mobility between regions (or a single region)
             if self.mobility_mode is None or self.mobility_mode == "none":
                 for region in self.attrs['region']:
-                    # todo: take advantage of from_coef and to_coef to simplify storage of population parameters
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'(1 - immunity) * kappa / {region}_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'(1 - immunity) * kappa / {region}_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta * immune_escape", from_coef=f'immunity * kappa / {region}_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta * immune_escape", from_coef=f'immunity * kappa / {region}_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta * immune_escape", from_coef=f'immunity * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta * immune_escape", from_coef=f'immunity * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
             # Transmission parameters attached to the susceptible population
             elif self.mobility_mode == "population_attached":
                 for from_region in self.attrs['region']:
                     # kappa in this mobility mode is associated with the susceptible population, so no need to store every kappa in every region
+                    # TODO: update based on new way of storing population parameters
                     asymptomatic_transmission = f'(1 - immunity) * kappa_pa * betta / {from_region}_pop'
                     for to_region in self.attrs['region']:
                         # TODO: update with immune escape
