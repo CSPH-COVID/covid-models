@@ -13,26 +13,28 @@ from covid_model.utils import IndentLogger, setup, get_filepath_prefix
 logger = IndentLogger(logging.getLogger(''), {})
 from covid_model.db import db_engine
 from covid_model.analysis.charts import plot_transmission_control
-
+from covid_model.runnable_functions import do_create_report, do_build_legacy_output_df
 
 def main():
     ####################################################################################################################
     # Set Up Arguments for Running
     outdir = setup(os.path.basename(__file__), 'info')
 
-    model_args = {'base_spec_id': 2665, 'end_date': "2022-11-01", 'params_defs': 'covid_model/analysis/20220525_model_simplification/params_nopriorinf.json'}
+    model_args = {'base_spec_id': 2665, 'end_date': "2022-11-01", 'params_defs': 'covid_model/analysis/20220525_model_simplification/params_nopriorinf.json',  'max_step_size': 1.0}
     logging.info(json.dumps({"model_args": model_args}, default=str))
 
     ####################################################################################################################
     # Run
 
     # fit a statewide model up to present day to act as a baseline
-    logging.info('Fitting')
+    logging.info('Loading Model')
 
     model = CovidModel(**model_args)
     model.prep()
     model.solve_seir()
-    model.immunity()
+    do_build_legacy_output_df(model).to_csv(get_filepath_prefix(outdir) + "out2.csv")
+
+    do_create_report(model, outdir)
 
     logger.info(f'{str(model.tags)}: Running forward sim')
     fig = plt.figure(figsize=(10, 10), dpi=300)
