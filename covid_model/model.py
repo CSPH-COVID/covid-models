@@ -41,6 +41,8 @@ class CovidModel:
     def __init__(self, engine=None, base_model=None, update_derived_properties=True, base_spec_id=None, **margs):
         # margs can be any model property
 
+        self.recently_updated_properties = []
+
         # basic model data
         self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                              'age': ['0-19', '20-39', '40-64', '65+'],
@@ -70,7 +72,6 @@ class CovidModel:
         self.mobility_proj_params = None
         self.actual_vacc_df = None
         self.proj_vacc_df = None
-        self.recently_updated_properties = []
         self.actual_hosp = None
 
         self.base_spec_id = None
