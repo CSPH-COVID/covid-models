@@ -513,7 +513,7 @@ class CovidModel:
     @property
     def y0_dict(self):
         if self.__y0_dict is None:
-            group_pops = self.get_param('region_age_pop', {'vacc': 'none', 'variant': 'none', 'immun': 'none'}).loc[0].reset_index().drop(columns=['vacc', 'variant', 'immun'])
+            group_pops = self.get_param_for_attrs_by_t('region_age_pop', attrs={'vacc': 'none', 'variant': 'none', 'immun': 'none'}).loc[0].reset_index().drop(columns=['vacc', 'variant', 'immun'])
             y0d = {('S', row['age'], 'none', 'none', 'none', row['region']): row['region_age_pop'] for i, row in group_pops.iterrows()}
             self.__y0_dict = y0d
             return y0d
