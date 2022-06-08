@@ -58,7 +58,7 @@ def main():
         #'max_step_size': np.inf
         'max_step_size': 1.0
     }
-    model_args = {'base_spec_id': 2698}
+    #model_args = {'base_spec_id': 2705}
     logging.info(json.dumps({"fit_args": fit_args}, default=str))
     logging.info(json.dumps({"model_args": model_args}, default=str))
 
@@ -66,16 +66,21 @@ def main():
     # Run
 
     # fit a statewide model up to present day to act as a baseline
-    #logging.info('Fitting')
-    #model = do_single_fit(**fit_args, **model_args, tags={'priorinf': False})
-    #model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun_total_all_at_once.csv")
-    #model.solution_sum().unstack().to_csv(get_filepath_prefix(outdir) + "states_full.csv")
-    #logging.debug(json.dumps({"serialized model": model.to_json_string()}, default=str))
-    model = CovidModel(**model_args)
+    logging.info('Fitting')
+    model = do_single_fit(**fit_args, **model_args, tags={'priorinf': False})
+    #model = CovidModel(**model_args)
+    #model.prep()
+    #model.solve_seir()
 
-    #do_create_report(model, outdir, prep_model=True, solve_model=True)
+    model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun_total_all_at_once.csv")
+    model.solution_sum().unstack().to_csv(get_filepath_prefix(outdir) + "states_full.csv")
+
+
+    logging.debug(json.dumps({"serialized model": model.to_json_string()}, default=str))
+    do_create_report(model, outdir, prep_model=True, solve_model=True)
 
     model.end_date = '2022-09-01'
+    model.update(db_engine())
     model.prep()  # needed
     model.solve_seir()
     model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun_total_all_at_once_forecast.csv")
@@ -94,8 +99,6 @@ def main():
     plt.close()
     hosps_df.to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_forecast.csv')
     json.dump(dict(dict(zip([0] + model.tc_tslices, model.tc))), open(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_forecast_tc.json', 'w'))
-
-
 
 
 if __name__ == "__main__":

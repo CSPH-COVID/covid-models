@@ -375,7 +375,7 @@
   {"param": "imm_decay_days",	"attrs": null,	"vals": {"2020-01-01": 360},	"desc": ""},
   {"param": "imm_decay_days",	"attrs": {"vacc": "shot3"},	"mults": {"2020-01-01": 1.25},	"desc": "Booster immunity decays more slowly than 2-dose immunity."},
 
-  {"param": "wildtype_seed",	"attrs": {"region": "co"},	"vals": {"2020-01-01": 0, "2020-01-24": 2.2, "2020-01-25": 0},	"desc": ""},
+  {"param": "wildtype_seed",	"attrs": {"region": "co"},	"vals": {"2020-01-01": 0, "2020-01-24": 6.6, "2020-01-30": 0},	"desc": ""},
   {"param": "wildtype_seed",	"attrs": {"region": "cent"},	"vals": {"2020-01-01": 0, "2020-03-01": 2.2, "2020-04-01": 0},	"desc": ""},
   {"param": "wildtype_seed",	"attrs": {"region": "cm"},	"vals": {"2020-01-01": 0, "2020-02-22": 2.2, "2020-03-22": 0},	"desc": ""},
   {"param": "wildtype_seed",	"attrs": {"region": "met"},	"vals": {"2020-01-01": 0, "2020-02-22": 2.2, "2020-03-22": 0},	"desc": ""},
@@ -387,9 +387,9 @@
   {"param": "wildtype_seed",	"attrs": {"region": "sec"},	"vals": {"2020-01-01": 0, "2020-02-22": 2.2, "2020-03-22": 0},	"desc": ""},
   {"param": "wildtype_seed",	"attrs": {"region": "sw"},	"vals": {"2020-01-01": 0, "2020-03-22": 2.2, "2020-04-22": 0},	"desc": ""},
   {"param": "wildtype_seed",	"attrs": {"region": "wcp"},	"vals": {"2020-01-01": 0, "2020-02-22": 2.2, "2020-03-22": 0},	"desc": ""},
-  {"param": "alpha_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2020-11-09": 1, "2020-12-04": 0},	"desc": ""},
-  {"param": "delta_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2021-03-07": 1, "2021-04-11": 0},	"desc": ""},
-  {"param": "omicron_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2021-11-09": 1, "2021-12-11": 0},	"desc": ""},
+  {"param": "alpha_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2020-11-09": 3, "2020-12-04": 0},	"desc": ""},
+  {"param": "delta_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2021-03-07": 3, "2021-04-11": 0},	"desc": ""},
+  {"param": "omicron_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2021-11-09": 3, "2021-12-11": 0},	"desc": ""},
   {"param": "ba2_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2021-12-23": 5, "2022-02-02": 0},	"desc": ""},
   {"param": "ba2121_seed",	"attrs": null,	"vals": {"2020-01-01": 0, "2022-02-27": 5, "2022-04-08": 0},	"desc": ""},
 
