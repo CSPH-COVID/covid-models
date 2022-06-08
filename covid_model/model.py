@@ -86,7 +86,7 @@ class CovidModel:
         self.compartments = list(self.compartments_as_index)
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
-        self.params_by_t = None
+        self.params_by_t = {'all': {}}
         self.__y0_dict = None
         self.flows_string = '(' + ','.join(self.attr_names) + ')'
 
@@ -403,6 +403,7 @@ class CovidModel:
         self.tc_tslices = new_tc_tslices
         self.tc = new_tc
         self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
+        self.recently_updated_properties.append('start_date')
 
     @property
     def end_date(self):
@@ -421,6 +422,7 @@ class CovidModel:
         self.tc_tslices = new_tc_tslices
         self.tc = new_tc
         self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
+        self.recently_updated_properties.append('end_date')
 
     @property
     def tmin(self):
@@ -436,6 +438,7 @@ class CovidModel:
         self.__end_date = self.start_date + dt.timedelta(days=value)
         self.__trange = range(self.tmin, self.tmax + 1)
         self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
+        self.recently_updated_properties.append('end_date')
 
     @property
     def trange(self):
@@ -462,6 +465,7 @@ class CovidModel:
     def regions(self, value: list):
         self.__regions = value
         self.attrs['region'] = value  # if regions changes, update the compartment attributes also
+        self.recently_updated_properties.append('regions')
 
 
     ### things which are dictionaries but which may be given as a path to a json file
@@ -471,7 +475,8 @@ class CovidModel:
 
     @params_defs.setter
     def params_defs(self, value):
-        self.__params_defs = value if isinstance(value, dict) else json.load(open(value))
+        self.__params_defs = value if isinstance(value, list) else json.load(open(value))
+        self.recently_updated_properties.append('params_defs')
 
     @property
     def vacc_proj_params(self):
@@ -480,6 +485,7 @@ class CovidModel:
     @vacc_proj_params.setter
     def vacc_proj_params(self, value):
         self.__vacc_proj_params = value if isinstance(value, dict) else json.load(open(value))
+        self.recently_updated_properties.append('vacc_proj_params')
 
     @property
     def region_defs(self):
@@ -488,6 +494,7 @@ class CovidModel:
     @region_defs.setter
     def region_defs(self, value):
         self.__region_defs = value if isinstance(value, dict) else json.load(open(value))
+        self.recently_updated_properties.append('region_defs')
 
     ### Set mobility mode as None if "none"
     @property
@@ -497,6 +504,7 @@ class CovidModel:
     @mobility_mode.setter
     def mobility_mode(self, value):
         self.__mobility_mode = value if value != 'none' else None
+        self.recently_updated_properties.append('mobility_mode')
 
 
     ### Properties that take a little computation to get
