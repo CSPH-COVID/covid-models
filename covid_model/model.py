@@ -1138,7 +1138,7 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} Serializing model to json")
         keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', 'attrs', 'tc_tslices', 'tc', 'tc_cov', 'tc_tslices', 'tc_t_prev_lookup', '_CovidModel__params_defs',
                 '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'actual_hosp',
-                '_CovidModel__y0_dict']
+                '_CovidModel__y0_dict', 'max_step_size']
         #TODO: handle mobility, add in proj_mobility
         serial_dict = OrderedDict()
         for key in keys:
@@ -1153,6 +1153,8 @@ class CovidModel:
                 serial_dict[key] = self.serialize_hosp(val)
             elif key == '_CovidModel__y0_dict' and self.__y0_dict is not None:
                 serial_dict[key] = self.serialize_y0_dict(val)
+            elif key == 'max_step_size':
+                serial_dict[key] = val if not np.isinf(val) else 'inf'
             else:
                 serial_dict[key] = val
         return json.dumps(serial_dict)
@@ -1175,6 +1177,8 @@ class CovidModel:
                 self.__dict__[key] = self.unserialize_tc_t_prev_lookup(val)
             elif key == '_CovidModel__y0_dict':
                 self.__dict__[key] = self.unserialize_y0_dict(val)
+            elif key == 'max_step_size':
+                self.__dict__[key] = np.inf if val == 'inf' else float(val)
             else:
                 self.__dict__[key] = val
 
