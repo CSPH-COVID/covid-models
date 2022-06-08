@@ -82,7 +82,7 @@ class CovidModel:
         # ode data
         self.t_prev_lookup = None
         self.terms = None
-        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attrs.keys())
+        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attr_names)
         self.compartments = list(self.compartments_as_index)
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
@@ -598,27 +598,44 @@ class CovidModel:
     def solution_sum_Ih(self, tstart=0):
         return pd.Series(self.solution_y[tstart:, self.compartments_as_index.get_level_values(0) == "Ih"].sum(axis=1), index=pd.date_range(self.t_to_date(tstart), end=self.end_date).date)
 
-    # Get the immunity against a given variant
+    # Get the immunity against a given variant.
+    # I.e. if everyone were exposed today, what fraction of people who WOULD be normally infected if the had no immunity, are NOT infected because they are immune?
+    # or, if to_hosp=True, then what fraction of people who WOULD be normally hospitalized if they had no immunity, are NOT hospitalized because they are immune?
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
-        group_by_attr_names = [attr_name for attr_name in self.param_attr_names if attr_name != 'variant']
+        group_by_attr_names = self.param_attr_names
         n = self.solution_sum(group_by_attr_names).stack(level=group_by_attr_names)
         if age is not None:
             n = n.xs(age, level='age')
 
-        attrs = {'variant': variant} if age is None else {'variant': variant, 'age': age}
-        params = self.get_params(['immunity', 'severe_immunity', 'hosp', 'immune_escape'], attrs).reset_index(['variant', 't']).drop(columns='variant')
+        from_attrs = {} if age is None else {'age': age}
+        to_attrs = {'variant': variant} if age is None else {'variant': variant, 'age': age}
+        if to_hosp:
+            from_params = self.get_params_for_attrs_by_t(['immunity', 'severe_immunity', 'hosp', 'mab_prev', 'mab_hosp_adj', 'pax_prev', 'pax_hosp_adj'], attrs=from_attrs)
+        else:
+            from_params = self.get_params_for_attrs_by_t(['immunity'], attrs=from_attrs)
+        from_to_params = self.get_params_for_attrs_by_t(['immune_escape'], from_attrs=from_attrs, to_attrs=to_attrs)
+        drop_cols = [name for name in from_to_params.index.names if 'to' in name]
+        from_to_params = from_to_params.reset_index(drop_cols).drop(columns=drop_cols)
+        from_to_params.index.set_names([name[5:] if 'from_' in name else name for name in from_to_params.index.names], inplace=True)
+        params = from_params.join(from_to_params).reset_index('t')
         params['date'] = [self.t_to_date(t) for t in params['t']]
+        if age is not None:
+            params = params.reset_index('age').drop(columns='age')
         params = params.drop(columns='t').set_index('date', append=True).reorder_levels(n.index.names)
 
         if vacc_only:
             params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
             params.loc[params.index.get_level_values('vacc') == 'none', 'severe_immunity'] = 0
 
+        params['effective_inf_rate'] = 1-params['immunity'] * (1-params['immune_escape'])
         if to_hosp:
-            weights = params['hosp'] * n
-            return (weights * (1 - (1 - params['immunity'] * (1-params['immune_escape']) ) * (1 - params['severe_immunity']))).groupby('date').sum() / weights.groupby('date').sum()
+            # weights = people who would be hospitalized if noone had any immunity
+            weights = n * params['hosp'] * (1-params['mab_prev']-params['pax_prev'] + params['mab_prev']*params['mab_hosp_adj'] + params['pax_prev']*params['pax_hosp_adj'])
+            params['effective_hosp_rate'] = params['effective_inf_rate'] * (1-params['severe_immunity'])
+            return (weights * (1 - params['effective_hosp_rate'])).groupby('date').sum() / weights.groupby('date').sum()
+            #return (n * (1 - params['effective_hosp_rate'])).groupby('date').sum() / n.groupby('date').sum()
         else:
-            return (n * params['immunity'] * (1-params['immune_escape']) ).groupby('date').sum() / n.groupby('date').sum()
+            return (n * (1 - params['effective_inf_rate'])).groupby('date').sum() / n.groupby('date').sum()
 
     def modeled_vs_actual_hosps(self):
         df = self.solution_sum(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
@@ -628,23 +645,35 @@ class CovidModel:
         df = df.reindex(columns=['actual', 'modeled'])
         return df
 
-    # get a parameter for a given set of attributes and trange
-    def get_param(self, param, attrs=None):
-        # pass empty dict if want all compartments listed separately
-        cmpt_list = ['all'] if attrs is None else self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True) if attrs else self.param_compartments
+    # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
+    def get_param_for_attrs_by_t(self, param, attrs=None, from_attrs=None, to_attrs=None):
+        # get the keys for the parameters we want
         df_list = []
-        for cmpt in cmpt_list:
-            if param in self.params_by_t[cmpt].keys():
-                df = pd.DataFrame(index=self.trange, columns=self.param_attr_names, data=[cmpt for t in self.trange]).rename_axis('t').set_index(self.param_attr_names, append=True)
-                df[param] = np.nan
-                for t, val in self.params_by_t[cmpt][param].items():
+        if attrs is not None:
+            cmpts = self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True)
+            for cmpt in cmpts:
+                param_key = self.get_param_key_for_param_and_cmpts(param, cmpt=cmpt, is_param_cmpt=True)
+                df = pd.DataFrame(index=self.trange, columns=self.param_attr_names, data=[cmpt for t in self.trange]).rename_axis('t').set_index(self.param_attr_names, append=True).assign(**{param: np.nan})
+                for t, val in self.params_by_t[param_key][param].items():
                     df[param][t] = val
                 df_list.append(df.ffill())
+        else:
+            from_cmpts = self.filter_cmpts_by_attrs(from_attrs, is_param_cmpts=True)
+            for from_cmpt in from_cmpts:
+                to_cmpts = self.update_cmpt_tuple_with_attrs(from_cmpt, to_attrs, is_param_cmpt=True)
+                for to_cmpt in to_cmpts:
+                    param_key = self.get_param_key_for_param_and_cmpts(param, from_cmpt=from_cmpt, to_cmpt=to_cmpt, is_param_cmpt=True)
+                    to_from_cols = ["from_" + name for name in self.param_attr_names] + ['to_' + name for name in self.param_attr_names]
+                    df = pd.DataFrame(index=self.trange, columns=to_from_cols, data=[from_cmpt + to_cmpt for t in self.trange])\
+                        .rename_axis('t').set_index(to_from_cols, append=True).assign(**{param: np.nan})
+                    for t, val in self.params_by_t[param_key][param].items():
+                        df[param][t] = val
+                    df_list.append(df.ffill())
         df = pd.concat(df_list)
         return df
 
-    def get_params(self, params: list, attrs=None):
-        return pd.concat([self.get_param(param, attrs) for param in params], axis=1)
+    def get_params_for_attrs_by_t(self, params: list, attrs=None, from_attrs=None, to_attrs=None):
+        return pd.concat([self.get_param_for_attrs_by_t(param, attrs, from_attrs, to_attrs) for param in params], axis=1)
 
     # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
@@ -692,6 +721,15 @@ class CovidModel:
     def filter_cmpts_by_attrs(self, attrs, is_param_cmpts=False):
         return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
+    # given a compartment tuple, update the corresponding elements with items from attrs dict.
+    # if one or more values in attrs dict is a list, then create all combinations of matching compartments
+    def update_cmpt_tuple_with_attrs(self, cmpt: tuple, attrs: dict, is_param_cmpt=False):
+        cmpt = list(cmpt)
+        cmpt_attrs = {attr_name: attr_val for attr_name, attr_val in zip(self.param_attr_names if is_param_cmpt else self.attrs, cmpt)}
+        for attr_name, new_attr_val in attrs.items():
+            cmpt_attrs[attr_name] = new_attr_val
+        return self.filter_cmpts_by_attrs(cmpt_attrs, is_param_cmpt)
+
     ####################################################################################################################
     ### Prepping and Running
 
@@ -702,7 +740,7 @@ class CovidModel:
         vacc_rates = pd.concat([missing_shots, vacc_rates])
         vacc_rates['t'] = [self.date_to_t(d) for d in vacc_rates.index.get_level_values('date')]
         vacc_rates = vacc_rates.set_index('t', append=True)
-        populations = self.get_param('region_age_pop', {'vacc': 'none', 'variant': 'none', 'immun': 'none'}).reset_index([an for an in self.param_attr_names if an not in ['region', 'age']])[['region_age_pop']]
+        populations = self.get_param_for_attrs_by_t('region_age_pop', attrs={'vacc': 'none', 'variant': 'none', 'immun': 'none'}).reset_index([an for an in self.param_attr_names if an not in ['region', 'age']])[['region_age_pop']]
         vacc_rates_ts = vacc_rates.index.get_level_values('t').unique()
         populations = populations.iloc[[t in vacc_rates_ts for t in populations.index.get_level_values('t')]].reorder_levels(['region', 'age', 't'])
         populations.rename(columns={'region_age_pop': 'population'}, inplace=True)
@@ -720,50 +758,74 @@ class CovidModel:
         vacc_per_available = vacc_per_available.clip(upper=1)
         return vacc_per_available
 
+    def set_param_by_t(self, param, vals: dict, mults: dict,  cmpt=None, from_cmpt=None, to_cmpt=None):
+        param_key = cmpt if cmpt is not None else (from_cmpt, to_cmpt)
+        # cmpts are added to params greedily to reduce space allocation
+        if param_key not in self.params_by_t.keys():
+            self.params_by_t[param_key] = {}
+        if vals is not None:
+            # always overwrite all values if vals specified
+            self.params_by_t[param_key][param] = SortedDict()
+            for d, val in vals.items():
+                t = max(self.date_to_t(d), self.tmin)
+                if t > self.tmax:
+                    continue
+                self.params_by_t[param_key][param][t] = val
+        if mults is not None:
+            # copy vals from more general key (e.g. "all") if param not present in this key
+            if param not in self.params_by_t[param_key]:
+                more_general_key = self.get_param_key_for_param_and_cmpts(param, cmpt, from_cmpt, to_cmpt, is_param_cmpt=True)
+                self.params_by_t[param_key][param] = copy.deepcopy(self.params_by_t[more_general_key][param])
+            # add in tslices which are missing
+            for d in sorted(list(mults.keys())):
+                t = max(self.date_to_t(d), self.tmin)
+                if t > self.tmax:
+                    continue
+                if not self.params_by_t[param_key][param].__contains__(t):
+                    t_left = self.params_by_t[param_key][param].keys()[self.params_by_t[param_key][param].bisect(t) - 1]
+                    self.params_by_t[param_key][param][t] = self.params_by_t[param_key][param][t_left]
+            # multiply
+            for d, mult in mults.items():
+                t = max(self.date_to_t(d), self.tmin)
+                if t > self.tmax:
+                    continue
+                self.params_by_t[param_key][param][t] *= mult
+
     # set values for a single parameter based on param_tslices
-    def set_param(self, param, attrs: dict=None, vals: dict=None, mults: dict=None, desc=None):
+    def set_compartment_param(self, param, attrs: dict=None, vals: dict=None, mults: dict=None, desc=None):
         # get only the compartments we want
         cmpts = ['all'] if attrs is None else self.filter_cmpts_by_attrs(attrs, is_param_cmpts=True)
         # update the parameter
         for cmpt in cmpts:
-            if param not in self.params_by_t[cmpt].keys():
-                # take from global params if present, otherwise create new dictionary
-                if param in self.params_by_t['all'].keys():
-                    self.params_by_t[cmpt][param] = copy.deepcopy(self.params_by_t['all'][param])
-                else:
-                    self.params_by_t[cmpt][param] = SortedDict()
-            if vals is not None:
-                for d, val in vals.items():
-                    t = max(self.date_to_t(d), self.tmin)
-                    if t > self.tmax:
-                        continue
-                    self.params_by_t[cmpt][param][t] = val
-            if mults is not None:
-                # add in tslices which are missing
-                for d in sorted(list(mults.keys())):
-                    t = max(self.date_to_t(d), self.tmin)
-                    if t > self.tmax:
-                        continue
-                    if not self.params_by_t[cmpt][param].__contains__(t):
-                        t_left = self.params_by_t[cmpt][param].keys()[self.params_by_t[cmpt][param].bisect(t) - 1]
-                        self.params_by_t[cmpt][param][t] = self.params_by_t[cmpt][param][t_left]
-                # set val or multiply
-                for d, mult in mults.items():
-                    t = max(self.date_to_t(d), self.tmin)
-                    if t > self.tmax:
-                        continue
-                    self.params_by_t[cmpt][param][t] *= mult
+            self.set_param_by_t(param, cmpt=cmpt, vals=vals, mults=mults)
+
+    # set values for a single parameter based on param_tslices
+    def set_from_to_compartment_param(self, param, from_attrs: dict = None, to_attrs: dict = None, vals: dict = None, mults: dict = None, desc=None):
+        # get only the compartments we want
+        from_cmpts = ['all'] if from_attrs is None else self.filter_cmpts_by_attrs(from_attrs, is_param_cmpts=True)
+        # update the parameter
+        for from_cmpt in from_cmpts:
+            if from_cmpt == 'all':
+                to_cmpts = ['all'] if to_attrs is None else self.filter_cmpts_by_attrs(to_attrs, is_param_cmpts=True)
+            else:
+                to_cmpts = self.update_cmpt_tuple_with_attrs(from_cmpt, to_attrs, is_param_cmpt=True)
+            for to_cmpt in to_cmpts:
+                self.set_param_by_t(param, from_cmpt=from_cmpt, to_cmpt=to_cmpt, vals=vals, mults=mults)
 
     # combine param_defs, vaccine_defs, etc. into a time indexed parameters dictionary
     def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
         logger.debug(f"{str(self.tags)} Building param lookups")
-        self.params_by_t = {pcmpt: {} for pcmpt in ['all'] + self.param_compartments}
+        # clear model params if they exist
+        self.params_by_t = {'all': {}}
 
         for param_def in self.params_defs:
-            self.set_param(**param_def)
+            if 'from_attrs' in param_def:
+                self.set_from_to_compartment_param(**param_def)
+            else:
+                self.set_compartment_param(**param_def)
 
-        # determine global trange
-        self.params_trange = sorted(list(set.union(*[set(cmpt_param.keys()) for cmpt in self.params_by_t.values() for cmpt_param in cmpt.values()])))
+        # determine all times when params change
+        self.params_trange = sorted(list(set.union(*[set(param.keys()) for param_key in self.params_by_t.values() for param in param_key.values()])))
         self.t_prev_lookup = {t_int: max(t for t in self.params_trange if t <= t_int) for t_int in self.trange}
 
         if apply_vaccines:
@@ -829,13 +891,32 @@ class CovidModel:
         self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
         self.nonlinear_multiplier = {}
 
-    # takes a symbolic expression (coef), and looks up variable names in params to provide a computed output for each t in params_trange
-    def calc_coef_by_t(self, coef, cmpt):
-        if len(cmpt) > len(self.param_attr_names):
-            param_cmpt = tuple(attr for attr, level in zip(cmpt, self.attr_names) if level in self.param_attr_names)
+    # given a parameter, find its definition in params_by_t for the desired compartment(s). Useful because of the "all" default, so we may have to hunt a bit for the param
+    def get_param_key_for_param_and_cmpts(self, param, cmpt=None, from_cmpt=None, to_cmpt=None, nomatch_okay=False, is_param_cmpt=False):
+        param_key = None
+        if cmpt is not None:
+            key = cmpt if is_param_cmpt else tuple(attr for attr, level in zip(cmpt, self.attr_names) if level in self.param_attr_names)
+            for key_option in [key, 'all']:
+                if key_option in self.params_by_t.keys() and param in self.params_by_t[key_option]:
+                    param_key = key_option
+                    break
+            if param_key is None and not nomatch_okay:
+                self.log_and_raise(f"parameter {param} not defined for compartment {cmpt}", ValueError)
         else:
-            param_cmpt = cmpt
+            key0 = from_cmpt if is_param_cmpt else tuple(attr for attr, level in zip(from_cmpt, self.attr_names) if level in self.param_attr_names)
+            key1 = to_cmpt if is_param_cmpt else tuple(attr for attr, level in zip(to_cmpt, self.attr_names) if level in self.param_attr_names)
+            for key_option in [(key0, key1), ('all', key1), (key0, 'all'), ('all','all')]:
+                if key_option in self.params_by_t.keys() and param in self.params_by_t[key_option]:
+                    param_key = key_option
+                    break
+            if param_key is None and not nomatch_okay:
+                self.log_and_raise(f"parameter {param} not defined for from-compartment {from_cmpt} and to-compartment {to_cmpt}", ValueError)
+        return param_key
 
+
+    # takes a symbolic expression (coef), and looks up variable names in params to provide a computed output for each t in params_trange
+    # cmpt_key may be a single compartment tuple or a tuple of two compartment tuples (for a pair-specific parameter)
+    def calc_coef_by_t(self, coef, cmpt=None, from_cmpt=None, to_cmpt=None):
         if isinstance(coef, dict):
             return {t: coef[t] if t in coef.keys() else 0 for t in self.params_trange}
         elif callable(coef):
@@ -848,19 +929,19 @@ class CovidModel:
                 expr = parse_expr(coef)
                 relevant_params = [str(s) for s in expr.free_symbols]
                 if len(relevant_params) == 1 and coef == relevant_params[0]:
-                    actual_param_cmpt = param_cmpt if coef in self.params_by_t[param_cmpt].keys() else 'all'
-                    param_vals = {t: self.params_by_t[actual_param_cmpt][coef][t] if self.params_by_t[actual_param_cmpt][coef].__contains__(t) else None for t in self.params_trange}
+                    param_key = self.get_param_key_for_param_and_cmpts(coef, cmpt, from_cmpt, to_cmpt)
+                    param_vals = {t: self.params_by_t[param_key][coef][t] if self.params_by_t[param_key][coef].__contains__(t) else None for t in self.params_trange}
                     for i, t in enumerate(self.params_trange[1:]):
                         if param_vals[t] is None:
-                            param_vals[t] = param_vals[self.params_trange[i]]
+                            param_vals[t] = param_vals[self.params_trange[i]]  # carry forward prev value if not defined for this t
                     coef_by_t = param_vals
                 else:
                     func = sym.lambdify(relevant_params, expr)
                     param_vals = {t: {} for t in self.params_trange}
                     for param in relevant_params:
-                        actual_param_cmpt = param_cmpt if param in self.params_by_t[param_cmpt].keys() else 'all'
+                        param_key = self.get_param_key_for_param_and_cmpts(param, cmpt, from_cmpt, to_cmpt)
                         for t in self.params_trange:
-                            param_vals[t][param] = self.params_by_t[actual_param_cmpt][param][t] if self.params_by_t[actual_param_cmpt][param].__contains__(t) else None
+                            param_vals[t][param] = self.params_by_t[param_key][param][t] if self.params_by_t[param_key][param].__contains__(t) else None
                         for i, t in enumerate(self.params_trange[1:]):
                             if param_vals[t][param] is None:
                                 param_vals[t][param] = param_vals[self.params_trange[i]][param]
@@ -871,30 +952,32 @@ class CovidModel:
             return {t: coef for t in self.params_trange}
 
     # add a flow term, and add new flow to ODE matrices
-    def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, from_coef=None, to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
-        if len(from_cmpt) < len(self.attrs.keys()):
-            self.log_and_raise(f'The length of tc ({len(self.tc)}) must be equal to the length of tc_tslices ({len(self.tc_tslices)}) + 1.', ValueError)
-        if len(to_cmpt) < len(self.attrs.keys()):
+    def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, from_coef=None, to_coef=None, from_to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+        if len(from_cmpt) < len(self.attr_names):
+            self.log_and_raise(f'Source compartment `{to_cmpt}` does not have the right number of attributes.', ValueError)
+        if len(to_cmpt) < len(self.attr_names):
             self.log_and_raise(f'Destination compartment `{to_cmpt}` does not have the right number of attributes.', ValueError)
         if scale_by_cmpts is not None:
             for cmpt in scale_by_cmpts:
-                if len(cmpt) < len(self.attrs.keys()):
+                if len(cmpt) < len(self.attr_names):
                     self.log_and_raise(f'Scaling compartment `{cmpt}` does not have the right number of attributes.', ValueError)
 
             # retreive the weights for each compartment we are scaling by
             coef_by_t_dl = None
             if scale_by_cmpts_coef:
+                # TODO: revisit based on new signature of calc_coef_by_t?
                 coef_by_t_lookup = {c: self.calc_coef_by_t(c, to_cmpt) for c in set(scale_by_cmpts_coef)}
                 coef_by_t_ld = [coef_by_t_lookup[c] for c in scale_by_cmpts_coef]
                 coef_by_t_dl = {t: [dic[t] for dic in coef_by_t_ld] for t in self.params_trange}
 
         # compute coef by t for the from and to compartments
         coef_by_t = {t: 1 for t in self.params_trange}
-        if to_coef:
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(to_coef, to_cmpt).items()}
-        if from_coef:
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(from_coef, from_cmpt).items()}
-
+        if to_coef is not None:
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(to_coef, cmpt=to_cmpt).items()}
+        if from_coef is not None:
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(from_coef, cmpt=from_cmpt).items()}
+        if from_to_coef is not None:
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(from_to_coef, from_cmpt=from_cmpt, to_cmpt=to_cmpt).items()}
 
         term = ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
@@ -920,7 +1003,7 @@ class CovidModel:
 
     # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
     # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
-    def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
+    def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, from_to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
         # Create string summarizing the flow
         from_attrs_str = '(' + ','.join(from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
         to_attrs_str = '(' + ','.join(to_attrs[p] if p in to_attrs.keys() else from_attrs[p] if p in from_attrs.keys() else "\"" for p in self.attrs) + ')'
@@ -931,6 +1014,8 @@ class CovidModel:
             flow_str += f' x [from comp params: {from_coef}]'
         if to_coef is not None:
             flow_str += f' x [to comp params: {to_coef}]'
+        if from_to_coef is not None:
+            flow_str += f' x [from/to comp params: {from_to_coef}]'
         if scale_by_attrs:
             scale_by_attrs_str = '(' + ','.join(scale_by_attrs[p] if p in scale_by_attrs.keys() else "*" for p in self.attrs) + ')'
             if scale_by_coef:
@@ -942,12 +1027,10 @@ class CovidModel:
         scale_by_cmpts = self.filter_cmpts_by_attrs(scale_by_attrs) if scale_by_attrs is not None else None
         from_cmpts = self.filter_cmpts_by_attrs(from_attrs)
         for from_cmpt in from_cmpts:
-            to_cmpt_list = list(from_cmpt)
-            for attr_name, new_attr_val in to_attrs.items():
-                to_cmpt_list[list(self.attrs.keys()).index(attr_name)] = new_attr_val
-            to_cmpt = tuple(to_cmpt_list)
-            self.add_flow_from_cmpt_to_cmpt(from_cmpt, to_cmpt, from_coef=from_coef, to_coef=to_coef, scale_by_cmpts=scale_by_cmpts,
-                                            scale_by_cmpts_coef=scale_by_coef, constant=constant)
+            to_cmpts = self.update_cmpt_tuple_with_attrs(from_cmpt, to_attrs)
+            for to_cmpt in to_cmpts:
+                self.add_flow_from_cmpt_to_cmpt(from_cmpt, to_cmpt, from_coef=from_coef, to_coef=to_coef, from_to_coef=from_to_coef, scale_by_cmpts=scale_by_cmpts,
+                                                scale_by_cmpts_coef=scale_by_coef, constant=constant)
 
     # build ODE
     def build_ode_flows(self):
@@ -986,8 +1069,8 @@ class CovidModel:
                 for region in self.attrs['region']:
                     self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
                     self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta * immune_escape", from_coef=f'immunity * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta * immune_escape", from_coef=f'immunity * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
             # Transmission parameters attached to the susceptible population
             elif self.mobility_mode == "population_attached":
                 for from_region in self.attrs['region']:
@@ -995,7 +1078,7 @@ class CovidModel:
                     # TODO: update based on new way of storing population parameters
                     asymptomatic_transmission = f'(1 - immunity) * kappa_pa * betta / {from_region}_pop'
                     for to_region in self.attrs['region']:
-                        # TODO: update with immune escape
+                        # TODO: update with from/to immune escape
                         self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': from_region})
                         self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': from_region})
             # Transmission parameters attached to the transmission location
