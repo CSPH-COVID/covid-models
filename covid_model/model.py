@@ -549,6 +549,13 @@ class CovidModel:
     def solution_ydf(self):
         return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
+    @property
+    def re_estimates(self):
+        # TODO: quick fix, assumes gamm is constant
+        infect_duration = 1/ self.model_params['gamm'][0]['values']
+        infected = (self.solution_sum('seir')['I'].shift(3) + self.solution_sum('seir')['A'].shift(3))
+        return infect_duration * self.new_infections.groupby('t').sum() / infected
+
 
     ####################################################################################################################
     ### useful getters
