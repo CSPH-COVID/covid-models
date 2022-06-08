@@ -835,7 +835,9 @@ class CovidModel:
             vacc_per_available = vacc_per_available.groupby(['region', 'age']).shift(vacc_delay).fillna(0)
 
             # group vacc_per_available by trange interval
-            bins = self.params_trange + [self.tmax] if self.tmax not in self.params_trange else self.params_trange
+            #bins = self.params_trange + [self.tmax] if self.tmax not in self.params_trange else self.params_trange
+            bins = list(range(self.tmin, self.tmax, 7))
+            bins = bins + [self.tmax] if self.tmax not in bins else bins
             t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), bins, right=False, retbins=False, labels=bins[:-1])
             vacc_per_available = vacc_per_available.groupby([t_index_rounded_down_to_tslices, 'region', 'age']).mean()
             vacc_per_available['date'] = [self.t_to_date(d) for d in vacc_per_available.index.get_level_values(0)]
@@ -851,7 +853,11 @@ class CovidModel:
                             vpa_sub = {vpa_sub[0]: vpa_sub[1]}
                         else:
                             vpa_sub = vpa_sub.reset_index(drop=True).set_index('date').sort_index().drop_duplicates().to_dict()[shot]
-                        self.set_param(param=f'{shot}_per_available', attrs={'age': age, 'region': region}, vals=vpa_sub)
+                        self.set_compartment_param(param=f'{shot}_per_available', attrs={'age': age, 'region': region}, vals=vpa_sub)
+
+        # Testing changing the vaccination to every week
+        self.params_trange = sorted(list(set.union(*[set(param.keys()) for param_key in self.params_by_t.values() for param in param_key.values()])))
+        self.t_prev_lookup = {t_int: max(t for t in self.params_trange if t <= t_int) for t_int in self.trange}
 
     # set TC by slice, and update non-linear multiplier; defaults to reseting the last TC values
     def apply_tc(self, tcs=None, tslices=None, force_nlm_update=False):
