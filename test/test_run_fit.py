@@ -12,7 +12,7 @@ class Test(TestCase):
     def setUp(self) -> None:
         self.engine = db_engine()
         self.fit = CovidModelFit(engine=self.engine, from_specs=1036)
-        self.fit.set_actual_hosp(self.engine)
+        self.fit.set_hosp(self.engine)
 
     def test_run(self):
         self.fit.run(self.engine, look_back=1)
