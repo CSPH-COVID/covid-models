@@ -6,7 +6,7 @@ import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
 ### Local Imports ###
-from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, format_date_axis
 from covid_model.db import db_engine
 from covid_model.model_with_future_variant import CovidModelWithFutureVariant
 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     engine = db_engine()
 
     fig, axs = plt.subplots(2)
-    plot_actual_hosps(engine, ax=axs[1], color='black')
+    plot_observed_hosps(engine, ax=axs[1], color='black')
 
     for spec_id in run_args.spec_ids:
 

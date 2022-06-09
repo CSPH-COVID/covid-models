@@ -15,9 +15,9 @@ from covid_model.db import db_engine
 from covid_model.data_imports import ExternalHosps
 
 
-def plot_actual_hosps(engine, county_ids=None, **plot_params):
+def plot_observed_hosps(engine, county_ids=None, **plot_params):
+    # TODO: pass in model and use its hosps instead of getting from db
     hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
-    hosps.index = pd.to_datetime(hosps.index)
     hosps.plot(**{'color': 'red', 'label': 'Actual Hosps.', **plot_params})
 
 
@@ -44,7 +44,6 @@ def plot_modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[]
             df = df.apply(lambda s: s / total)
         df = df[compartments].sum(axis=1)
 
-    df.index = model.daterange
     if from_date is not None:
         df = df.loc[from_date]
 

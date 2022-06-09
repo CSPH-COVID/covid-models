@@ -5,6 +5,7 @@ import logging
 import traceback
 import os
 ### Third Party Imports ###
+import matplotlib
 ### Local Imports ###
 
 
@@ -70,7 +71,7 @@ def setup(name, log_level="info"):
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)-4s|%(message)s',
                         datefmt='%Y/%m/%d %H:%M:%S',
-                        filename=get_file_prefix(outdir) + name + "________________________________________.log",
+                        filename=get_filepath_prefix(outdir) + name + "________________________________________.log",
                         filemode='a')
     # set up logging to console (only do this if there are no handlers)
     if len(logging.getLogger('').handlers) < 2:
@@ -80,6 +81,9 @@ def setup(name, log_level="info"):
         console.formatter = formatter
         logging.getLogger('').addHandler(console)
     logging.info("============================================================")
+
+    # stop the incessant warning messages about missing fonts from matplotlib
+    logging.getLogger('matplotlib.font_manager').disabled = True
 
     return outdir
 

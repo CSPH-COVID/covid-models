@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
 ### Local Imports ###
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
 from covid_model.data_imports import ExternalHosps
 
@@ -39,15 +39,15 @@ def run_solve_seir(outdir=None, model=None, tags={}, **specs_args):
         print("plotting results")
         p = sns.relplot(data=df, x='date', y='y', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
         _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-        plt.savefig(f"{get_file_prefix(outdir)}{model.spec_id}_run_solve_seir_compartments.png", dpi=300)
+        plt.savefig(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_compartments.png", dpi=300)
 
         p = sns.relplot(data=dfh_melt, x='date', y='hospitalized', hue='model', col='region', col_wrap=min(3, len(model.regions)), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
         _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-        plt.savefig(f"{get_file_prefix(outdir)}{model.spec_id}_run_solve_sier_hospitalized.png", dpi=300)
+        plt.savefig(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_sier_hospitalized.png", dpi=300)
 
         print("saving results")
-        df.to_csv(f"{get_file_prefix(outdir)}{model.spec_id}_run_solve_seir_compartments.csv")
-        dfh.to_csv(f"{get_file_prefix(outdir)}{model.spec_id}_run_solve_seir_hospitalized.csv")
+        df.to_csv(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_compartments.csv")
+        dfh.to_csv(f"{get_filepath_prefix(outdir)}{model.spec_id}_run_solve_seir_hospitalized.csv")
     return model, df, dfh
 
 

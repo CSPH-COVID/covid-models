@@ -10,7 +10,7 @@ import seaborn as sns
 ### Local Imports ###
 from covid_model import CovidModel, ModelSpecsArgumentParser, db_engine
 from covid_model.run_scripts.run_solve_seir import run_solve_seir
-from covid_model.utils import get_file_prefix
+from covid_model.utils import get_filepath_prefix
 
 ###################################################################################
 # TODO: FIX THIS CODE; IT'S TOTALLY BROKEN
@@ -95,19 +95,19 @@ def run_model_scenarios(params_scens, vacc_proj_params_scens, mobility_proj_para
     dfh2 = pd.concat([dfh_measured, dfh_modeled], axis=0).set_index('series', append=True)
 
     print("saving results")
-    df.to_csv(get_file_prefix(outdir) + "run_model_scenarios_compartments.csv")
-    dfh.to_csv(get_file_prefix(outdir) + "run_model_scenarios_hospitalized.csv")
-    dfh2.to_csv(get_file_prefix(outdir) + "run_model_scenarios_hospitalized2.csv")
+    df.to_csv(get_filepath_prefix(outdir) + "run_model_scenarios_compartments.csv")
+    dfh.to_csv(get_filepath_prefix(outdir) + "run_model_scenarios_hospitalized.csv")
+    dfh2.to_csv(get_filepath_prefix(outdir) + "run_model_scenarios_hospitalized2.csv")
 
     print("plotting results")
     p = sns.relplot(data=df, x='date', y='y', hue='scen', col='region', row='seir', kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "run_model_scenarios_compartments.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + "run_model_scenarios_compartments.png", dpi=300)
 
 
     p = sns.relplot(data=dfh2, x='date', y='hospitalized', hue='scen', col='region', col_wrap=min(3, len(specs_args['regions'])), kind='line', facet_kws={'sharex': False, 'sharey': False}, height=2, aspect=4)
     _ = [ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator())) for ax in p.axes.flat]
-    plt.savefig(get_file_prefix(outdir) + "run_model_scenarios_hospitalized.png", dpi=300)
+    plt.savefig(get_filepath_prefix(outdir) + "run_model_scenarios_hospitalized.png", dpi=300)
 
     print("done")
 
