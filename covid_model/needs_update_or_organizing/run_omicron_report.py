@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
-from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, format_date_axis
 from covid_model.db import db_engine
 from covid_model.model import CovidModel
 from covid_model.cli_specs import ModelSpecsArgumentParser
@@ -73,7 +73,7 @@ if __name__ == '__main__':
             ax_hosp = ax
             ax.set_ylabel('Hospitalized with COVID-19')
             ax.legend(loc='best')
-            plot_actual_hosps(engine, ax=ax, color='black')
+            plot_observed_hosps(engine, ax=ax, color='black')
             # data added below under tc scenarios section
         if plot == "var":
             # variants

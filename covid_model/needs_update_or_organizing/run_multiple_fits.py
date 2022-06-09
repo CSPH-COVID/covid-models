@@ -84,16 +84,7 @@ def run():
             counties, county_ids = (None, None)
 
         # if hospitalization data CSV is provided, get hospitalizations from there; else query the database
-        if fit_params.hosp_data is not None:
-            if region is not None:
-                hosp_data = pd.read_csv(fit_params.hosp_data)[['date'] + counties]
-                tstart = pd.to_datetime(hosp_data['date']).min()
-                fit.base_specs.start_date = dt.date(tstart.year, tstart.month, tstart.day)
-                fit.actual_hosp = hosp_data.drop('date', axis=1).sum(axis=1)
-            else:
-                raise ValueError('Hospitalization data file is not supported for statewide model fitting.')
-        else:
-            fit.set_actual_hosp(engine, county_ids=county_ids)
+        fit.set_hosp(engine, county_ids=county_ids)
 
         # run fit
         if look_back == 0:

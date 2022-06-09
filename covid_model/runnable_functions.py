@@ -17,7 +17,7 @@ import matplotlib.ticker as mtick
 from covid_model import CovidModel, db_engine
 from covid_model.analysis.charts import plot_transmission_control
 from covid_model.utils import IndentLogger, setup, get_filepath_prefix
-from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, format_date_axis
 logger = IndentLogger(logging.getLogger(''), {})
 
 
@@ -37,7 +37,7 @@ def __single_window_fit(model: CovidModel, look_back, tc_min, tc_max, yd_start=N
     fitted_tc, fitted_tc_cov = spo.curve_fit(
         f=func
         , xdata=trange
-        , ydata=model.actual_hosp[tstart:(tstart + len(trange))]
+        , ydata=model.estimated_actual_hosp[tstart:(tstart + len(trange))]
         , p0=model.tc[-look_back:]
         , bounds=([tc_min] * look_back, [tc_max] * look_back))
     return fitted_tc, fitted_tc_cov
@@ -68,7 +68,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         logger.info(f'{str(model.tags)}: Running forward sim')
         fig = plt.figure(figsize=(10, 10), dpi=300)
         ax = fig.add_subplot(211)
-        hosps_df = model.modeled_vs_actual_hosps().reset_index('region').drop(columns='region')
+        hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
         hosps_df.plot(ax=ax)
         ax = fig.add_subplot(212)
         plot_transmission_control(model, ax=ax)
@@ -88,9 +88,9 @@ def do_single_fit(tc_0=0.75,  # default value for TC
 
     # get the end date from actual hosps
     if use_hosps_end_date:
-        base_model.end_date = base_model.actual_hosp.index.max()
-    elif base_model.actual_hosp.index.max() < base_model.end_date:
-        ermsg = f'Opted to fit to model end_date, {base_model.end_date}, but hospitalizations only available up to {base_model.actual_hosp.index.max()}'
+        base_model.end_date = base_model.observed_hosp.index.max()
+    elif base_model.observed_hosp.index.max() < base_model.end_date:
+        ermsg = f'Opted to fit to model end_date, {base_model.end_date}, but hospitalizations only available up to {base_model.observed_hosp.index.max()}'
         logger.exception(f"{str(base_model.tags)}" + ermsg)
         raise ValueError(ermsg)
 
@@ -232,7 +232,7 @@ def do_create_report(model, outdir, from_date=None, to_date=None, prep_model=Fal
     # hospitalizations
     ax = axs.flatten()[1]
     ax.set_ylabel('Hospitalized with COVID-19')
-    plot_actual_hosps(db_engine(), ax=ax, color='black')
+    plot_observed_hosps(db_engine(), ax=ax, color='black')
     plot_modeled(model, 'Ih', ax=ax, label='modeled')
 
     #hosps_df = pd.DataFrame(index=model.trange)

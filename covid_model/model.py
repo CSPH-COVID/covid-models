@@ -72,7 +72,9 @@ class CovidModel:
         self.mobility_proj_params = None
         self.actual_vacc_df = None
         self.proj_vacc_df = None
-        self.actual_hosp = None
+        self.observed_hosp = None
+        self.estimated_actual_hosp = None
+        self.__hosp_reporting_frac = {}
 
         self.base_spec_id = None
         self.spec_id = None
@@ -95,7 +97,6 @@ class CovidModel:
         self.constant_vector = None
         self.nonlinear_multiplier = {}
         self.max_step_size = np.inf
-
 
         if base_model is not None and base_spec_id is not None:
             self.log_and_raise("Cannot pass both a base_model and base_spec_id", ValueError)
@@ -155,9 +156,9 @@ class CovidModel:
             self.tc_t_prev_lookup = {t_int: max(t for t in [0] + self.tc_tslices if t <= t_int) for t_int in self.trange}
             self.apply_tc(force_nlm_update=True)
 
-        if any([p in self.recently_updated_properties for p in ['start_date', 'regions', 'region_defs']]):
-            logger.debug(f"{str(self.tags)} Setting Actual Hospitalizations")
-            self.set_actual_hosp(engine)
+        if any([p in self.recently_updated_properties for p in ['start_date', 'regions', 'region_defs', 'hosp_reporting_frac']]):
+            logger.debug(f"{str(self.tags)} Setting Hospitalizations")
+            self.set_hosp(engine)
 
         self.recently_updated_properties = []
 
@@ -367,19 +368,39 @@ class CovidModel:
         return params
 
     # pulls hospitalizations for only the first region, since the model only fits one region at a time
-    def set_actual_hosp(self, engine=None):
+    def set_hosp(self, engine=None):
         if engine is None:
             engine = db_engine()
         logger.info(f"{str(self.tags)} Retrieving hospitalizations")
         # makes sure we pull from EMResource if region is CO
         county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
-        hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
+        hosps = ExternalHosps(engine).fetch(county_ids=county_ids)
+
         # fill in the beginning if necessary
         if min(hosps.index.get_level_values(0)) > self.start_date:
-            s_fill = pd.Series(index=[self.t_to_date(t) for t in range(self.tmin, self.date_to_t(min(hosps.index.get_level_values(0))))], dtype='float64').fillna(0)
-            self.actual_hosp = pd.concat([s_fill, hosps])
+            h_fill = pd.DataFrame(index=[self.t_to_date(t) for t in range(self.tmin, self.date_to_t(min(hosps.index.get_level_values(0))))], columns=['currently_hospitalized'], dtype='float64').fillna(0)
+            hosps = pd.concat([h_fill, hosps])
         else:
-            self.actual_hosp = hosps[hosps.index.get_level_values(0) >= self.start_date]
+            hosps.observed_hosp = hosps[hosps.index.get_level_values(0) >= self.start_date]
+
+        # TODO: make work with multiple regions
+        # compute estimated actual hospitalizations
+        hosps['hosp_reporting_frac'] = np.nan
+        early_dates = []
+        for date, val in self.hosp_reporting_frac.items():
+            date = date if isinstance(date, dt.date) else dt.datetime.strptime(date, "%Y-%m-%d").date()
+            if date in hosps.index:
+                hosps.loc[date]['hosp_reporting_frac'] = val
+            elif date <= hosps.index[0]:
+                early_dates.append(date)
+        if len(early_dates) > 0:
+            # among all the dates before the start date, take the latest one
+            hosps.iloc[0] = self.hosp_reporting_frac[dt.datetime.strftime(max(early_dates), "%Y-%m-%d")]
+        hosps = hosps.ffill()
+
+        self.observed_hosp = hosps['currently_hospitalized']
+        self.estimated_actual_hosp = hosps['currently_hospitalized'] / hosps['hosp_reporting_frac']
+
 
     ####################################################################################################################
     ### Properites
@@ -506,6 +527,14 @@ class CovidModel:
         self.__mobility_mode = value if value != 'none' else None
         self.recently_updated_properties.append('mobility_mode')
 
+    @property
+    def hosp_reporting_frac(self):
+        return self.__hosp_reporting_frac
+
+    @hosp_reporting_frac.setter
+    def hosp_reporting_frac(self, value):
+        self.__hosp_reporting_frac = value
+        self.recently_updated_properties.append('hosp_reporting_frac')
 
     ### Properties that take a little computation to get
 
@@ -644,12 +673,15 @@ class CovidModel:
         else:
             return (n * (1 - params['effective_inf_rate'])).groupby('date').sum() / n.groupby('date').sum()
 
-    def modeled_vs_actual_hosps(self):
+    def modeled_vs_observed_hosps(self):
         df = self.solution_sum(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
-        df['actual'] = np.nan
-        hosps = self.actual_hosp[:len(self.daterange)].to_numpy()
-        df['actual'][:len(hosps)] = hosps
-        df = df.reindex(columns=['actual', 'modeled'])
+        df['estimated_actual'] = np.nan
+        df['observed'] = np.nan
+        ea_hosps = self.estimated_actual_hosp[:len(self.daterange)].to_numpy()
+        o_hosps = self.observed_hosp[:len(self.daterange)].to_numpy()
+        df['estimated_actual'][:len(ea_hosps)] = ea_hosps
+        df['observed'][:len(o_hosps)] = o_hosps
+        df = df.reindex(columns=['observed', 'estimated_actual', 'modeled'])
         return df
 
     # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
@@ -1233,7 +1265,7 @@ class CovidModel:
     def to_json_string(self):
         logger.debug(f"{str(self.tags)} Serializing model to json")
         keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', 'attrs', 'tc_tslices', 'tc', 'tc_cov', 'tc_tslices', 'tc_t_prev_lookup', '_CovidModel__params_defs',
-                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'actual_hosp',
+                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'estimated_actual_hosp', 'observed_hosp', '_CovidModel__hosp_reporting_frac',
                 '_CovidModel__y0_dict', 'max_step_size']
         #TODO: handle mobility, add in proj_mobility
         serial_dict = OrderedDict()
@@ -1245,7 +1277,9 @@ class CovidModel:
                 serial_dict[key] = val.tolist()
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
                 serial_dict[key] = self.serialize_vacc(val)
-            elif key == 'actual_hosp' and val is not None:
+            elif key == 'estimated_actual_hosp' and val is not None:
+                serial_dict[key] = self.serialize_hosp(val)
+            elif key == 'observed_hosp' and val is not None:
                 serial_dict[key] = self.serialize_hosp(val)
             elif key == '_CovidModel__y0_dict' and self.__y0_dict is not None:
                 serial_dict[key] = self.serialize_y0_dict(val)
@@ -1267,7 +1301,9 @@ class CovidModel:
                 pass
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
                 self.__dict__[key] = CovidModel.unserialize_vacc(val)
-            elif key == 'actual_hosp' and val is not None:
+            elif key == 'estimated_actual_hosp' and val is not None:
+                self.__dict__[key] = CovidModel.unserialize_hosp(val)
+            elif key == 'observed_hosp' and val is not None:
                 self.__dict__[key] = CovidModel.unserialize_hosp(val)
             elif key == 'tc_t_prev_lookup':
                 self.__dict__[key] = self.unserialize_tc_t_prev_lookup(val)

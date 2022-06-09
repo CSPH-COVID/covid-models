@@ -15,7 +15,7 @@ from covid_model.db import db_engine
 from covid_model.data_imports import ExternalHosps
 
 
-def plot_actual_hosps(engine, county_ids=None, **plot_params):
+def plot_observed_hosps(engine, county_ids=None, **plot_params):
     # TODO: pass in model and use its hosps instead of getting from db
     hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
     hosps.plot(**{'color': 'red', 'label': 'Actual Hosps.', **plot_params})

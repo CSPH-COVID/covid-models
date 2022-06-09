@@ -82,7 +82,7 @@ def main():
     logging.info(f'{str(model.tags)}: Running forward sim')
     fig = plt.figure(figsize=(10, 10), dpi=300)
     ax = fig.add_subplot(211)
-    hosps_df = model.modeled_vs_actual_hosps().reset_index('region').drop(columns='region')
+    hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
     hosps_df.plot(ax=ax)
     ax = fig.add_subplot(212)
     plot_transmission_control(model, ax=ax)

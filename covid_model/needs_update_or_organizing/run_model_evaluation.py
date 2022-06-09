@@ -2,7 +2,7 @@ from covid_model.cli_specs import ModelSpecsArgumentParser
 from covid_model.model import CovidModel
 from covid_model.db import db_engine
 from covid_model.data_imports import ExternalHosps
-from covid_model.analysis.charts import plot_modeled, plot_actual_hosps
+from covid_model.analysis.charts import plot_modeled, plot_observed_hosps
 from covid_model.model_sims import forecast_timeseries
 
 import datetime as dt
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     for i, (proj_method, data) in enumerate(df.groupby(['Projection Method', 'Projection Start Date'])['Actual Hospitalizations (14-Day) at Projection Start Date', 'Trend (14-Day) at Projection Start Date', 'Error'].mean().groupby('Projection Method')):
         sns.regplot(data=data, x='Actual Hospitalizations (14-Day) at Projection Start Date', y='Error', ax=ax_hosp_scatter, label=proj_method, color=colors[i])
         sns.regplot(data=data, x='Trend (14-Day) at Projection Start Date', y='Error', ax=ax_trend_scatter, label=proj_method,   color=colors[i])
-    plot_actual_hosps(engine, color='black', ax=ax_hosp)
+    plot_observed_hosps(engine, color='black', ax=ax_hosp)
 
     ax_hosp.set_ylim(0, 3000)
 
