@@ -966,32 +966,31 @@ class CovidModel:
             return {t: coef[t] if t in coef.keys() else 0 for t in self.params_trange}
         elif callable(coef):
             return {t: coef(t) for t in self.params_trange}
-        elif isinstance(coef, str):
-            if coef == '1':
-                coef_by_t = {t: 1 for t in self.params_trange}
+        elif coef == '1':
+            return {t: 1 for t in self.params_trange}
+        elif isinstance(coef, str) or isinstance(coef, sym.Expr):
+            coef_by_t = {}
+            expr = parse_expr(coef) if isinstance(coef, str) else coef
+            relevant_params = [str(s) for s in expr.free_symbols]
+            if len(relevant_params) == 1 and coef == relevant_params[0]:
+                param_key = self.get_param_key_for_param_and_cmpts(coef, cmpt, from_cmpt, to_cmpt)
+                param_vals = {t: self.params_by_t[param_key][coef][t] if self.params_by_t[param_key][coef].__contains__(t) else None for t in self.params_trange}
+                for i, t in enumerate(self.params_trange[1:]):
+                    if param_vals[t] is None:
+                        param_vals[t] = param_vals[self.params_trange[i]]  # carry forward prev value if not defined for this t
+                coef_by_t = param_vals
             else:
-                coef_by_t = {}
-                expr = parse_expr(coef)
-                relevant_params = [str(s) for s in expr.free_symbols]
-                if len(relevant_params) == 1 and coef == relevant_params[0]:
-                    param_key = self.get_param_key_for_param_and_cmpts(coef, cmpt, from_cmpt, to_cmpt)
-                    param_vals = {t: self.params_by_t[param_key][coef][t] if self.params_by_t[param_key][coef].__contains__(t) else None for t in self.params_trange}
+                func = sym.lambdify(relevant_params, expr) if lambdified_coef is None else lambdified_coef
+                param_vals = {t: {} for t in self.params_trange}
+                for param in relevant_params:
+                    param_key = self.get_param_key_for_param_and_cmpts(param, cmpt, from_cmpt, to_cmpt)
+                    for t in self.params_trange:
+                        param_vals[t][param] = self.params_by_t[param_key][param][t] if self.params_by_t[param_key][param].__contains__(t) else None
                     for i, t in enumerate(self.params_trange[1:]):
-                        if param_vals[t] is None:
-                            param_vals[t] = param_vals[self.params_trange[i]]  # carry forward prev value if not defined for this t
-                    coef_by_t = param_vals
-                else:
-                    func = sym.lambdify(relevant_params, expr)
-                    param_vals = {t: {} for t in self.params_trange}
-                    for param in relevant_params:
-                        param_key = self.get_param_key_for_param_and_cmpts(param, cmpt, from_cmpt, to_cmpt)
-                        for t in self.params_trange:
-                            param_vals[t][param] = self.params_by_t[param_key][param][t] if self.params_by_t[param_key][param].__contains__(t) else None
-                        for i, t in enumerate(self.params_trange[1:]):
-                            if param_vals[t][param] is None:
-                                param_vals[t][param] = param_vals[self.params_trange[i]][param]
-                    for t, tvals in param_vals.items():
-                        coef_by_t[t] = func(**tvals)
+                        if param_vals[t][param] is None:
+                            param_vals[t][param] = param_vals[self.params_trange[i]][param]
+                for t, tvals in param_vals.items():
+                    coef_by_t[t] = func(**tvals)
             return coef_by_t
         else:
             return {t: coef for t in self.params_trange}
@@ -1018,11 +1017,17 @@ class CovidModel:
         # compute coef by t for the from and to compartments
         coef_by_t = {t: 1 for t in self.params_trange}
         if to_coef is not None:
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(to_coef, cmpt=to_cmpt).items()}
+            parsed_coef = parse_expr(to_coef)  # parsing and lambdifying the coef ahead of time saves doing it for every t
+            relevant_params = [str(s) for s in parsed_coef.free_symbols]
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(parse_expr(to_coef), cmpt=to_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
         if from_coef is not None:
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(from_coef, cmpt=from_cmpt).items()}
+            parsed_coef = parse_expr(from_coef)  # parsing and lambdifying the coef ahead of time saves doing it for every t
+            relevant_params = [str(s) for s in parsed_coef.free_symbols]
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(parse_expr(from_coef), cmpt=from_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
         if from_to_coef is not None:
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(from_to_coef, from_cmpt=from_cmpt, to_cmpt=to_cmpt).items()}
+            parsed_coef = parse_expr(from_to_coef)  # parsing and lambdifying the coef ahead of time saves doing it for every t
+            relevant_params = [str(s) for s in parsed_coef.free_symbols]
+            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(parse_expr(from_to_coef), from_cmpt=from_cmpt, to_cmpt=to_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
 
         term = ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
