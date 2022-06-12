@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
         params = model.params_as_df
         group_by_attr_names = ['seir'] + [attr_name for attr_name in model.param_attr_names if attr_name != 'variant']
-        n = model.solution_sum(group_by_attr_names).stack(level=group_by_attr_names).xs('S', level='seir')
+        n = model.solution_sum_df(group_by_attr_names).stack(level=group_by_attr_names).xs('S', level='seir')
 
         for variant_label, variant in variants.items():
             if immunity_label != 'Prior Omicron Infection' or variant_label == 'Non-Omicron':

@@ -17,7 +17,7 @@ from covid_model.db import db_engine
 def remove_variants(model, y_dict, remove_variants):
     new_variant = [var for var in model.attrs['variant'] if var not in remove_variants][0]
     for variant in remove_variants:
-        cmpts_to_remove = model.filter_cmpts_by_attrs({'variant': variant})
+        cmpts_to_remove = model.get_cmpts_matching_attrs({'variant': variant})
         for cmpt in cmpts_to_remove:
             new_cmpt = tuple(cmpt[:4] + tuple([new_variant]) + cmpt[5:])
             y_dict[new_cmpt] += y_dict[cmpt]
@@ -106,7 +106,7 @@ def main():
         model = CovidModel(base_spec_id=2630)
         model.prep()
         model.solve_seir()
-        model.solution_sum(['seir', 'variant', 'priorinf']).unstack().to_csv(get_filepath_prefix(outdir) + f"states_seir_variant_priorinf_total_chunk{1}.csv")
+        model.solution_sum_df(['seir', 'variant', 'priorinf']).unstack().to_csv(get_filepath_prefix(outdir) + f"states_seir_variant_priorinf_total_chunk{1}.csv")
 
         new_model_args = copy.deepcopy(model_args)
         new_model_args.update({'base_model': model, 'start_date': model.t_to_date(model.trange[-backtrack]), 'end_date': chunk['end_date'], 'attrs': copy.deepcopy(attrs)})
@@ -118,7 +118,7 @@ def main():
         new_model_args.update({'y0_dict': y_final})
 
         model = do_single_fit(**fit_args, **new_model_args, tags={'chunk': i})
-        model.solution_sum(['seir', 'variant', 'priorinf']).unstack().to_csv(get_filepath_prefix(outdir) + f"states_seir_variant_priorinf_total_chunk{i}.csv")
+        model.solution_sum_df(['seir', 'variant', 'priorinf']).unstack().to_csv(get_filepath_prefix(outdir) + f"states_seir_variant_priorinf_total_chunk{i}.csv")
 
 
 if __name__ == "__main__":

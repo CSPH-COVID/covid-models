@@ -18,7 +18,7 @@ from covid_model.utils import get_filepath_prefix
 
 
 def build_legacy_output_df(model: CovidModel):
-    ydf = model.solution_sum(['seir', 'age']).stack(level='age')
+    ydf = model.solution_sum_df(['seir', 'age']).stack(level='age')
     dfs_by_group = []
     for i, group in enumerate(model.attrs['age']):
         dfs_by_group.append(ydf.xs(group, level='age').rename(columns={var: var + str(i+1) for var in model.attrs['seir']}))
@@ -27,8 +27,8 @@ def build_legacy_output_df(model: CovidModel):
     params_df = model.params_as_df
     combined = model.solution_ydf.stack(model.param_attr_names).join(params_df)
 
-    totals = model.solution_sum('seir')
-    totals_by_priorinf = model.solution_sum(['seir', 'priorinf'])
+    totals = model.solution_sum_df('seir')
+    totals_by_priorinf = model.solution_sum_df(['seir', 'priorinf'])
     df['Iht'] = totals['Ih']
     df['Dt'] = totals['D']
     df['Rt'] = totals_by_priorinf[('S', 'none')]

@@ -43,7 +43,7 @@ if __name__ == '__main__':
     projections = dict()
     for last_tc, projection_start_t in zip(base_model.tc[run_args.skip_first_increments:], base_model.tc_tslices[run_args.skip_first_increments:]):
         # shorten model to end tslice + projection_days
-        projection_end_t = min(projection_start_t + run_args.projection_days, base_model.tmax)
+        projection_end_t = min(projection_start_t + run_args.projection_days, base_model.tend)
         projection_start_date = base_model.start_date + dt.timedelta(days=projection_start_t)
         projection_end_date = base_model.start_date + dt.timedelta(days=projection_end_t)
 
@@ -63,13 +63,13 @@ if __name__ == '__main__':
         print(f'Fixed TCs: {fixed_tc}')
         for i, (tc_projection_method, projected_tc) in enumerate(projected_tc_dict.items()):
             print(f'{tc_projection_method}: projected TC from {projection_start_date} to {projection_end_date} is {projected_tc})')
-            model.apply_tc(tcs=projected_tc)
+            model.update_tc(tc=projected_tc)
 
             # run model
             model.solve_seir()
 
             # write results to dictionary to dictionary
-            projections_by_method[tc_projection_method] = model.solution_sum('seir')['Ih'].loc[projection_start_t:projection_end_t].rename('Projected Hospitalizations').to_frame()
+            projections_by_method[tc_projection_method] = model.solution_sum_df('seir')['Ih'].loc[projection_start_t:projection_end_t].rename('Projected Hospitalizations').to_frame()
 
         projections[projection_start_date] = pd.concat(projections_by_method, names=['Projection Method', 't'])
 

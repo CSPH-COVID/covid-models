@@ -117,12 +117,12 @@ if __name__ == '__main__':
             start_t = 749
             future_tslices = list(range(start_t, start_t + tc_shift_days))
             future_tc = np.linspace(base_tc[-1], base_tc[-1] + tc_shift, len(future_tslices))
-            model.apply_tc(tcs=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
+            model.update_tc(tc=base_tc + list(future_tc), tslices=base_tslices + list(future_tslices))
             model.solve_seir()
             label = f'{round(100*-tc_shift)}% drop in TC over {round(len(future_tslices)/7)} weeks' if tc_shift < 0 else f'Current trajectory'
             if "hosp" in plots:
                 plot_modeled(model, 'Ih', ax=ax_hosp, label=label)
-                hosps_df[label] = model.solution_sum('seir')['Ih']
+                hosps_df[label] = model.solution_sum_df('seir')['Ih']
             if "prev" in plots:
                 plot_modeled(model, ['I', 'A'], share_of_total=True, ax=ax_prev, label=label)
         if "hosp" in plots:

@@ -44,7 +44,7 @@ if __name__ == '__main__':
             change_over_n_windows = 6
             future_tcs = list(np.linspace(model.tc[-1], run_args.future_tc, change_over_n_windows + 1))[1:]
             future_tslices = list(range(model.tc_tslices[-1], model.tc_tslices[-1] + window_size * change_over_n_windows + 1, window_size))[1:]
-            model.apply_tc(tcs=future_tcs, tslices=future_tslices)
+            model.update_tc(tc=future_tcs, tslices=future_tslices)
 
         # add winter TC shift starting on November 25
         if run_args.winter_tc_shift:
@@ -54,13 +54,13 @@ if __name__ == '__main__':
             winter_start_t = (winter_start_date - model.start_date).days
             winter_tslices = [winter_start_t, *(tslice for tslice in model.tc_tslices if tslice > winter_start_t)]
             winter_tc = [tc + run_args.winter_tc_shift for tc in model.tc[-len(winter_tslices):]]
-            model.apply_tc(tcs=winter_tc, tslices=winter_tslices)
+            model.update_tc(tc=winter_tc, tslices=winter_tslices)
             # shift TC back at winter end date
             winter_end_date = dt.date(today.year, 2, 1) if today.strftime('%m%d') < '0201' else dt.date(today.year + 1, 2, 1)
             winter_end_t = (winter_end_date - model.start_date).days
             post_winter_tslices = [winter_end_t, *(tslice for tslice in model.tc_tslices if tslice > winter_end_t)]
             post_winter_tc = [tc - run_args.winter_tc_shift for tc in model.tc[-len(post_winter_tslices):]]
-            model.apply_tc(tcs=post_winter_tc, tslices=post_winter_tslices)
+            model.update_tc(tc=post_winter_tc, tslices=post_winter_tslices)
 
         # prep model
         model.prep()

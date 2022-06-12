@@ -19,7 +19,7 @@ from covid_model.db import db_engine
 def remove_variants(model, y_dict, remove_variants):
     new_variant = [var for var in model.attrs['variant'] if var not in remove_variants][0]
     for variant in remove_variants:
-        cmpts_to_remove = model.filter_cmpts_by_attrs({'variant': variant})
+        cmpts_to_remove = model.get_cmpts_matching_attrs({'variant': variant})
         for cmpt in cmpts_to_remove:
             new_cmpt = tuple(cmpt[:4] + tuple([new_variant]) + cmpt[5:])
             y_dict[new_cmpt] += y_dict[cmpt]
@@ -78,8 +78,8 @@ def main():
     model.end_date = '2022-09-01'
     model.prep()  # needed
     model.solve_seir()
-    model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun_total_all_at_once_forecast.csv")
-    model.solution_sum().unstack().to_csv(get_filepath_prefix(outdir) + "states_full_forecast.csv")
+    model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun_total_all_at_once_forecast.csv")
+    model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir) + "states_full_forecast.csv")
 
     logging.info(f'{str(model.tags)}: Running forward sim')
     fig = plt.figure(figsize=(10, 10), dpi=300)

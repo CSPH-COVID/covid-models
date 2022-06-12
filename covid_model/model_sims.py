@@ -58,10 +58,10 @@ class CovidModelSimulation:
         self.model = CovidModel(end_date=end_date, from_specs=specs, engine=engine)
         self.base_tc = self.model.tc.copy()
         self.window_size = self.model.tc_tslices[-1] - self.model.tc_tslices[-2]
-        self.simulation_horizon = int(np.ceil((self.model.tmax - self.model.tc_tslices[-1]) / self.window_size)) - 1
+        self.simulation_horizon = int(np.ceil((self.model.tend - self.model.tc_tslices[-1]) / self.window_size)) - 1
 
-        if self.model.tmax - self.model.tc_tslices[-1] > self.window_size:
-            self.model.apply_tc(tslices=list(range(self.model.tc_tslices[-1] + self.window_size, self.model.tmax, self.window_size)))
+        if self.model.tend - self.model.tc_tslices[-1] > self.window_size:
+            self.model.update_tc(tslices=list(range(self.model.tc_tslices[-1] + self.window_size, self.model.tend, self.window_size)))
         self.model.prep()
 
         self.engine = engine
@@ -137,10 +137,10 @@ class CovidModelSimulation:
         simulated_tcs = self.sample_simulated_tcs(n, **tc_sampling_args)
         for i, tcs in enumerate(simulated_tcs):
             t0 = perf_counter()
-            self.model.apply_tc(tcs)
+            self.model.update_tc(tcs)
             self.model.solve_seir()
             self.results.append(self.model.solution_ydf.stack(level=self.model.param_attr_names))
-            self.results_hosps.append(self.model.solution_sum('seir')['Ih'])
+            self.results_hosps.append(self.model.solution_sum_df('seir')['Ih'])
             t1 = perf_counter()
             self.model.write_results_to_db(self.engine, sim_id=self.sim_id, sim_result_id=i, cmpts_json_attrs=tuple())
             t2 = perf_counter()
