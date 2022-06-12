@@ -44,7 +44,7 @@ def main():
         'refrech_actual_mobility': True,
         'regions': ['co'],
         'start_date': dt.datetime.strptime('2020-01-24', "%Y-%m-%d").date(),
-        'end_date': dt.datetime.strptime('2022-08-01', "%Y-%m-%d").date(),
+        'end_date': dt.datetime.strptime('2022-09-01', "%Y-%m-%d").date(),
         'max_step_size': None
     }
     scen_args = {
@@ -53,9 +53,9 @@ def main():
         'mobility_proj_params_scens': None,
         'timeseries_effect_multipliers_scens': None,
         'mab_prevalence_scens': None,
-        'attribute_multipliers_scens': f'covid_model/input/{subdir}/attribute_multipliers_scenarios_5only.json',
+        'attribute_multipliers_scens': f'covid_model/input/{subdir}/attribute_multipliers_scenarios_med_only.json',
         'refit_from_date': dt.datetime.strptime('2021-10-25', "%Y-%m-%d").date(),
-        'multiprocess': 9,
+        'multiprocess': None,
         'plot_from_date': dt.datetime.strptime('2021-10-01', "%Y-%m-%d"),
         'plot_to_date': dt.datetime.strptime('2022-08-01', "%Y-%m-%d")
     }

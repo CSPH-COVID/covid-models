@@ -345,7 +345,7 @@ class CovidModel(ODEBuilder, CovidModelSpecifications):
         df_by_t = {t: pd.DataFrame.from_dict(df_by_group, orient='index') for t, df_by_group in self.params.items()}
         pd.concat(df_by_t, names=['t', 'age']).to_csv(fname)
 
-    def solution_sum(self, group_by_attr_levels, index_with_model_dates=False):
+    def solution_sum(self, group_by_attr_levels=None, index_with_model_dates=False):
         df = ODEBuilder.solution_sum(self, group_by_attr_levels)
         if index_with_model_dates:
             df['date'] = self.daterange

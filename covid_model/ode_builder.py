@@ -427,8 +427,11 @@ class ODEBuilder:
         return pd.Series(index=self.compartments_as_index, data=y)
 
     # return solution grouped by group_by_attr_levels
-    def solution_sum(self, group_by_attr_levels):
-        return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
+    def solution_sum(self, group_by_attr_levels=None):
+        if group_by_attr_levels is None:
+            return self.solution_ydf
+        else:
+            return self.solution_ydf.groupby(group_by_attr_levels, axis=1).sum()
 
     def ode_terms_as_json(self, compact=False):
         if compact:

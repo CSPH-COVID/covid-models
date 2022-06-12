@@ -84,6 +84,7 @@ def run_single_scenario(args):
     run_omicron_report(plots=['prev', 'hosp','var','imm'], from_date=dt.datetime.strptime('2021-07-01', "%Y-%m-%d").date(), model=scen_model, outdir=outdir, fname_extra=scen)
     print("running compartment report")
     run_compartment_report(plot_from_date, plot_to_date, group_by_attr_names=['age', 'vacc', 'priorinf', 'immun', 'seir', 'variant'], model=scen_model, outdir=outdir, fname_extra=scen)
+    scen_model.solution_sum(index_with_model_dates=True).unstack().to_csv(get_filepath_prefix(outdir) + f"{scen}.csv")
 
 
     if return_model:
