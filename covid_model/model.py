@@ -36,10 +36,8 @@ class CovidModel:
 
     ####################################################################################################################
     ### Initialization and Updating
-
     def __init__(self, engine=None, base_model=None, update_derived_properties=True, base_spec_id=None, **margs):
         # margs can be any model property
-
         self.recently_updated_properties = []
 
         # basic model data
@@ -405,6 +403,7 @@ class CovidModel:
     @start_date.setter
     def start_date(self, value):
         start_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
+        # shift tc to the right if start date is earlier; shift left and possibly truncate TC if start date is later
         tshift = (start_date-self.start_date).days
         self.__start_date = start_date
         self.__tend = (self.end_date - self.start_date).days
@@ -915,7 +914,6 @@ class CovidModel:
         self.linear_matrix = {t: spsp.lil_matrix((self.n_compartments, self.n_compartments)) for t in self.params_trange}
         self.nonlinear_matrices = {t: defaultdict(self._default_nonlinear_matrix) for t in self.params_trange}
         self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
-        self.nonlinear_multiplier = {}
 
     # given a parameter, find its definition in params_by_t for the desired compartment(s). Useful because of the "all" default, so we may have to hunt a bit for the param
     def get_param_key_for_param_and_cmpts(self, param, cmpt=None, from_cmpt=None, to_cmpt=None, nomatch_okay=False, is_param_cmpt=False):
@@ -1068,7 +1066,6 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} Building ode flows")
         self.flows_string = self.flows_string = '(' + ','.join(self.attr_names) + ')'
         self.reset_ode()
-        self.apply_tc(force_nlm_update=True)  # update the nonlinear multiplier
 
         # vaccination
         for seir in ['S', 'E', 'A']:
