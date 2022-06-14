@@ -10,7 +10,7 @@ from collections import OrderedDict
 from matplotlib import pyplot as plt
 ### Local Imports ###
 from covid_model import CovidModel
-from covid_model.runnable_functions import do_create_report, do_fit_scenarios
+from covid_model.runnable_functions import do_create_report, do_fit_scenarios, do_create_multiple_reports
 from covid_model.utils import setup, get_filepath_prefix
 from covid_model.analysis.charts import plot_transmission_control
 from covid_model.db import db_engine
@@ -22,17 +22,15 @@ def main():
     outdir = setup(os.path.basename(__file__), 'info')
 
     fit_args = {
-        'batch_size': 5,
-        'increment_size': 2,
+        'fit_start_date': None,
+        'fit_end_date': None,
         'tc_min': 0.0,
         'tc_max': 0.999,
-        'forward_sim_each_batch': True,
-        'look_back': None,
-        #'refit_from_date': '2022-03-01',
-        'use_hosps_end_date': True,
-        'window_size': 14,
-        'last_window_min_size': 14,
-        'write_batch_output': False,
+        'tc_window_size': 14,
+        'tc_window_batch_size': 5,
+        'tc_batch_increment': 2,
+        'last_tc_window_min_size': 14,
+        #'write_results': True, TODO: doesn't currently work with multiprocessing options. fix this. (still writes, but can't specify arguments)
         'outdir': outdir
     }
     base_model_args = {
@@ -40,22 +38,21 @@ def main():
         'region_defs': 'covid_model/input/region_definitions.json',
         'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
         'regions': ['co'],
-        'tc': [0.75, 0.75],
-        'tc_tslices': [14],
         'mobility_mode': None,
         'start_date': dt.datetime.strptime('2020-01-24', "%Y-%m-%d").date(),
-        'end_date': dt.datetime.strptime('2022-06-07', "%Y-%m-%d").date(),
+        'end_date': dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date(),
         #'max_step_size': np.inf
         'max_step_size': 1.0
     }
-    multiprocess = 6
-    base_model_args = {'base_spec_id': 2710, 'params_defs': json.load(open('covid_model/analysis/20220606_GovBriefing/params_no_ba45_immuneescape.json'))}
+    multiprocess = 8
+    #base_model_args = {'base_spec_id': 2710, 'params_defs': json.load(open('covid_model/analysis/20220606_GovBriefing/params_no_ba45_immuneescape.json'))}
     logging.info(json.dumps({"fit_args": fit_args}, default=str))
     logging.info(json.dumps({"base_model_args": base_model_args}, default=str))
 
     ####################################################################################################################
     # Run
 
+    logging.info('Building Scenarios')
     scenario_args_list = []
     #for beta_mult in [0.9, 0.95, 0.99, 1.01, 1.05, 1.1]:
     for beta_mult in [0.95, 1.00, 1.05]:
@@ -69,19 +66,22 @@ def main():
                                            'hosp_reporting_frac': {"2020-01-01": 1, "2022-03-10": for_covid_frac}})
 
     # run the scenarios
-    models = do_fit_scenarios(base_model_args, scenario_args_list, fit_args, multiprocess=multiprocess)
+    #logging.info('Running Scenarios')
+    #models = do_fit_scenarios(base_model_args, scenario_args_list, fit_args, multiprocess=multiprocess)
 
+    logging.info('Loading models from DB')
+    engine=db_engine()
+    models = [CovidModel(engine, base_spec_id=id) for id in [2772,2773,2774,2775,2776,2777,2778,2779,2780,2781,2782,2783,2784,2785,2786,2787,2788,2789]]
+    #models = [CovidModel(engine, base_spec_id=id) for id in [2772,2773]]
+
+    logging.info('Projecting')
     for model in models:
-        logging.info('Fitting')
-        model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_states_seir_variant_immun_total_all_at_once.csv')
-        model.solution_sum().unstack().to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_states_full.csv')
+        logging.info('')
+        model.prep()
+        model.solve_seir()
 
-        model.end_date = '2022-09-15'
-        model.update(db_engine())
-        do_create_report(model, outdir, prep_model=True, solve_model=True)
-
-        model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_states_seir_variant_immun_total_all_at_once_forecast.csv')
-        model.solution_sum().unstack().to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_states_full_forecast.csv')
+        model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_seir_variant_immun_total_all_at_once_projection.csv')
+        model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_full_projection.csv')
 
         logging.info(f'{str(model.tags)}: Running forward sim')
         fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -92,10 +92,17 @@ def main():
         ax = fig.add_subplot(212)
         plot_transmission_control(model, ax=ax)
         ax.set_xlim(dt.datetime.strptime('2022-01-01', "%Y-%m-%d").date(), dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date())
-        plt.savefig(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_forecast.png')
+        plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast.png')
         plt.close()
-        hosps_df.to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_forecast.csv')
-        json.dump(dict(dict(zip([0] + model.tc_tslices, model.tc))), open(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_forecast_tc.json', 'w'))
+        hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
+        json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
+
+    logging.info('Running reports')
+    do_create_multiple_reports(models, multiprocess=multiprocess, outdir=outdir, prep_model=False, solve_model=True, immun_variants=['ba2121', 'ba45'], from_date='2022-01-01')
+
+
+
+
 
 
 if __name__ == "__main__":

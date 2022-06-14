@@ -53,7 +53,7 @@ def main():
     model.write_specs_to_db(engine)
     model.write_results_to_db(engine)
     logger.info(f'{str(model.tags)}: spec_id: {model.spec_id}')
-    model.solution_sum(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun.csv")
+    model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun.csv")
 
 
 if __name__ == "__main__":

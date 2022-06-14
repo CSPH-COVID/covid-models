@@ -27,8 +27,8 @@ def run_solve_seir(outdir=None, model=None, tags={}, **specs_args):
                                                  'mobility_mode': model.mobility_mode if model else specs_args['mobility_mode'], **tags})
     model.write_results_to_db(engine=engine)
 
-    df = model.solution_sum(['seir', 'region']).assign(**{'date':model.daterange}).set_index('date').stack([0, 1]).reset_index(name='y')
-    dfh = model.solution_sum(['seir', 'region'], index_with_model_dates=True)['Ih'].stack('region').rename('modeled_hospitalized')
+    df = model.solution_sum_df(['seir', 'region']).assign(**{'date':model.daterange}).set_index('date').stack([0, 1]).reset_index(name='y')
+    dfh = model.solution_sum_df(['seir', 'region'], index_with_model_dates=True)['Ih'].stack('region').rename('modeled_hospitalized')
     hosps = pd.concat([ExternalHosps(engine=engine).fetch(county_ids=model.get_all_county_fips(region)).assign(region=region).set_index('region', append=True) for region in model.regions], axis=0)
     hosps.index.set_names('date', level=0, inplace=True)
     dfh = dfh.to_frame().join(hosps)

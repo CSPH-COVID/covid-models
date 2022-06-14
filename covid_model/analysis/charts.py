@@ -33,12 +33,12 @@ def plot_modeled(model, compartments, ax=None, transform=lambda x: x, groupby=[]
     if groupby:
         if type(groupby) == str:
             groupby = [groupby]
-        df = transform(model.solution_sum(['seir', *groupby])[compartments].groupby(groupby, axis=1).sum())
+        df = transform(model.solution_sum_df(['seir', *groupby])[compartments].groupby(groupby, axis=1).sum())
         if share_of_total:
             total = df.sum(axis=1)
             df = df.apply(lambda s: s / total)
     else:
-        df = transform(model.solution_sum('seir'))
+        df = transform(model.solution_sum_df('seir'))
         if share_of_total:
             total = df.sum(axis=1)
             df = df.apply(lambda s: s / total)
@@ -60,13 +60,12 @@ def plot_modeled_by_group(model, axs, compartment='Ih', **plot_params):
         ax.legend(loc='best')
         ax.set_xlabel('')
 
+
 def plot_transmission_control(model, **plot_params):
     # need to extend one more time period to see the last step. Assume it's the same gap as the second to last step
-    tcs = model.tc + [np.infty]  # the last tc doesn't get plotted b/c of "steps-post" style.
-    tend = [2 * model.tc_tslices[-1] - model.tc_tslices[-2]] if len(model.tc_tslices) > 1 else [2 * model.tc_tslices[0]]
-    tslices = [0] + model.tc_tslices + tend # 0 is implicit first tslice
-    tc_df = pd.DataFrame(tcs, columns=['TC'], index=[model.start_date + dt.timedelta(days=d) for d in tslices])
-    tc_df.plot(drawstyle="steps-post", **plot_params)
+    tc_df = pd.DataFrame.from_dict(model.tc, orient='index').set_index(np.array([model.t_to_date(t) for t in model.tc.keys()]))
+    tc_df.plot(drawstyle="steps-post", xlim=(model.start_date, model.end_date), **plot_params)
+
 
 def format_date_axis(ax, interval_months=None, **locator_params):
     locator = mdates.MonthLocator(interval=interval_months) if interval_months is not None else mdates.AutoDateLocator(**locator_params)

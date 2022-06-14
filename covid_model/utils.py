@@ -88,8 +88,9 @@ def setup(name, log_level="info"):
     return outdir
 
 
-def get_filepath_prefix(outdir = None):
-    if outdir:
-        return join(outdir, dt.datetime.now().strftime('%Y%m%d_%H%M%S') + '_')
-    else:
-        return dt.datetime.now().strftime('%Y%m%d_%H%M%S') + '_'
+def get_filepath_prefix(outdir = None, tags=None):
+    now = dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+    prefix = join(outdir, now) if outdir is not None else now
+    if tags:
+        prefix += f'_{"_".join(str(key) + "_" + str(val) for key, val in tags.items())}'
+    return prefix + '_'
