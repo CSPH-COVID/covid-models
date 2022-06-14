@@ -63,8 +63,8 @@ def plot_modeled_by_group(model, axs, compartment='Ih', **plot_params):
 
 def plot_transmission_control(model, **plot_params):
     # need to extend one more time period to see the last step. Assume it's the same gap as the second to last step
-    tc_df = pd.DataFrame.from_dict(model.tc, orient='index').set_index(np.array([model.start_date + dt.timedelta(days=d) for d in model.tc.keys()]))
-    tc_df.plot(drawstyle="steps-post", **plot_params)
+    tc_df = pd.DataFrame.from_dict(model.tc, orient='index').set_index(np.array([model.t_to_date(t) for t in model.tc.keys()]))
+    tc_df.plot(drawstyle="steps-post", xlim=(model.start_date, model.end_date), **plot_params)
 
 
 def format_date_axis(ax, interval_months=None, **locator_params):
