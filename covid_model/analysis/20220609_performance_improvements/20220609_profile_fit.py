@@ -33,8 +33,7 @@ def main():
         'tc_window_batch_size': 5,
         'tc_batch_increment': 2,
         'last_tc_window_min_size': 14,
-        'write_results': False,
-        'loss_projection_days': 0,
+        'write_results': True,
         'outdir': outdir
     }
     model_args = {
@@ -44,31 +43,25 @@ def main():
         'regions': ['co'],
         'mobility_mode': None,
         'start_date': dt.datetime.strptime('2020-01-24', "%Y-%m-%d").date(),
-        'end_date': dt.datetime.strptime('2020-08-01', "%Y-%m-%d").date(),
+        'end_date': dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date(),
         # 'max_step_size': np.inf
         'max_step_size': 1.0
     }
+    model_args = {'base_spec_id': 2753}
     logging.info(json.dumps({"fit_args": fit_args}, default=str))
     logging.info(json.dumps({"model_args": model_args}, default=str))
 
     ####################################################################################################################
 
-    #model = CovidModel(**model_args)
-    #t0 = perf_counter()
-    #model.prep()
-    #model.update_tc({0: 0.75})
-    #logging.info(f'{str(model.tags)} Model prepped for fitting in {perf_counter() - t0} seconds.')
-    #t1 = perf_counter()
-    #for i in range(100):
-    #    model.solve_seir()
-    #logging.info(f'{str(model.tags)} Model fit 100 times in {perf_counter() - t1} seconds.')
+    model = CovidModel(**model_args)
 
+    #logging.info('Fitting')
+    #model = do_single_fit(**fit_args, **model_args, tags={'profiling': True})
 
-    logging.info('Fitting')
-    model = do_single_fit(**fit_args, **model_args, tags={'priorinf': False})
-    model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + "states_seir_variant_immun_total_all_at_once.csv")
-    model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir) + "states_full.csv")
-    logging.debug(json.dumps({"serialized model": model.to_json_string()}, default=str))
+    #model.end_date = '2022-09-15'
+    #model.update(db_engine())
+    do_create_report(model, outdir, immun_variants=['ba2121', 'ba45'], from_date='2022-01-01', prep_model=True, solve_model=True)
+    #do_create_report(model, outdir, immun_variants=['ba2121', 'ba45'], from_date='2022-01-01', prep_model=False, solve_model=True)
 
     return
 
