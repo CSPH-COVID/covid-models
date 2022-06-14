@@ -70,10 +70,10 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         hosps_df.plot(ax=ax)
         ax = fig.add_subplot(212)
         plot_transmission_control(model, ax=ax)
-        plt.savefig(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.png')
+        plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + '_model_fit.png')
         plt.close()
-        hosps_df.to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_fit.csv')
-        json.dump(dict(model.tc), open(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_model_tc.json', 'w'))
+        hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_fit.csv')
+        json.dump(dict(model.tc), open(get_filepath_prefix(outdir, tags=model.tags) + '_model_tc.json', 'w'))
 
     logging.debug(str({"model_build_args": model_args}))
 
@@ -162,6 +162,7 @@ def do_single_fit_wrapper_nonparallel(args):
 
 def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
     # generate list of arguments
+    fit_args2 = {key: val for key, val in fit_args.items() if key not in ['write_results', 'write_batch_output']}
     args_list = list(map(lambda x: {**x, **fit_args}, model_args_list))
     # run each scenario
     if multiprocess:
@@ -188,9 +189,11 @@ def do_regions_fit(model_args, fit_args, multiprocess=None):
     do_multiple_fits(model_args_list, fit_args, multiprocess=multiprocess)
 
 
-def do_create_report(model, outdir, from_date=None, to_date=None, prep_model=False, solve_model=False):
+def do_create_report(model, outdir, immun_variants=('ba2121'), from_date=None, to_date=None, prep_model=False, solve_model=False):
     from_date = model.start_date if from_date is None else from_date
+    from_date = dt.datetime.strptime(from_date, '%Y-%m-%d').date() if isinstance(from_date, str) else from_date
     to_date = model.end_date if to_date is None else to_date
+    to_date = dt.datetime.strptime(to_date, '%Y-%m-%d').date() if isinstance(to_date, str) else to_date
 
     if prep_model:
         logger.info('Prepping model')
@@ -202,96 +205,114 @@ def do_create_report(model, outdir, from_date=None, to_date=None, prep_model=Fal
     if solve_model:
         logger.info('Solving model')
         model.solve_seir()
-    # build_legacy_output_df(model).to_csv('output/out2.csv')
 
-    size_per_chart = 8
-    fig, axs = plt.subplots(2,2, figsize=(size_per_chart * 2 + 1, size_per_chart * 2))
+    subplots_args = {'figsize': (10, 8), 'dpi': 300}
 
     # prevalence
-    ax = axs.flatten()[0]
-    ax.set_ylabel('SARS-CoV-2 Prevalenca')
+    fig, ax = plt.subplots(**subplots_args)
+    ax.set_ylabel('SARS-CoV-2 Prevalence')
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     ax.legend(loc='best')
     plot_modeled(model, ['I', 'A'], share_of_total=True, ax=ax, label='modeled')
+    format_date_axis(ax)
+    ax.set_xlim(from_date, to_date)
+    ax.axvline(x=dt.date.today(), color='darkgray')
+    ax.grid(color='lightgray')
+    ax.legend(loc='best')
+    fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'prevalence.png')
+    plt.close()
 
     # hospitalizations
-    ax = axs.flatten()[1]
+    #TODO: update to be the back_adjusted hosps
+    fig, ax = plt.subplots(**subplots_args)
     ax.set_ylabel('Hospitalized with COVID-19')
     plot_observed_hosps(db_engine(), ax=ax, color='black')
     plot_modeled(model, 'Ih', ax=ax, label='modeled')
-
-    #hosps_df = pd.DataFrame(index=model.trange)
-    #hosps_df['modeled'] = model.solution_sum('seir')['Ih']
-    #hosps_df.index = model.daterange
-    #hosps_df.loc[:'2022-02-28'].round(1).to_csv(get_filepath_prefix(outdir) + 'omicron_report_hospitalizations.csv')
+    format_date_axis(ax)
+    ax.set_xlim(from_date, to_date)
+    ax.axvline(x=dt.date.today(), color='darkgray')
+    ax.grid(color='lightgray')
+    ax.legend(loc='best')
+    fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'hospitalized.png')
+    plt.close()
 
     # variants
-    ax = axs.flatten()[2]
+    fig, ax = plt.subplots(**subplots_args)
     plot_modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=ax)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     ax.set_ylabel('Variant Share of Infections')
+    format_date_axis(ax)
+    ax.set_xlim(from_date, to_date)
+    ax.axvline(x=dt.date.today(), color='darkgray')
+    ax.grid(color='lightgray')
+    ax.legend(loc='best')
+    fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'variant_share.png')
+    plt.close()
 
     # immunity
-    ax = axs.flatten()[3]
-    ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='cyan')
-    ax.plot(model.daterange, model.immunity('omicron', age='65+'), label='Immunity vs Omicron (65+ only)', color='darkcyan')
-    ax.plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Severe Omicron', color='gold')
-    ax.plot(model.daterange, model.immunity('omicron', to_hosp=True, age='65+'), label='Immunity vs Severe Omicron (65+ only)', color='darkorange')
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-    ax.set_ylim(0, 1)
-    ax.set_ylabel('Percent Immune')
-
-    # formatting
-    for ax in axs.flatten():
+    for variant in immun_variants:
+        fig, ax = plt.subplots(**subplots_args)
+        immun = model.immunity(variant=variant)
+        immun_65p = model.immunity(variant=variant, age='65+')
+        immun_hosp = model.immunity(variant=variant, to_hosp=True)
+        immun_hosp_65p = model.immunity(variant=variant, age='65+', to_hosp=True)
+        for df, name in zip((immun, immun_65p, immun_hosp, immun_hosp_65p), ('immun', 'immun_65p', 'immun_hosp', 'immun_hosp_65p')):
+            df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + f'{name}_{variant}.csv')
+        ax.plot(model.daterange, immun, label=f'Immunity vs Infection', color='cyan')
+        ax.plot(model.daterange, immun_65p, label=f'Immunity vs Infection (65+ only)', color='darkcyan')
+        ax.plot(model.daterange, immun_hosp, label=f'Immunity vs Severe Infection', color='gold')
+        ax.plot(model.daterange, immun_hosp_65p, label=f'Immunity vs Severe Infection (65+ only)', color='darkorange')
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.set_ylim(0, 1)
+        ax.set_ylabel('Percent Immune')
         format_date_axis(ax)
         ax.set_xlim(from_date, to_date)
         ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
         ax.legend(loc='best')
+        fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + f'immunity_{variant}.png')
+        plt.close()
 
-    fig.tight_layout()
-    fig.savefig(get_filepath_prefix(outdir) + 'report.png')
+    do_build_legacy_output_df(model).to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'out2.csv')
+
+    return None
+
+
+def do_create_report_wrapper_parallel(args):
+    setup(os.path.basename(__file__), 'info')
+    logger = IndentLogger(logging.getLogger(''), {})
+    return do_create_report(**args)
+
+
+def do_create_report_wrapper_nonparallel(args):
+    return do_create_report(**args)
+
+
+def do_create_multiple_reports(models, multiprocess=None, **report_args):
+    # generate list of arguments
+    args_list = list(map(lambda x: {'model': x, **report_args}, models))
+    # run each scenario
+    if multiprocess:
+        install_mp_handler()
+        p = Pool(multiprocess)
+        p.map(do_create_report_wrapper_parallel, args_list)
+    else:
+        list(map(do_create_report_wrapper_nonparallel, args_list))
 
 
 def do_build_legacy_output_df(model: CovidModel):
-    ydf = model.solution_sum_df(['seir', 'age', 'region']).stack(level='age')
-    df = ydf.unstack(level=1).stack(level=1)
-
-    alpha_df = model.get_param_for_attrs_by_t('alpha', attrs={})
-    alpha_df['date'] = model.daterange
-    alpha_df = alpha_df.reset_index('t').set_index('date', append=True).drop(columns='t')
-    combined = model.solution_sum_df()[['E']].stack(model.param_attr_names).join(alpha_df)
-    combined['Einc'] = (combined['E'] / combined['alpha'])
-    combined = combined.groupby(['date', 'region']).sum()
-
     totals = model.solution_sum_df(['seir', 'region']).stack(level=1)
+    totals['region_pop'] = totals.sum(axis=1)
     totals = totals.rename(columns={'Ih': 'Iht', 'D': 'Dt', 'E': 'Etotal'})
     totals['Itotal'] = totals['I'] + totals['A']
 
-    #totals_by_priorinf = model.solution_sum(['seir', 'priorinf']) # TODO: update
+    df = totals.join(model.new_infections).join(model.re_estimates)
 
-    #df['Rt'] = totals_by_priorinf[('S', 'none')]  # TODO: update
-    #df['Itotal'] = totals['I'] + totals['A']
-    #df['Etotal'] = totals['E']
-    #df['Einc'] = (combined['E'] / combined['alpha']).groupby('t').sum()
-    df.join(totals).join(combined)
+    df['prev'] = 100000.0 * df['Itotal'] / df['region_pop']
+    df['oneinX'] = df['region_pop'] / df['Itotal']
 
-    # TODO: how to generalize this for all variants?
-    # TODO:  immunity per region?
-    df['Vt'] = model.immunity(variant='omicron', vacc_only=True)
-    df['immune'] = model.immunity(variant='omicron')
-    # why is this needed?
-    df['Ilag'] = df['I'].shift(3)
-
-    #df['Re'] = model.re_estimates   # TODO: needs updating in model class
-    # update to work with region pop
-    #df['prev'] = 100000.0 * df['Itotal'] / model.model_params['total_pop']
-    #df['oneinX'] = model.model_params['total_pop'] / df['Itotal']
-    # TODO: what is this supposed to be?
-    #df['Exposed'] = 100.0 * df['Einc'].cumsum()
-
-    df.index.names = ['t']
     return df
+
 
 def do_fit_scenarios(base_model_args, scenario_args_list, fit_args, multiprocess = None):
     # construct model args from base model args and scenario args list
