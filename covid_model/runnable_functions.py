@@ -54,7 +54,6 @@ def do_single_fit(tc_0=0.75,  # default value for TC
                   last_tc_window_min_size=21,  # smallest size of the last TC window
                   fit_start_date=None,  # refit all tc's on or after this date (if None, use model start date)
                   fit_end_date=None,  # refit all tc's up to this date (if None, uses either model end date or last date with hospitalization data, whichever is earlier
-                  loss_projection_days=None,  # can compute loss of fit using only the batch window (if =0), or also include a projection (in days) into the future. If None, will project until fit_end_date
                   prep_model=True,  # Should we run model.prep
                   outdir=None,  # the output directory for saving results
                   write_results=True,  # should final results be written to the database
@@ -119,7 +118,6 @@ def do_single_fit(tc_0=0.75,  # default value for TC
 
     logger.info(f'{str(model.tags)} Will fit {len(batch_tstarts)} times')
     for i, (tstart, tend) in enumerate(zip(batch_tstarts, batch_tends)):
-        tend = min(fit_tend, tend + loss_projection_days) if loss_projection_days is not None else fit_tend
         t0 = perf_counter()
         yd_start = model.y_dict(tstart) if tstart != 0 else model.y0_dict
         fitted_tc, fitted_tc_cov = __single_batch_fit(model, tc_min=tc_min, tc_max=tc_max, yd_start=yd_start, tstart=tstart, tend=tend)
