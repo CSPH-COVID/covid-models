@@ -357,6 +357,25 @@ class CovidModel:
             params = [{'param': 'kappa_pa', 'attrs': {'region': region}, 'vals': dict(zip(dates, kappas[:, j].tolist())), 'desc': ''} for j, region in enumerate(self.regions)]
         return params
 
+    def hosp_reporting_frac_by_t(self):
+        # currently assigns the same hrf to all regions.
+        hrf = pd.DataFrame(index=self.daterange)
+        hrf['hosp_reporting_frac'] = np.nan
+        early_dates = []
+        for date, val in self.hosp_reporting_frac.items():
+            date = date if isinstance(date, dt.date) else dt.datetime.strptime(date, "%Y-%m-%d").date()
+            if date in hrf.index:
+                hrf.loc[date]['hosp_reporting_frac'] = val
+            elif date <= hrf.index[0]:
+                early_dates.append(date)
+        if len(early_dates) > 0:
+            # among all the dates before the start date, take the latest one
+            hrf.iloc[0] = self.hosp_reporting_frac[dt.datetime.strftime(max(early_dates), "%Y-%m-%d")]
+        hrf = hrf.ffill()
+        hrf.index.name = 'date'
+        hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True)
+        return hrf
+
     # pulls hospitalizations for only the first region, since the model only fits one region at a time
     def set_hosp(self, engine=None):
         if engine is None:
@@ -375,18 +394,7 @@ class CovidModel:
 
         # TODO: make work with multiple regions
         # compute estimated actual hospitalizations
-        hosps['hosp_reporting_frac'] = np.nan
-        early_dates = []
-        for date, val in self.hosp_reporting_frac.items():
-            date = date if isinstance(date, dt.date) else dt.datetime.strptime(date, "%Y-%m-%d").date()
-            if date in hosps.index:
-                hosps.loc[date]['hosp_reporting_frac'] = val
-            elif date <= hosps.index[0]:
-                early_dates.append(date)
-        if len(early_dates) > 0:
-            # among all the dates before the start date, take the latest one
-            hosps.iloc[0] = self.hosp_reporting_frac[dt.datetime.strftime(max(early_dates), "%Y-%m-%d")]
-        hosps = hosps.ffill()
+        hosps['hosp_reporting_frac'] = self.hosp_reporting_frac_by_t()
 
         self.observed_hosp = hosps['currently_hospitalized']
         self.estimated_actual_hosp = hosps['currently_hospitalized'] / hosps['hosp_reporting_frac']
@@ -570,11 +578,23 @@ class CovidModel:
         return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
     @property
+    def new_infections(self):
+        param_df = self.get_param_for_attrs_by_t('alpha', attrs={}, convert_to_dates=True)
+        combined = self.solution_sum_df()[['E']].stack(self.param_attr_names).join(param_df)
+        combined['Enew'] = (combined['E'] / combined['alpha'])
+        combined = combined.groupby(['date', 'region']).sum().drop(columns=['E', 'alpha'])
+        return combined
+
+    @property
     def re_estimates(self):
-        # TODO: quick fix, assumes gamm is constant
-        infect_duration = 1/ self.model_params['gamm'][0]['values']
-        infected = (self.solution_sum_df('seir')['I'].shift(3) + self.solution_sum_df('seir')['A'].shift(3))
-        return infect_duration * self.new_infections.groupby('t').sum() / infected
+        param_df = self.get_params_for_attrs_by_t(['gamm', 'alpha'], attrs={}, convert_to_dates=True)
+        combined = self.solution_sum_df()[['I', 'A', 'E']].stack(self.param_attr_names).join(param_df)
+        combined['infect_duration'] = 1/combined['gamm']
+        combined['lagged_infected'] = combined.groupby('region').shift(3)[['I', 'A']].sum(axis=1)
+        combined['new_infected'] = combined['E'] / combined['alpha']
+        combined = combined.groupby(['date', 'region']).agg({'new_infected':'sum', 'lagged_infected': 'sum', 'infect_duration': 'mean'})
+        combined['re'] = combined['new_infected'] * combined['infect_duration'] / combined['lagged_infected']
+        return combined[['re']]
 
 
     ####################################################################################################################
@@ -669,15 +689,17 @@ class CovidModel:
         df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
         df['estimated_actual'] = np.nan
         df['observed'] = np.nan
+        df['hosp_reporting_frac'] = self.hosp_reporting_frac_by_t()
         ea_hosps = self.estimated_actual_hosp[:len(self.daterange)].to_numpy()
         o_hosps = self.observed_hosp[:len(self.daterange)].to_numpy()
         df['estimated_actual'][:len(ea_hosps)] = ea_hosps
         df['observed'][:len(o_hosps)] = o_hosps
-        df = df.reindex(columns=['observed', 'estimated_actual', 'modeled'])
+        df['modeled_observed'] = df['modeled'] * df['hosp_reporting_frac']
+        df = df.reindex(columns=['observed', 'estimated_actual', 'modeled', 'modeled_observed'])
         return df
 
     # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
-    def get_param_for_attrs_by_t(self, param, attrs=None, from_attrs=None, to_attrs=None):
+    def get_param_for_attrs_by_t(self, param, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
         # get the keys for the parameters we want
         df_list = []
         if attrs is not None:
@@ -701,10 +723,13 @@ class CovidModel:
                         df[param][t] = val
                     df_list.append(df.ffill())
         df = pd.concat(df_list)
+        if convert_to_dates:
+            df['date'] = [self.t_to_date(t) for t in df.index.get_level_values('t')]
+            df = df.reset_index().set_index(['date'] + df.index.names[1:]).drop(columns=['t'])
         return df
 
-    def get_params_for_attrs_by_t(self, params: list, attrs=None, from_attrs=None, to_attrs=None):
-        return pd.concat([self.get_param_for_attrs_by_t(param, attrs, from_attrs, to_attrs) for param in params], axis=1)
+    def get_params_for_attrs_by_t(self, params: list, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
+        return pd.concat([self.get_param_for_attrs_by_t(param, attrs, from_attrs, to_attrs, convert_to_dates) for param in params], axis=1)
 
     # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
@@ -1321,8 +1346,8 @@ class CovidModel:
                 ("end_date", self.end_date),
                 ("tags", json.dumps(self.tags)),
                 ("regions", json.dumps(self.regions)),
-                ("tslices", self.__tc.keys()),
-                ("tc", self.__tc.values()),
+                ("tslices", list(self.__tc.keys())),
+                ("tc", list(self.__tc.values())),
                 ("serialized_model", self.to_json_string())
             ]))
             session.execute(stmt)
