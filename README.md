@@ -4,6 +4,57 @@ This repo contains a set of tools for running and processing the State of Colora
 Previous versions of these models can be found in [another repo](https://github.com/agb85/covid-19).
 Periodic modeling reports can be found on the Colorado School of Public Health website [here](https://coloradosph.cuanschutz.edu/resources/covid-19/modeling-results).
 
+# Repository Information
+
+This repository contains the core model code, along with many relevant model parameters.
+It also contains code to read/write data to a database, fit and run the model, and run various analyses using the model.
+
+### Organization
+
+Since our team is constantly balancing the need to provide relevant, timely, and actionable input to decision makers, the repository is in constant flux.
+Some things need to be updated, others are completely outdated by later events.
+Even so, we strive to be organized and systematic for increased ease of use and public transparency.
+We thank you in advance for your understanding!
+With that in mind, here is a high-level overview of this repository's file structure: 
+
+```commandline
+covid-models/
+├─ covid_model/
+│  ├─ analysis/
+│  ├─ input/
+|  ├─ needs_update_or_organizing/
+|  ├─ output/
+|  ├─ sql/
+|  ├─ data_imports.py
+|  ├─ db.py
+|  ├─ model.py
+|  ├─ ode_flow_terms.py
+|  ├─ runnable_functions.py
+|  ├─ utils.py
+├─ test/
+├─ .gitignore
+├─ README.md
+├─ requirements.txt
+```
+
+The `covid_model` directory contains all the functional code, while `test` is reserved for unit tests and other testing scripts.
+At this time, most testing scripts are out of date and need to be updated.
+Within `covid_model` are the core python files which define the model functionality, along with some subdirectories.
+First we describe the python files:
+1. `data_imports.py` contains code to read in data from external sources, such as files or a database. Right now, the model is configured to read everything from a database.
+2. `db.py` contains code necessary for connecting with an external database in order to read/write data and model specifications / results.
+3. `model.py` is the single most important script in this repository. It defines the `CovidModel` class which loads data, processes parameter specifications, and runs the compartmental model, and reads/writes to/from the database.
+4. `ode_flow_terms.py` defines classes which represent a single term in an ordinary differential equation. These terms are used by the model class to define all the flows in the compartmental model.
+5. `runnable_functions.py` defines several functions which allow running and training of the model, as well as producing reports.
+6. `utils.py` contains some utility functions that help set up project logging, format filenames, etc.
+
+Next, the contained directories:
+1. `analysis/` holds analyses we run using the model, for example, model runs informing an upcoming modeling report. Each analysis should have its own subdirectory with a date-prefixed name for organizational purposes. This directory also contains the `charts.py` script, which defines some auxilliary plotting functions useful for viewing model output. More details on working with the model and performing analyses are provided below. 
+2. `input/` holds parameter specification files, region definitions, and other input data that is not held in a database, especially data that is common to multiple analysis scenarios. Often, however, analysis subdirectories will contain their own versions of input files which reflect the best knowledge of parameters at the time, or which explore a particular scenario or set of scenarios.
+3. `needs_update_or_organizing/` is a holding location for files which are out of date, yet to be overhauled, or need reviewing before deleting. Keeping these files in the current version of the repo makes it easier to not forget about them and systematically review them.
+4. `output/` is a (mostly) empty directory which is the default output location for analyses in the analysis folder. By convention, output subdirectories should have the same name as the analysis script being run, for easy cross-referencing.
+5. `sql/` contains `.sql` files used to query data from the database.
+
 # Model Overview
 
 At its core, the model is [compartmental](https://en.wikipedia.org/wiki/Compartmental_models_in_epidemiology), where individuals move between different _compartments_, governed by a system of ordinary differential equations.
@@ -37,15 +88,6 @@ For example, to represent susceptible individuals becoming infected, we have a f
 
 In lieu of the full set of differential equations governing (coming soon), we can describe the model dynamics pictorally using a set of flow diagrams.
 TODO: Add in flow diagrams and differential equations.
-
-# Repository Information
-
-This repository contains the core model code, along with many relevant model parameters.
-It also contains code to read/write data to a database, fit and run the model, and run various analyses using the model.
-
-### Organization
-
-TODO: explain file structure, etc.
 
 ### Model Parameters
 
@@ -197,21 +239,51 @@ Reverseing the order would cause multiple issues: (1) a multiplier can't be appl
 
 [2] Stricly speaking, `null` and `{}` put data in slightly different places, but the effect is the same. `{}` actually applies the specification to every compartment individually, whereas `null` stores the value once, outside the compartments, which is checked whenever a parameter is needed for a particular compartment but hasn't been set yet. This should not concern the casual user of the model.
 
-### The Model Class
+### Model Fitting and Transmission Control (TC)
 
-TODO: talk about the model class. instantiation, prep, solving, serialization, etc.
+TODO: describe
+
 
 # Working with the model
 
-TODO:
+This section discusses how to set up your Python environment in order to work with the model, as well as an introduction to the `CovidModel` class and some common tasks that are done with the model.
 
-### Data Dependencies
+### Data dependencies
 
-TODO: describe database
+Our team uses a BigQuery database into which is regularly updated with up-to-date hospitalizations, vaccinations, etc. that serve as input to the model.
+It also serves as a repository for model specifications and results, so they can be easily referenced in the future and different model versions can be compared.
+Sadly, this database is not available to the public at this time.
+
+TODO: outline tables used, so someone can build their own if they want to run model.
 
 ### Environment setup
 
-TODO: packages and environment variables
+We use Python 3.9, though older versions may work as well.
+Package dependencies are documented in `requirements.txt`.
+All scripts import packages relative to the root directory (`covid-models`), so that directory should either be added to your `PYTHONPATH` environment variable, or that should be the working directory when running scripts. 
+
+### The `CovidModel` class
+
+Working with the model requires an understanding of the `CovidModel` class, defined in `covid-models/covid_model/model.py`.
+
+This class is responsible for loading data, processing parameter specifications, and solving the system of ODEs which define the compartmental model, and reading/writing to/from the database.
+
+A common workflow when working with the model is as follows:
+* Instantiate a model object, either from specification files, an existing "base_model" object, or a specification from the database. Here are some things that typically occur when a model instance is created:
+  * Basic model properties get set, such as the start date and end date
+  * Parameter specifications are set, but not processed yet (i.e. they are still just a list of specifications)
+  * Region definitions are set, which list the FIPS codes for the counties contained in each region of the model
+  * Hospitalization and vaccination data is loaded into the model
+  * Parameters for projecting vaccination rates are set, and projected vaccination rates are set, if the end date of the model is beyond the available vaccination data
+* Prep the model for running and solving. Here are some things that occur during this step:
+  * The set of parameter specifications is processed to determine parameter values over time for each compartment. I.e. all appropriate values and multipliers are applied in sequence to the appropriate compartments and flows, resulting in the final set of parameters to be used in the ODE (this step occupies most of the prep time)
+  * Sparse arrays and matrices are constructed to be used in forward-solving the system of ODEs from some initial condition
+  * A placeholder NumPy array is created which will store the ODE solution after it has been solved.
+* Solve the model. This may be done as a singular task, or solving may occur many times while fitting TC values to make model estimated hospitalizations fit observed data. I.e. an optimization algorithm will specify values for TC, solve the model, compute the error in modeled vs. observed hospitalizations, and repeat until it has converged to the best estimates of TC.
+
+
+TODO: more detail with sample code for instantiating in each different way, prepping, and solving, etc.
+TODO: rely on docstrings for detailed documentation of the model class?
 
 ### Common tasks
 
