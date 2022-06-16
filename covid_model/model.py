@@ -394,7 +394,9 @@ class CovidModel:
 
         # TODO: make work with multiple regions
         # compute estimated actual hospitalizations
-        hosps['hosp_reporting_frac'] = self.hosp_reporting_frac_by_t()
+        hosps = hosps.join(self.hosp_reporting_frac_by_t().reset_index('region').drop(columns='region')) # hack to drop region from hosp_reporting_frac_by_t. long term need to add region to hosps
+        #hosps['hosp_reporting_frac'] = self.hosp_reporting_frac_by_t()
+
 
         self.observed_hosp = hosps['currently_hospitalized']
         self.estimated_actual_hosp = hosps['currently_hospitalized'] / hosps['hosp_reporting_frac']
@@ -685,6 +687,11 @@ class CovidModel:
         else:
             return (n * (1 - params['effective_inf_rate'])).groupby('date').sum() / n.groupby('date').sum()
 
+    # risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
+    def risk(self, variant=None, to_hosp=False, age=None):
+        pass
+
+
     def modeled_vs_observed_hosps(self):
         df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
         df['estimated_actual'] = np.nan
@@ -844,14 +851,14 @@ class CovidModel:
                 if t > self.tend:
                     continue
                 if not self.params_by_t[param_key][param].__contains__(t):
-                    t_left = self.params_by_t[param_key][param].keys()[self.params_by_t[param_key][param].bisect(t) - 1]
+                    t_left = self.params_by_t[param_key][param].keys()[self.params_by_t[param_key][param].bisect_right(t) - 1]
                     self.params_by_t[param_key][param][t] = self.params_by_t[param_key][param][t_left]
             # multiply
-            for d, mult in mults.items():
-                t = max(self.date_to_t(d), self.tstart)
-                if t > self.tend:
-                    continue
-                self.params_by_t[param_key][param][t] *= mult
+            mults2 = SortedDict({self.date_to_t(d): val for d, val in mults.items()})
+            for t in self.params_by_t[param_key][param].keys(): #
+                idx_left = mults2.bisect_right(t) - 1
+                if idx_left >= 0:  # there is a multiplier that applies to this time.
+                    self.params_by_t[param_key][param][t] *= mults2[list(mults2.keys())[idx_left]]
 
     # set values for a single parameter based on param_tslices
     def set_compartment_param(self, param, attrs: dict=None, vals: dict=None, mults: dict=None, desc=None):
