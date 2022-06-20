@@ -20,7 +20,7 @@ from sortedcontainers import SortedDict
 ### Local Imports ###
 from covid_model.db import get_sqa_table, db_engine
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
-from covid_model.data_imports import ExternalVacc, ExternalHosps, get_region_mobility_from_db
+from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
 from covid_model.utils import get_params, IndentLogger
 logger = IndentLogger(logging.getLogger(''), {})
 
@@ -69,8 +69,7 @@ class CovidModel:
         self.mobility_proj_params = None
         self.actual_vacc_df = None
         self.proj_vacc_df = None
-        self.observed_hosp = None
-        self.estimated_actual_hosp = None
+        self.hosps = None
         self.__hosp_reporting_frac = None
 
         self.base_spec_id = None
@@ -143,9 +142,9 @@ class CovidModel:
                 logger.debug(f"{str(self.tags)} Getting Mobility As Parameters")
                 self.params_defs.extend(self.get_mobility_as_params())
 
-        if any([p in self.recently_updated_properties for p in ['region_fit_spec_ids', 'region_fit_result_ids']]):
-            logger.debug(f"{str(self.tags)} Getting kappas as parameters using region fits")
-            self.params_defs.extend(self.get_kappas_as_params_using_region_fits(engine))
+        #if any([p in self.recently_updated_properties for p in ['region_fit_spec_ids', 'region_fit_result_ids']]):
+            #logger.debug(f"{str(self.tags)} Getting kappas as parameters using region fits")
+            #self.params_defs.extend(self.get_kappas_as_params_using_region_fits(engine))
 
         if any([p in self.recently_updated_properties for p in ['start_date', 'regions', 'region_defs', 'hosp_reporting_frac']]):
             logger.debug(f"{str(self.tags)} Setting Hospitalizations")
@@ -157,6 +156,7 @@ class CovidModel:
     ### Functions to Update Derived Properites and Retrieve Data
 
     def set_actual_vacc(self, engine=None, actual_vacc_df=None):
+        logger.info(f"{str(self.tags)} Retrieving vaccinations data")
         if engine is None:
             engine = db_engine()
         logger.debug(f"{str(self.tags)} getting vaccines from db")
@@ -166,8 +166,10 @@ class CovidModel:
             actual_vacc_df_list.append(ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age']))
         self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
+        logger.debug(f"{str(self.tags)} Vaccinations span from {self.actual_vacc_df.index.get_level_values(0).min()} to {self.actual_vacc_df.index.get_level_values(0).max()}")
 
     def set_proj_vacc(self):
+        logger.info(f"{str(self.tags)} Constructing vaccination projections")
         proj_lookback = self.vacc_proj_params['lookback']
         proj_fixed_rates = self.vacc_proj_params['fixed_rates']
         max_cumu = self.vacc_proj_params['max_cumu']
@@ -220,10 +222,13 @@ class CovidModel:
                     cumu_vacc += projections.loc[d]
 
             self.proj_vacc_df = projections
+            logger.debug(f"{str(self.tags)} projected vaccinations span from {self.proj_vacc_df.index.get_level_values(0).min()} to {self.proj_vacc_df.index.get_level_values(0).max()}")
         else:
             self.proj_vacc_df = None
+            logger.info(f"{str(self.tags)} No vaccine projections necessary")
 
     def set_actual_mobility(self, engine=None):
+        logger.info(f"{str(self.tags)} Retrieving mobility data")
         if engine is None:
             engine = db_engine()
         regions = self.regions
@@ -373,33 +378,40 @@ class CovidModel:
             hrf.iloc[0] = self.hosp_reporting_frac[dt.datetime.strftime(max(early_dates), "%Y-%m-%d")]
         hrf = hrf.ffill()
         hrf.index.name = 'date'
-        hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True)
+        hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True).reorder_levels([1,0])
         return hrf
 
     # pulls hospitalizations for only the first region, since the model only fits one region at a time
     def set_hosp(self, engine=None):
         if engine is None:
             engine = db_engine()
-        logger.info(f"{str(self.tags)} Retrieving hospitalizations")
+        logger.info(f"{str(self.tags)} Retrieving hospitalizations data")
         # makes sure we pull from EMResource if region is CO
-        county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
-        hosps = ExternalHosps(engine).fetch(county_ids=county_ids)
-
-        # fill in the beginning if necessary
-        if min(hosps.index.get_level_values(0)) > self.start_date:
-            h_fill = pd.DataFrame(index=[self.t_to_date(t) for t in range(self.tstart, self.date_to_t(min(hosps.index.get_level_values(0))))], columns=['currently_hospitalized'], dtype='float64').fillna(0)
-            hosps = pd.concat([h_fill, hosps])
+        #county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
+        regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
+                                                 'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
+        # TODO: fix for CO
+        if self.regions != ['co']:
+            hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list())\
+                .join(regions_lookup.set_index('county_id'), on='county_id')\
+                .groupby(['measure_date', 'region'])\
+                .aggregate(observed=('observed_hosp', 'sum'))\
+                .reset_index('measure_date')\
+                .rename(columns={'measure_date': 'date'})\
+                .set_index('date', append=True).sort_index()
         else:
-            hosps.observed_hosp = hosps[hosps.index.get_level_values(0) >= self.start_date]
+            hosps = ExternalHospsEMR(engine).fetch()\
+                .rename(columns={'currently_hospitalized': 'observed'})\
+                .assign(region='co')\
+                .reset_index('measure_date')\
+                .rename(columns={'measure_date': 'date'})\
+                .set_index(['region', 'date']).sort_index()
+        # fill in the beginning if necessary, or truncate if necessary
+        hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values(1))).date], names=['region', 'date']), fill_value=0)
 
-        # TODO: make work with multiple regions
-        # compute estimated actual hospitalizations
-        hosps = hosps.join(self.hosp_reporting_frac_by_t().reset_index('region').drop(columns='region')) # hack to drop region from hosp_reporting_frac_by_t. long term need to add region to hosps
-        #hosps['hosp_reporting_frac'] = self.hosp_reporting_frac_by_t()
-
-
-        self.observed_hosp = hosps['currently_hospitalized']
-        self.estimated_actual_hosp = hosps['currently_hospitalized'] / hosps['hosp_reporting_frac']
+        hosps = hosps.join(self.hosp_reporting_frac_by_t())
+        hosps['estimated_actual'] = hosps['observed'] / hosps['hosp_reporting_frac']
+        self.hosps = hosps
 
 
     ####################################################################################################################
@@ -693,16 +705,12 @@ class CovidModel:
 
 
     def modeled_vs_observed_hosps(self):
-        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled').to_frame()
-        df['estimated_actual'] = np.nan
-        df['observed'] = np.nan
-        df['hosp_reporting_frac'] = self.hosp_reporting_frac_by_t()
-        ea_hosps = self.estimated_actual_hosp[:len(self.daterange)].to_numpy()
-        o_hosps = self.observed_hosp[:len(self.daterange)].to_numpy()
-        df['estimated_actual'][:len(ea_hosps)] = ea_hosps
-        df['observed'][:len(o_hosps)] = o_hosps
-        df['modeled_observed'] = df['modeled'] * df['hosp_reporting_frac']
-        df = df.reindex(columns=['observed', 'estimated_actual', 'modeled', 'modeled_observed'])
+        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled_actual').to_frame()
+        df = df.join(self.hosps)
+        df['hosp_reporting_frac'].ffill(inplace=True)
+        df['modeled_observed'] = df['modeled_actual'] * df['hosp_reporting_frac']
+        df = df.reindex(columns=['observed', 'estimated_actual', 'modeled_actual', 'modeled_observed'])
+        df = df.reorder_levels([1,0]).sort_index() # put region first
         return df
 
     # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
@@ -898,6 +906,7 @@ class CovidModel:
         self.t_prev_lookup = {t_int: max(t for t in self.params_trange if t <= t_int) for t_int in self.trange}
 
         if apply_vaccines:
+            logger.debug(f"{str(self.tags)} Building vaccination param lookups")
             vacc_per_available = self.get_vacc_per_available()
 
             # apply vacc_delay
@@ -1100,6 +1109,7 @@ class CovidModel:
         self.reset_ode()
 
         # vaccination
+        logger.debug(f"{str(self.tags)} Building vaccination flows")
         for seir in ['S', 'E', 'A']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
@@ -1113,6 +1123,7 @@ class CovidModel:
                         self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available')
 
         # seed variants (only seed the ones in our attrs)
+        logger.debug(f"{str(self.tags)} Building seed flows")
         for variant in self.attrs['variant']:
             if variant == 'none':
                 continue
@@ -1121,6 +1132,7 @@ class CovidModel:
             self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': from_variant, 'immun': 'none'}, {'seir': 'E', 'variant': variant}, constant=seed_param)
 
         # exposure
+        logger.debug(f"{str(self.tags)} Building transmission flows")
         for variant in self.attrs['variant']:
             if variant == 'none':
                 continue
