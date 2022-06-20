@@ -65,7 +65,7 @@ class CovidModel:
         self.regions = self.attrs['region']
         self.__vacc_proj_params = None
         self.__mobility_mode = None
-        self.actual_mobility = {}
+        self.actual_mobility = None
         self.mobility_proj_params = None
         self.actual_vacc_df = None
         self.proj_vacc_df = None
@@ -200,7 +200,7 @@ class CovidModel:
                 cumu_vacc = self.actual_vacc_df.groupby(['region', 'age']).sum()
                 groups = realloc_priority if realloc_priority else projections.groupby(['region','age']).sum().index
                 # self.params_by_t hasn't necessarily been built yet, so use a workaround
-                populations = pd.DataFrame([{'region': param_dict['attrs']['region'], 'age': param_dict['attrs']['age'], 'population': list(param_dict['vals'].values())[0]} for region in self.regions for param_dict in self.params_defs if param_dict['param'] == 'region_age_pop'])
+                populations = pd.DataFrame([{'region': param_dict['attrs']['region'], 'age': param_dict['attrs']['age'], 'population': list(param_dict['vals'].values())[0]} for param_dict in self.params_defs if param_dict['param'] == 'region_age_pop' and param_dict['attrs']['region'] in self.regions])
 
                 for d in projections.index.unique('date'):
                     this_max_cumu = get_params(max_cumu.copy(), d)
@@ -231,62 +231,72 @@ class CovidModel:
         logger.info(f"{str(self.tags)} Retrieving mobility data")
         if engine is None:
             engine = db_engine()
-        regions = self.regions
-        county_ids = [fips for region in regions for fips in self.region_defs[region]['counties_fips']]
-        df = get_region_mobility_from_db(engine, county_ids=county_ids).reset_index('measure_date')
+        regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
+                                                 'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
+        # get mobility and add regions to it
+        df = get_region_mobility_from_db(engine, county_ids=regions_lookup['county_id'].to_list()).reset_index('measure_date').rename(columns={'measure_date': 'date'})\
+            .join(regions_lookup.rename(columns={'county_id': 'origin_county_id', 'region': 'from_region'}).set_index('origin_county_id'), on='origin_county_id')\
+            .join(regions_lookup.rename(columns={'county_id': 'destination_county_id', 'region': 'to_region'}).set_index('destination_county_id'), on='destination_county_id')
 
-        # add regions to dataframe
-        regions_lookup = {fips: region for region in regions for fips in self.region_defs[region]['counties_fips']}
-        df['origin_region'] = [regions_lookup[id] for id in df['origin_county_id']]
-        df['destination_region'] = [regions_lookup[id] for id in df['destination_county_id']]
-        df['t'] = (df['measure_date'] - self.start_date).dt.days
-        # find most recent data before self.start_date and set its time to zero so we have an initial mobility
-        df.replace({'t': max(df['t'][df['t']<=0])}, 0, inplace=True)
+        # aggregate by t and origin / dest regions
+        df = df.drop(columns=['origin_county_id', 'destination_county_id']) \
+            .groupby(['date', 'from_region', 'to_region']) \
+            .aggregate(total_hrs=('total_dwell_duration_hrs', 'sum'))
 
-        df = df[df['t']>=0].drop(columns=['origin_county_id', 'destination_county_id']) \
-            .groupby(['t', 'origin_region', 'destination_region']) \
-            .aggregate(total_dwell_duration_hrs=('total_dwell_duration_hrs', 'sum'))
-
-        # Create dictionaries of matrices, both D and M.
-        ts = df.index.get_level_values('t')
-        region_idx = {region: i for i, region in enumerate(regions)}
-        dwell_matrices = {}
-        for t in ts:
-            dfsub = df.loc[df.index.get_level_values('t') == t].reset_index('t', drop=True).reset_index()
-            idx_i = [region_idx[region] for region in dfsub['origin_region']]
-            idx_j = [region_idx[region] for region in dfsub['destination_region']]
-            vals = dfsub['total_dwell_duration_hrs']
-            dwell = spsp.coo_array((vals, (idx_i, idx_j)), shape=(len(regions), len(regions))).todense()
-            dwell[np.isnan(dwell)] = 0
-            dwell_rownorm = dwell / dwell.sum(axis=1)[:, np.newaxis]
-            dwell_colnorm = dwell / dwell.sum(axis=0)[np.newaxis, :]
-            dwell_matrices[t] = {"dwell": dwell.tolist(), "dwell_rownorm": dwell_rownorm.tolist(), "dwell_colnorm": dwell_colnorm.tolist()}
+        self.actual_mobility = df
+        logger.debug(f"{str(self.tags)} mobility spans from {self.actual_mobility.index.get_level_values(0).min()} to {self.actual_mobility.index.get_level_values(0).max()}")
 
         self.actual_mobility = dwell_matrices
 
     def set_proj_mobility(self):
         # TODO: implement mobility projections
-        self.proj_mobility = {}
+        logger.info(f"{str(self.tags)} Constructing Mobility projections")
+        #self.proj_mobility = pd.DataFrame(columns = self.actual_mobility.columns)
+        self.proj_mobility = None
+        logger.warning(f"{str(self.tags)} mobility projections not yet implemented")
 
     def get_mobility_as_params(self):
-        mobility_dict = self.actual_mobility
-        mobility_dict.update(self.proj_mobility)
-        tslices = list(mobility_dict.keys())
+        logger.info(f"{str(self.tags)} Converting mobility data into parameters")
+        # compute fraction in and fraction from
+        mobility = pd.concat([self.actual_mobility, self.proj_mobility]) if self.proj_mobility is not None else self.actual_mobility
+        mobility = mobility\
+            .join(mobility.groupby(['date', 'from_region']).aggregate(total_from_hrs=('total_hrs', 'sum')))\
+            .join(mobility.groupby(['date', 'to_region']).aggregate(total_to_hrs=('total_hrs', 'sum')))\
+            .reorder_levels([1, 2, 0]).sort_index()
+        mobility['frac_of_from'] = mobility['total_hrs'] / mobility['total_from_hrs']  # fraction of "from"'s hours spent in "to"
+        mobility['frac_of_to'] = mobility['total_hrs'] / mobility['total_to_hrs']   # fraction of hours spent in "to" that are from "from".
+
+        # convert index to string, so they can be serialized more easily.
+        mobility.reset_index('date', inplace=True)
+        mobility['date'] = [dt.datetime.strftime(d, '%Y-%m-%d') for d in mobility['date']]
+        mobility.set_index('date', append=True, inplace=True)
+
         params = []
-        if self.mobility_mode == "population_attached":
-            matrix_list = [np.dot(mobility_dict[t]['dwell_rownorm'], np.transpose(mobility_dict[t]['dwell_colnorm'])) for t in tslices]
-            for j, from_region in enumerate(self.regions):
-                params.extend([{'param': f"mob_{from_region}", 'attrs': {'region': to_region}, 'vals': dict(zip(tslices, [m[i,j] for m in matrix_list])), 'desc':''} for i, to_region in enumerate(self.regions)])
-        elif self.mobility_mode == "location_attached":
-            dwell_rownorm_list = [mobility_dict[t]['dwell_rownorm'] for t in tslices]
-            dwell_colnorm_list = [mobility_dict[t]['dwell_colnorm'] for t in tslices]
-            for j, in_region in enumerate(self.regions):
-                params.extend([{'param': f"mob_fracin_{in_region}", 'attrs': {'seir': 'S', 'region': to_region}, 'vals': dict(zip(tslices,[m[i,j] for m in dwell_rownorm_list])), 'desc': ''} for i, to_region in enumerate(self.regions)])
-            for i, from_region in enumerate(self.regions):
-                for j, in_region in enumerate(self.regions):
-                    params.extend([{'param': f"mob_{in_region}_fracfrom_{from_region}", 'attrs': {}, 'vals': dict(zip(tslices,[m[i,j] for m in dwell_colnorm_list]))}])
-        else:
-            self.log_and_raise(f'Mobility mode {self.mobility_mode} not supported', ValueError)
+        if self.mobility_mode == 'population_attached':
+            # self join to compute the dot product over all intermediate regions
+            S_in_region = mobility[['frac_of_from']].reset_index(['to_region', 'from_region'])\
+                .rename(columns={'to_region': 'intermediate_region', 'from_region': 'susceptible_region', 'frac_of_from': 'frac_of_susceptible_region' })\
+                .set_index(['susceptible_region', 'intermediate_region'], append=True)
+            I_in_region = mobility[['frac_of_to']].reset_index(['to_region', 'from_region'])\
+                .rename(columns={'to_region': 'intermediate_region', 'from_region': 'infectious_region', 'frac_of_to': 'frac_from_infectious_region' }) \
+                .set_index(['infectious_region', 'intermediate_region'], append=True)
+            I_S_contact = S_in_region.join(I_in_region)\
+                .reorder_levels(['date', 'susceptible_region', 'infectious_region', 'intermediate_region'])\
+                .assign(I_S_contact = lambda x: x['frac_of_susceptible_region'] * x['frac_from_infectious_region'])\
+                .groupby(['date', 'susceptible_region', 'infectious_region'])\
+                .aggregate(I_S_contact = ('I_S_contact', 'sum'))\
+                .reorder_levels(['susceptible_region', 'infectious_region', 'date']).sort_index()
+
+            for S_region in I_S_contact.index.get_level_values('susceptible_region').unique():
+                for I_region in I_S_contact.index.get_level_values('infectious_region').unique():
+                    params.extend([{'param': f'mob_{S_region}_exposure_from_{I_region}',  'attrs': {}, 'vals': I_S_contact.loc[(S_region, I_region)]['I_S_contact'].to_dict()}])
+
+        elif self.mobility_mode == 'location_attached':
+            for from_region in mobility.index.get_level_values('from_region').unique():
+                for to_region in mobility.index.get_level_values('to_region').unique():
+                    params.extend([{'param': f'mob_{from_region}_frac_in_{to_region}',  'attrs': {}, 'vals': mobility.loc[(from_region, to_region)]['frac_of_from'].to_dict()}])
+                    params.extend([{'param': f'mob_{to_region}_frac_from_{from_region}', 'attrs': {}, 'vals': mobility.loc[(from_region, to_region)]['frac_of_to'].to_dict()}])
+
         return params
 
     def get_kappas_as_params_using_region_fits(self, engine=None):
@@ -1145,25 +1155,21 @@ class CovidModel:
                     self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
             # Transmission parameters attached to the susceptible population
             elif self.mobility_mode == "population_attached":
-                for from_region in self.attrs['region']:
-                    # kappa in this mobility mode is associated with the susceptible population, so no need to store every kappa in every region
-                    # TODO: update based on new way of storing population parameters
-                    asymptomatic_transmission = f'(1 - immunity) * kappa_pa * betta / {from_region}_pop'
-                    for to_region in self.attrs['region']:
-                        # TODO: update with from/to immune escape
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_{from_region} * lamb * {asymptomatic_transmission}', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': from_region})
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_{from_region} * {asymptomatic_transmission}', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': from_region})
+                for infecting_region in self.attrs['region']:
+                    for susceptible_region in self.attrs['region']:
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
             # Transmission parameters attached to the transmission location
             elif self.mobility_mode == "location_attached":
-                for from_region in self.attrs['region']:
-                    for in_region in self.attrs['region']:
-                        # kappa in this mobility mode is associated with the in_region, so need to store every kappa in every region
-                        asymptomatic_transmission = f'(1 - immunity) * kappa_la_{in_region} * betta / {from_region}_pop'
-                        for to_region in self.attrs['region']:
-                            # TODO: take advantage of from_coef and to_coef to more efficiently store mobility parameters
-                            # TODO: update with immune escape
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * lamb * {asymptomatic_transmission}', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': from_region})
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': to_region}, {'seir': 'E', 'variant': variant}, from_coef="immune_escape", to_coef=f'mob_fracin_{in_region} * mob_{in_region}_fracfrom_{from_region} * {asymptomatic_transmission}', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': from_region})
+                for infecting_region in self.attrs['region']:
+                    for susceptible_region in self.attrs['region']:
+                        for transmission_region in self.attrs['region']:
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
 
         # disease progression
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'I'}, to_coef='1 / alpha * pS')
@@ -1274,7 +1280,18 @@ class CovidModel:
     def unserialize_hosp(cls, hdict):
         df = pd.DataFrame.from_dict(hdict)
         df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
-        return df.set_index(['date'])['hosps']
+        return df.set_index(['region', 'date']).sort_index()
+
+    def serialize_mob(self, df):
+        df = df.reset_index()
+        df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
+        return df.to_dict('records')
+
+    @classmethod
+    def unserialize_mob(cls, mdict):
+        df = pd.DataFrame.from_dict(mdict)
+        df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
+        return df.set_index(['date', 'from_region', 'to_region']).sort_index()
 
     @classmethod
     def unserialize_tc(cls, tc_dict):
