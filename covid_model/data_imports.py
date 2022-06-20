@@ -47,14 +47,16 @@ class ExternalData:
         return pd.read_sql(con=self.engine, **args)
 
 
-class ExternalHosps(ExternalData):
+class ExternalHospsEMR(ExternalData):
+    def fetch_from_db(self):
+        sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
+        return pd.read_sql(sql, self.engine, index_col=['measure_date'])
+
+class ExternalHospsCOPHS(ExternalData):
     def fetch_from_db(self, county_ids):
-        if county_ids is None or len(county_ids) == 64:
-            sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
-            return pd.read_sql(sql, self.engine, index_col=['measure_date'])
-        else:
-            sql = open('covid_model/sql/hospitalized_county_subset.sql', 'r').read()
-            return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
+        sql = open('covid_model/sql/hospitalized_county_subset.sql', 'r').read()
+        return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
+
 
 
 class ExternalVacc(ExternalData):

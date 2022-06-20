@@ -12,12 +12,15 @@ import matplotlib.dates as mdates
 ### Local Imports ###
 from covid_model.model import CovidModel
 from covid_model.db import db_engine
-from covid_model.data_imports import ExternalHosps
+from covid_model.data_imports import ExternalHospsEMR, ExternalHospsCOPHS
 
 
 def plot_observed_hosps(engine, county_ids=None, **plot_params):
     # TODO: pass in model and use its hosps instead of getting from db
-    hosps = ExternalHosps(engine).fetch(county_ids=county_ids)['currently_hospitalized']
+    if county_ids is None:
+        hosps = ExternalHospsEMR(engine).fetch()['currently_hospitalized']
+    else:
+        hosps = ExternalHospsCOPHS(engine).fetch(county_ids=county_ids)['currently_hospitalized']
     hosps.plot(**{'color': 'red', 'label': 'Actual Hosps.', **plot_params})
 
 
