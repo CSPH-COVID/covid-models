@@ -86,10 +86,6 @@ class CovidModel:
         # ode data
         self.t_prev_lookup = None
         self.terms = None
-        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attr_names)
-        self.compartments = list(self.compartments_as_index)
-        self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
-        self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
         self.params_by_t = {'all': {}}
         self.__y0_dict = None
         self.flows_string = '(' + ','.join(self.attr_names) + ')'
