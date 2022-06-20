@@ -248,8 +248,6 @@ class CovidModel:
         self.actual_mobility = df
         logger.debug(f"{str(self.tags)} mobility spans from {self.actual_mobility.index.get_level_values(0).min()} to {self.actual_mobility.index.get_level_values(0).max()}")
 
-        self.actual_mobility = dwell_matrices
-
     def set_proj_mobility(self):
         # TODO: implement mobility projections
         logger.info(f"{str(self.tags)} Constructing Mobility projections")
@@ -689,9 +687,14 @@ class CovidModel:
         df = df.set_index('date')
         return df
 
-    def solution_sum_Ih(self, tstart=0, tend=None):
+    # gives hospitalizations, separated by region, as a numpy array where rows are time and columns are region
+    def solution_sum_Ih(self, tstart=0, tend=None, regions=None):
         tend = self.tend if tend is None else tend
-        return self.solution_y[tstart:(tend+1), self.compartments_as_index.get_level_values(0) == "Ih"].sum(axis=1)
+        regions = self.regions if regions is None else regions
+
+        region_levels = self.compartments_as_index.get_level_values(-1)
+        Ih = np.concatenate([self.solution_y[tstart:(tend+1), self.Ih_compartments & (region_levels == region)].sum(axis=1) for region in regions])
+        return Ih
 
     # Get the immunity against a given variant.
     # I.e. if everyone were exposed today, what fraction of people who WOULD be normally infected if the had no immunity, are NOT infected because they are immune?
@@ -1226,6 +1229,16 @@ class CovidModel:
         for seir in [seir for seir in self.attrs['seir'] if seir != 'D']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'immun': 'strong'}, {'immun': 'weak'}, to_coef='1 / imm_decay_days')
 
+    # a matrix which picks out the r
+    # possibly could be used in the future to modify TC for subgroups as well e.g. for scenario exploration.
+    def build_region_picker_matrix(self):
+        logger.debug(f"{str(self.tags)} creating region picker matrix")
+        picker = spsp.lil_matrix((self.n_compartments, len(self.regions)))
+        for i, region in enumerate(self.regions):
+            region_idx = [self.cmpt_idx_lookup[cmpt] for cmpt in self.get_cmpts_matching_attrs({'region': region})]
+            picker[region_idx,i] = 1
+        self.region_picker_matrix = picker
+
     # convert ODE matrices to CSR format, to (massively) improve performance
     def compile(self):
         logger.debug(f"{str(self.tags)} compiling ODE")
@@ -1233,20 +1246,22 @@ class CovidModel:
             self.linear_matrix[t] = self.linear_matrix[t].tocsr()
             for k, v in self.nonlinear_matrices[t].items():
                 self.nonlinear_matrices[t][k] = v.tocsr()
+        self.region_picker_matrix = self.region_picker_matrix.tocsr()
 
     # ODE step forward
     def ode(self, t: float, y: list):
         dy = [0] * self.n_compartments
         t_int = self.t_prev_lookup[math.floor(t)]
         t_tc = self.tc_t_prev_lookup[math.floor(t)]
-        nlm = (1 - self.__tc[t_tc])
+        nlm = [(1 - self.__tc[t_tc][region]) for region in self.regions]
+        nlm_vec = self.region_picker_matrix.dot(nlm)
 
         # apply linear terms
         dy += (self.linear_matrix[t_int]).dot(y)
 
         # apply non-linear terms
         for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
-            dy += nlm * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * (matrix).dot(y)
+            dy += nlm_vec * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * (matrix).dot(y)
 
         # apply constant terms
         dy += self.constant_vector[t_int]
@@ -1254,7 +1269,7 @@ class CovidModel:
         return dy
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y
-    def solve_seir(self, y0=None, tstart=None, tend=None, method='RK45'):
+    def solve_seir(self, y0=None, tstart=None, tend=None):
         tstart = self.tstart if tstart is None else tstart
         tend = self.tend if tend is None else tend
         trange = range(tstart, tend + 1) # simulate up to and including tend
@@ -1265,7 +1280,7 @@ class CovidModel:
             t_span=[min(trange), max(trange)],
             y0=y0,
             t_eval=trange,
-            method=method,
+            method=self.ode_method,
             max_step=self.max_step_size
         )
         if not solution.success:
@@ -1279,13 +1294,13 @@ class CovidModel:
         if rebuild_param_lookups:
             self.build_param_lookups(**build_param_lookup_args)
         self.build_ode_flows()
+        self.build_region_picker_matrix()
         self.compile()
         # initialize solution dataframe with all NA values
         self.solution_y = np.ndarray(shape=(len(self.trange), len(self.compartments_as_index)))
 
     ####################################################################################################################
     ### Reading and Writing Data
-
     def serialize_vacc(self, df):
         df = df.reset_index()
         df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
@@ -1362,7 +1377,6 @@ class CovidModel:
 
     def from_json_string(self, s):
         logger.debug(f"{str(self.tags)} repopulating model from serialized json")
-        # TODO: handle mobility, add in proj_mobility
         raw = json.loads(s)
         for key, val in raw.items():
             if key in ['_CovidModel__start_date', '_CovidModel__end_date']:
