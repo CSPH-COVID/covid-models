@@ -41,7 +41,7 @@ class CovidModel:
         self.recently_updated_properties = []
 
         # basic model data
-        self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
+        self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                              'age': ['0-19', '20-39', '40-64', '65+'],
                              'vacc': ['none', 'shot1', 'shot2', 'shot3'],
                              'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45'],
@@ -58,6 +58,12 @@ class CovidModel:
         self.tc_cov = None
 
         self.solution_y = None
+
+        self.compartments_as_index = None
+        self.Ih_compartments = None
+        self.compartments = None
+        self.cmpt_idx_lookup = None
+        self.param_compartments = None
 
         # model data
         self.__params_defs = None
@@ -497,7 +503,15 @@ class CovidModel:
     def param_attr_names(self):
         return self.attr_names[1:]
 
-    ### regions
+    ### attributes and regions
+    def update_compartments(self):
+        self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attr_names)
+        self.Ih_compartments = self.compartments_as_index.get_level_values(0) == "Ih"
+        self.compartments = list(self.compartments_as_index)
+        self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
+        self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
+
+
     @property
     def regions(self):
         return self.__regions
@@ -505,7 +519,20 @@ class CovidModel:
     @regions.setter
     def regions(self, value: list):
         self.__regions = value
-        self.attrs['region'] = value  # if regions changes, update the compartment attributes also
+        # if regions changes, update the compartment attributes, and everything derived from that as well.
+        self.__attrs['region'] = value
+        self.update_compartments()
+        self.recently_updated_properties.append('regions')
+
+    @property
+    def attrs(self):
+        return self.__attrs
+
+    @attrs.setter
+    def attrs(self, value: OrderedDict):
+        self.__attrs = value
+        self.__regions = value['region']
+        self.update_compartments()
         self.recently_updated_properties.append('regions')
 
     ### things which are dictionaries but which may be given as a path to a json file
@@ -1172,6 +1199,7 @@ class CovidModel:
                             self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
 
         # disease progression
+        logger.debug(f"{str(self.tags)} Building disease progression flows")
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'I'}, to_coef='1 / alpha * pS')
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'A'}, to_coef='1 / alpha * (1 - pS)')
         # assume no one is receiving both pax and mab
@@ -1180,6 +1208,7 @@ class CovidModel:
         self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * pax_prev * pax_hosp_adj')
 
         # disease termination
+        logger.debug(f"{str(self.tags)} Building termination flows")
         for variant in self.attrs['variant']:
             if variant == 'none':
                 continue
@@ -1197,6 +1226,7 @@ class CovidModel:
             self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'D'}, to_coef='1 / hlos * dh')
 
         # immunity decay
+        logger.debug(f"{str(self.tags)} Building immunity decay flows")
         for seir in [seir for seir in self.attrs['seir'] if seir != 'D']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'immun': 'strong'}, {'immun': 'weak'}, to_coef='1 / imm_decay_days')
 
@@ -1272,7 +1302,7 @@ class CovidModel:
         return df.set_index(['date', 'region', 'age'])
 
     def serialize_hosp(self, df):
-        df = pd.DataFrame({'date': df.index, 'hosps': df.values})
+        df = df.reset_index()
         df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
         return df.to_dict('records')
 
@@ -1309,10 +1339,10 @@ class CovidModel:
     # model needs prepping still
     def to_json_string(self):
         logger.debug(f"{str(self.tags)} Serializing model to json")
-        keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', 'attrs', '_CovidModel__tc', 'tc_cov', 'tc_t_prev_lookup', '_CovidModel__params_defs',
-                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'estimated_actual_hosp', 'observed_hosp', '_CovidModel__hosp_reporting_frac',
+        keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', '__attrs', '_CovidModel__tc', 'tc_cov', 'tc_t_prev_lookup', '_CovidModel__params_defs',
+                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df',  'hosps', '_CovidModel__hosp_reporting_frac',
                 '_CovidModel__y0_dict', 'max_step_size']
-        #TODO: handle mobility, add in proj_mobility
+        # add in proj_mobility
         serial_dict = OrderedDict()
         for key in keys:
             val = self.__dict__[key]
@@ -1322,9 +1352,9 @@ class CovidModel:
                 serial_dict[key] = val.tolist()
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
                 serial_dict[key] = self.serialize_vacc(val)
-            elif key == 'estimated_actual_hosp' and val is not None:
-                serial_dict[key] = self.serialize_hosp(val)
-            elif key == 'observed_hosp' and val is not None:
+            elif key in ['actual_mobility', 'proj_mobility'] and val is not None:
+                serial_dict[key] = self.serialize_mob(val)
+            elif key == 'hosps' and val is not None:
                 serial_dict[key] = self.serialize_hosp(val)
             elif key == '_CovidModel__y0_dict' and self.__y0_dict is not None:
                 serial_dict[key] = self.serialize_y0_dict(val)
@@ -1348,9 +1378,9 @@ class CovidModel:
                 pass
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
                 self.__dict__[key] = CovidModel.unserialize_vacc(val)
-            elif key == 'estimated_actual_hosp' and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_hosp(val)
-            elif key == 'observed_hosp' and val is not None:
+            elif key in ['actual_mobility', 'proj_mobility'] and val is not None:
+                self.__dict__[key] = CovidModel.unserialize_mob(val)
+            elif key == 'hosp' and val is not None:
                 self.__dict__[key] = CovidModel.unserialize_hosp(val)
             elif key == '_CovidModel__y0_dict':
                 self.__dict__[key] = self.unserialize_y0_dict(val)
@@ -1383,7 +1413,7 @@ class CovidModel:
                 ("tags", json.dumps(self.tags)),
                 ("regions", json.dumps(self.regions)),
                 ("tslices", list(self.__tc.keys())),
-                ("tc", list(self.__tc.values())),
+                #("tc", list(self.__tc.values())), # doesn't work now that TC is a nested dict, This field in the DB is a list.
                 ("serialized_model", self.to_json_string())
             ]))
             session.execute(stmt)
