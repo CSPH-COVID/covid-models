@@ -23,25 +23,36 @@ logger = IndentLogger(logging.getLogger(''), {})
 
 def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=None, tend=None):
     # define initial states
+    regions = model.regions if regions is None else regions
     tc = {t: model.tc[t] for t in model.tc.keys() if t >= tstart and t <= tend}
     tc_ts  = list(tc.keys())
     yd_start = model.y0_dict if yd_start is None else yd_start
     y0 = model.y0_from_dict(yd_start)
     trange = range(tstart, tend+1)
+    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['estimated_actual'].to_numpy().flatten('F')
+
+    # convert tc output by curve_fit to a dict like in our model.
+    def tc_list_to_dict(tc_list):
+        i = 0
+        tc_dict = {t: {} for t in tc_ts}
+        for tc_t in tc.keys():
+            for region in regions:
+                tc_dict[tc_t][region] = tc_list[i]
+                i += 1
+        return tc_dict
 
     # function to be optimized
     def func(trange, *test_tc):
-        for i, tc_val in enumerate(test_tc):
-            tc[tc_ts[i]] = tc_val
-        model.update_tc(tc, replace=False, update_lookup=False)
-        model.solve_seir(y0=y0, tstart=tstart, tend=tend, method='RK45')
-        return model.solution_sum_Ih(tstart, tend)
+        model.update_tc(tc_list_to_dict(test_tc), replace=False, update_lookup=False)
+        model.solve_seir(y0=y0, tstart=tstart, tend=tend)
+        return model.solution_sum_Ih(tstart, tend, regions=regions)
     fitted_tc, fitted_tc_cov = spo.curve_fit(
         f=func,
         xdata=trange,
-        ydata=model.estimated_actual_hosp[trange],
-        p0=[tc[t] for t in tc_ts],
-        bounds=([tc_min] * len(tc_ts), [tc_max] * len(tc_ts)))
+        ydata=ydata,
+        p0=[tc[t][region] for t in tc_ts for region in model.regions],
+        bounds=([tc_min] * len(tc_ts) * len(regions), [tc_max] * len(tc_ts) * len(regions)))
+    fitted_tc = tc_list_to_dict(fitted_tc)
     return fitted_tc, fitted_tc_cov
 
 # fits TC for the model between two dates, and does the fit in batches to make the solving easier
@@ -63,12 +74,13 @@ def do_single_fit(tc_0=0.75,  # default value for TC
     def forward_sim_plot(model):
         # TODO: refactor into charts?
         logger.info(f'{str(model.tags)}: Running forward sim')
-        fig = plt.figure(figsize=(10, 10), dpi=300)
-        ax = fig.add_subplot(211)
-        hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
-        hosps_df.plot(ax=ax)
-        ax = fig.add_subplot(212)
-        plot_transmission_control(model, ax=ax)
+        fig, axs = plt.subplots(2, len(model.regions), figsize=(10*len(model.regions), 10), dpi=300, sharex=True, sharey=False, squeeze=False)
+        hosps_df = model.modeled_vs_observed_hosps()
+        for i, region in enumerate(model.regions):
+            hosps_df.loc[region].plot(ax=axs[0, i])
+            axs[0,i].title.set_text(f'Hospitalizations: {region}')
+            plot_transmission_control(model, [region], ax=axs[1,i])
+            axs[1, i].title.set_text(f'TC: {region}')
         plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + '_model_fit.png')
         plt.close()
         hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_fit.csv')
@@ -84,13 +96,13 @@ def do_single_fit(tc_0=0.75,  # default value for TC
 
     # adjust fit start and end, and check for consistency with model and hosp dates
     fit_start_date = model.start_date if fit_start_date is None else fit_start_date
-    fit_end_date = min(model.end_date, model.observed_hosp.index.max()) if fit_end_date is None else fit_end_date
+    fit_end_date = min(model.end_date, model.hosps.index.get_level_values(1).max()) if fit_end_date is None else fit_end_date
     ermsg = None
     if fit_start_date < model.start_date:
         ermsg = f'Fit needs to start on or after model start date. Opted to start fitting at {fit_start_date} but model start date is {model.start_date}'
     elif fit_end_date > model.end_date:
         ermsg = f'Fit needs to end on or before model end date. Opted to stop fitting at {fit_end_date} but model end date is {model.end_date}'
-    elif fit_end_date > model.observed_hosp.index.max():
+    elif fit_end_date > model.hosps.index.get_level_values(1).max():
         ermsg = f'Fit needs to end on or before last date with hospitalization data. Opted to stop fitting at {fit_end_date} but last date with hospitalization data is {model.observed_hosp.index.max()}'
     if ermsg is not None:
         logger.exception(f"{str(model.tags)}" + ermsg)
@@ -108,8 +120,9 @@ def do_single_fit(tc_0=0.75,  # default value for TC
     fit_tstart = model.date_to_t(fit_start_date)
     fit_tend = model.date_to_t(fit_end_date)
     tc = {t: tc for t, tc in model.tc.items() if t < fit_tstart or t > fit_tend}
-    tc.update({t: tc_0 for t in range(fit_tstart, fit_tend - last_tc_window_min_size, tc_window_size)})
-    model.update_tc(tc)
+    if tc_0 is not None:
+        tc.update({t: {region: tc_0 for region in model.regions} for t in range(fit_tstart, fit_tend - last_tc_window_min_size, tc_window_size)})
+        model.update_tc(tc)
 
     # Get start/end for each batch
     relevant_tc_ts = [t for t in model.tc.keys() if t >= fit_tstart and t <= fit_tend]
