@@ -34,7 +34,7 @@ def main():
         'outdir': outdir
     }
     model_args = {
-        'params_defs': 'covid_model/analysis/20220616_mobility_update/params_reduced.json',
+        'params_defs': 'covid_model/analysis/20220616_mobility_update/params.json',
         'region_defs': 'covid_model/input/region_definitions.json',
         'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
         #'attrs': OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
