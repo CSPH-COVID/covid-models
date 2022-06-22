@@ -112,7 +112,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
     if prep_model:
         logger.info(f'{str(model.tags)} Prepping Model')
         t0 = perf_counter()
-        model.prep()
+        model.prep(outdir=outdir)
         logger.debug(f'{str(model.tags)} Model flows {model.flows_string}')
         logger.info(f'{str(model.tags)} Model prepped for fitting in {perf_counter() - t0} seconds.')
 
@@ -209,7 +209,7 @@ def do_create_report(model, outdir, immun_variants=('ba2121'), from_date=None, t
     if prep_model:
         logger.info('Prepping model')
         t0 = perf_counter()
-        model.prep()
+        model.prep(outdir=outdir)
         t1 = perf_counter()
         logger.info(f'Model prepped in {t1 - t0} seconds.')
 

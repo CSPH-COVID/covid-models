@@ -7,6 +7,7 @@ from operator import itemgetter
 import itertools
 from collections import OrderedDict, defaultdict
 import logging
+import pickle
 ### Third Party Imports ###
 import numpy as np
 import pandas as pd
@@ -21,7 +22,7 @@ from sortedcontainers import SortedDict
 from covid_model.db import get_sqa_table, db_engine
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
-from covid_model.utils import get_params, IndentLogger
+from covid_model.utils import get_params, IndentLogger, get_filepath_prefix
 logger = IndentLogger(logging.getLogger(''), {})
 
 
@@ -84,6 +85,7 @@ class CovidModel:
         self.region_fit_result_ids = None
 
         # ode data
+        self.ode_method = 'RK45'
         self.t_prev_lookup = None
         self.terms = None
         self.params_by_t = {'all': {}}
@@ -1270,6 +1272,10 @@ class CovidModel:
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y
     def solve_seir(self, y0=None, tstart=None, tend=None):
+        if len(self.tc) == 0:
+            self.log_and_raise("Trying to solve SEIR, but no TC is set", RuntimeError)
+        elif self.linear_matrix is None:
+            self.log_and_raise("Trying to solve SEIR, but model not prepped yet", RuntimeError)
         tstart = self.tstart if tstart is None else tstart
         tend = self.tend if tend is None else tend
         trange = range(tstart, tend + 1) # simulate up to and including tend
@@ -1289,7 +1295,7 @@ class CovidModel:
         self.solution_y[tstart:(tend+1), ] = np.transpose(solution.y)
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
-    def prep(self, rebuild_param_lookups=True, **build_param_lookup_args):
+    def prep(self, rebuild_param_lookups=True, pickle_matrices=True, outdir=None, **build_param_lookup_args):
         logger.info(f"{str(self.tags)} Prepping Model")
         if rebuild_param_lookups:
             self.build_param_lookups(**build_param_lookup_args)
@@ -1298,6 +1304,8 @@ class CovidModel:
         self.compile()
         # initialize solution dataframe with all NA values
         self.solution_y = np.ndarray(shape=(len(self.trange), len(self.compartments_as_index)))
+        if pickle_matrices:
+            self.pickle_ode_matrices(outdir)
 
     ####################################################################################################################
     ### Reading and Writing Data
@@ -1479,3 +1487,21 @@ class CovidModel:
 
         self.result_id = df['result_id'][0]
         return df
+
+    def pickle_ode_matrices(self, outdir=None):
+        logger.debug("Pickling ODE matrices")
+        with open(get_filepath_prefix(outdir, self.tags) + "ode_matrices.pkl", 'wb') as f:
+            pickle.dump(self.constant_vector, f)
+            pickle.dump(self.linear_matrix, f)
+            pickle.dump(self.nonlinear_matrices, f)
+            pickle.dump(self.region_picker_matrix, f)
+            pickle.dump(self.t_prev_lookup, f)
+
+    def unpickle_ode_matrices(self, filepath):
+        logger.debug("Unpickling ODE matrices")
+        with open(filepath, "rb") as f:
+            self.constant_vector = pickle.load(f)
+            self.linear_matrix = pickle.load(f)
+            self.nonlinear_matrices = pickle.load(f)
+            self.region_picker_matrix = pickle.load(f)
+            self.t_prev_lookup = pickle.load(f)
