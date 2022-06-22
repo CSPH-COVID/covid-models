@@ -21,7 +21,7 @@ from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, forma
 logger = IndentLogger(logging.getLogger(''), {})
 
 
-def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=None, tend=None):
+def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=None, tend=None, regions=None):
     # define initial states
     regions = model.regions if regions is None else regions
     tc = {t: model.tc[t] for t in model.tc.keys() if t >= tstart and t <= tend}
