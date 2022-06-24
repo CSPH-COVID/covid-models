@@ -1,9 +1,10 @@
+### Python Standard Library ###
 import datetime as dt
 import json
-
+### Third Party Imports ###
 import numpy as np
 import pandas as pd
-
+### Local Imports ###
 from covid_model.utils import get_params
 
 
@@ -46,29 +47,31 @@ class ExternalData:
         return pd.read_sql(con=self.engine, **args)
 
 
-class ExternalHosps(ExternalData):
+class ExternalHospsEMR(ExternalData):
+    def fetch_from_db(self):
+        sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
+        return pd.read_sql(sql, self.engine, index_col=['measure_date'])
+
+class ExternalHospsCOPHS(ExternalData):
     def fetch_from_db(self, county_ids):
-        if county_ids is None:
-            sql = open('sql/emresource_hospitalizations.sql', 'r').read()
-            return pd.read_sql(sql, self.engine, index_col=['measure_date'])
-        else:
-            sql = open('sql/hospitalized_county_subset.sql', 'r').read()
-            return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
+        sql = open('covid_model/sql/hospitalized_county_subset.sql', 'r').read()
+        return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
+
 
 
 class ExternalVacc(ExternalData):
     def fetch_from_db(self, county_ids=None):
         if county_ids is None:
-            sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open('sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 
 class ExternalVaccWithProjections(ExternalData):
     def fetch_from_db(self, proj_params=None, group_pop=None):
-        sql = open('sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+        sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
 
         proj_params = proj_params if type(proj_params) == dict else json.load(open(proj_params))
         proj_lookback = proj_params['lookback'] if 'lookback' in proj_params.keys() else 7
@@ -118,16 +121,6 @@ class ExternalVaccWithProjections(ExternalData):
         return df
 
 
-
-
-# load actual hospitalization data for fitting
-# def get_hosps(engine, min_date=dt.datetime(2020, 1, 24)):
-#     actual_hosp_df = pd.read_sql(open('sql/emresource_hospitalizations.sql').read(), engine)
-#     actual_hosp_df['t'] = ((pd.to_datetime(actual_hosp_df['measure_date']) - min_date) / np.timedelta64(1, 'D')).astype(int)
-#     actual_hosp_tmin = actual_hosp_df[actual_hosp_df['currently_hospitalized'].notnull()]['t'].min()
-#     return [0] * actual_hosp_tmin + list(actual_hosp_df['currently_hospitalized'])
-
-
 def get_hosps_df(engine):
     return pd.read_sql(open('sql/emresource_hospitalizations.sql').read(), engine, parse_dates=['measure_date']).set_index('measure_date')['currently_hospitalized']
 
@@ -141,36 +134,6 @@ def get_hosps_by_age(engine, fname):
     cophs_total = df.groupby('measure_date').sum()
     emr_total = get_hosps_df(engine)
     return df * emr_total / cophs_total
-
-
-# load actual death data for plotting
-def get_deaths(engine, min_date=dt.datetime(2020, 1, 24)):
-    sql = """
-        select 
-            reporting_date as measure_date
-            , sum(total_count) as new_deaths
-        from cdphe.covid19_county_summary ccs 
-        where count_type = 'deaths'
-        group by 1
-        order by 1"""
-    df = pd.read_sql(sql, engine, parse_dates=['measure_date']).set_index('measure_date')
-    df = pd.date_range(min_date, df.index.max()).to_frame().join(df, how='left').drop(columns=[0]).fillna(0)
-    df['cumu_deaths'] = df['new_deaths'].cumsum()
-
-    return df
-
-
-def get_deaths_by_age(engine):
-    sql = """select
-        date::date as measure_date
-        , case when age_group in ('0-5', '6-11', '12-17', '18-19') then '0-19' else age_group end as "group"
-        , sum(count::int) as new_deaths
-    from cdphe.temp_covid19_county_summary
-    where count_type like 'deaths, %%' and date_type = 'date of death'
-    group by 1, 2
-    order by 1, 2"""
-    df = pd.read_sql(sql, engine, parse_dates=['measure_date']).set_index(['measure_date', 'age'])
-    return df
 
 
 def get_vaccinations_by_county(engine):
@@ -191,9 +154,13 @@ def get_corrected_emresource(fpath):
     print(pd.to_datetime(pd.to_numeric(raw_reports).groupby('facility').rolling(20).agg(np.max)))
 
 
-def get_region_mobility_from_db(engine, fpath=None) -> pd.DataFrame:
-    with open('sql/mobility_dwell_hours.sql') as f:
-        df = pd.read_sql(f.read(), engine, index_col=['measure_date'])
+def get_region_mobility_from_db(engine, county_ids=None, fpath=None) -> pd.DataFrame:
+    if county_ids is None:
+        with open('covid_model/sql/mobility_dwell_hours.sql') as f:
+            df = pd.read_sql(f.read(), engine, index_col=['measure_date'])
+    else:
+        with open('covid_model/sql/mobility_dwell_hours_county_subset.sql') as f:
+            df = pd.read_sql(f.read(), engine, index_col=['measure_date'], params={'county_ids': county_ids})
     if fpath:
         df.to_csv(fpath)
     return df

@@ -1,15 +1,15 @@
+### Python Standard Library ###
 import os
 import json
 import unittest
 from collections import OrderedDict
-
+### Third Party Imports ###
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
-
-from data_imports import get_region_mobility_from_db, get_region_mobility_from_file
-from db import db_engine
-from covid_model.regional_model import RegionalCovidModel
+### Local Imports ###
+from covid_model.data_imports import get_region_mobility_from_db, get_region_mobility_from_file
+from covid_model.utils import db_engine
 
 
 class MyTestCase(unittest.TestCase):
@@ -44,10 +44,10 @@ class MyTestCase(unittest.TestCase):
             ("sw", "Southwest"),
             ("wcp", "West Central Partnership")
         ])
-        # get region-to-county mapping by loading the region_params.json file
-        with open('input/region_params.json', 'r') as f:
-            region_params = json.loads(f.read())
-        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_params.items() if key in regions.keys()])
+        # get region-to-county mapping by loading the region_definitions.json file
+        with open('input/region_definitions.json', 'r') as f:
+            region_definitions = json.loads(f.read())
+        regions = OrderedDict([(key, (regions[key], val['county_fips'], val['county_names'], val['total_pop'])) for key, val in region_definitions.items() if key in regions.keys()])
         cm = RegionalCovidModel.construct_region_contact_matrices(regions, fpath='../contact_matrices/mobility.csv')
         dates = list(cm['dwell_matrices'].keys())
 
