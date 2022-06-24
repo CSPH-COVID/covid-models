@@ -8,10 +8,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
 from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, format_date_axis
-from covid_model.db import db_engine
+from covid_model.utils import db_engine
 from covid_model.model import CovidModel
-from covid_model.cli_specs import ModelSpecsArgumentParser
-from covid_model.run_model_scenarios import build_legacy_output_df
 
 plot_opts = {
     "prev": "SARS-CoV-2 Prevalence",

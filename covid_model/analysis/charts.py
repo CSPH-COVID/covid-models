@@ -11,7 +11,7 @@ import matplotlib.ticker as mtick
 import matplotlib.dates as mdates
 ### Local Imports ###
 from covid_model.model import CovidModel
-from covid_model.db import db_engine
+from covid_model.utils import db_engine
 from covid_model.data_imports import ExternalHospsEMR, ExternalHospsCOPHS
 
 

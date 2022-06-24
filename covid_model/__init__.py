@@ -6,4 +6,3 @@
 # classes
 from covid_model.model import CovidModel
 # functions
-from covid_model.db import db_engine

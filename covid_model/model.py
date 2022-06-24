@@ -19,10 +19,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sortedcontainers import SortedDict
 ### Local Imports ###
-from covid_model.db import get_sqa_table, db_engine
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
-from covid_model.utils import get_params, IndentLogger, get_filepath_prefix
+from covid_model.utils import get_params, IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
+
 logger = IndentLogger(logging.getLogger(''), {})
 
 

@@ -9,8 +9,7 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 ### Local Imports ###
 from covid_model.data_imports import get_region_mobility_from_db, get_region_mobility_from_file
-from covid_model.db import db_engine
-from covid_model.regional_model import RegionalCovidModel
+from covid_model.utils import db_engine
 
 
 class MyTestCase(unittest.TestCase):

@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
 from covid_model.analysis.charts import plot_modeled
-from covid_model.db import db_engine
 import covid_model
 from covid_model import CovidModel
-from covid_model.cli_specs import ModelSpecsArgumentParser
+from covid_model.utils import db_engine
 
 
 if __name__ == '__main__':

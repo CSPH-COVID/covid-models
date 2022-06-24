@@ -14,9 +14,9 @@ from scipy import optimize as spo
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
-from covid_model import CovidModel, db_engine
+from covid_model import CovidModel
 from covid_model.analysis.charts import plot_transmission_control
-from covid_model.utils import IndentLogger, setup, get_filepath_prefix
+from covid_model.utils import IndentLogger, setup, get_filepath_prefix, db_engine
 from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, format_date_axis
 logger = IndentLogger(logging.getLogger(''), {})
 

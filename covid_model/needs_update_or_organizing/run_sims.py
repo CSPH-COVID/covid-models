@@ -5,10 +5,7 @@ import argparse
 ### Third Party Imports ###
 import numpy as np
 ### Local Imports ###
-from covid_model.db import db_engine
-from covid_model.cli_specs import ModelSpecsArgumentParser
-from covid_model.model_specs import CovidModelSpecifications
-from covid_model.model_sims import CovidModelSimulation
+from covid_model.utils import db_engine
 
 
 if __name__ == '__main__':
