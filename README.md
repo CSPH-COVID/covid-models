@@ -42,11 +42,10 @@ At this time, most testing scripts are out of date and need to be updated.
 Within `covid_model` are the core python files which define the model functionality, along with some subdirectories.
 First we describe the python files:
 1. `data_imports.py` contains code to read in data from external sources, such as files or a database. Right now, the model is configured to read everything from a database.
-2. `db.py` contains code necessary for connecting with an external database in order to read/write data and model specifications / results.
-3. `model.py` is the single most important script in this repository. It defines the `CovidModel` class which loads data, processes parameter specifications, and runs the compartmental model, and reads/writes to/from the database.
-4. `ode_flow_terms.py` defines classes which represent a single term in an ordinary differential equation. These terms are used by the model class to define all the flows in the compartmental model.
-5. `runnable_functions.py` defines several functions which allow running and training of the model, as well as producing reports.
-6. `utils.py` contains some utility functions that help set up project logging, format filenames, etc.
+2. `model.py` is the single most important script in this repository. It defines the `CovidModel` class which loads data, processes parameter specifications, and runs the compartmental model, and reads/writes to/from the database.
+3. `ode_flow_terms.py` defines classes which represent a single term in an ordinary differential equation. These terms are used by the model class to define all the flows in the compartmental model.
+4. `runnable_functions.py` defines several functions which allow running and training of the model, as well as producing reports.
+5. `utils.py` contains some utility functions that help set up project logging, read/write from database, etc.
 
 Next, the contained directories:
 1. `analysis/` holds analyses we run using the model, for example, model runs informing an upcoming modeling report. Each analysis should have its own subdirectory with a date-prefixed name for organizational purposes. This directory also contains the `charts.py` script, which defines some auxilliary plotting functions useful for viewing model output. More details on working with the model and performing analyses are provided below. 
