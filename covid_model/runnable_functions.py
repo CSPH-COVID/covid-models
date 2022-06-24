@@ -60,8 +60,8 @@ def do_single_fit(tc_0=0.75,  # default value for TC
                   tc_min=0,  # minimum allowable TC
                   tc_max=0.99,  # maximum allowable TC
                   tc_window_size=14,  # How often to update TC (days)
-                  tc_window_batch_size=5,  # How many windows to fit at once
-                  tc_batch_increment=1,  # How many TC windows to shift over for each batch fit
+                  tc_window_batch_size=6,  # How many windows to fit at once
+                  tc_batch_increment=2,  # How many TC windows to shift over for each batch fit
                   last_tc_window_min_size=21,  # smallest size of the last TC window
                   fit_start_date=None,  # refit all tc's on or after this date (if None, use model start date)
                   fit_end_date=None,  # refit all tc's up to this date (if None, uses either model end date or last date with hospitalization data, whichever is earlier
@@ -69,6 +69,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
                   outdir=None,  # the output directory for saving results
                   write_results=True,  # should final results be written to the database
                   write_batch_results=False,  # Should we write output to the database after each fit
+                  model_class = CovidModel,
                   **model_args):
 
     def forward_sim_plot(model):
@@ -92,7 +93,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
     if write_batch_results or write_results:
         engine = db_engine()
 
-    model = CovidModel(**model_args)
+    model = model_class(**model_args)
 
     # adjust fit start and end, and check for consistency with model and hosp dates
     fit_start_date = model.start_date if fit_start_date is None else fit_start_date
