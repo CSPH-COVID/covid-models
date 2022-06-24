@@ -507,7 +507,6 @@ class CovidModel:
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
-
     @property
     def regions(self):
         return self.__regions
@@ -559,7 +558,6 @@ class CovidModel:
         self.__region_defs = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('region_defs')
 
-    ### Set mobility mode as None if "none"
     @property
     def mobility_mode(self):
         return self.__mobility_mode
@@ -1131,7 +1129,6 @@ class CovidModel:
             else:
                 flow_str += f' x [scale by comp: {scale_by_attrs_str}]'
         self.flows_string += '\n' + flow_str
-
         scale_by_cmpts = self.get_cmpts_matching_attrs(scale_by_attrs) if scale_by_attrs is not None else None
         from_cmpts = self.get_cmpts_matching_attrs(from_attrs)
         for from_cmpt in from_cmpts:
