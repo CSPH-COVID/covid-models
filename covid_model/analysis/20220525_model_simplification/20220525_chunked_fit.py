@@ -10,8 +10,7 @@ from collections import OrderedDict
 ### Local Imports ###
 from covid_model import CovidModel
 from covid_model.runnable_functions import do_single_fit
-from covid_model.utils import setup, get_filepath_prefix
-from covid_model.db import db_engine
+from covid_model.utils import setup, get_filepath_prefix, db_engine
 
 
 def remove_variants(model, y_dict, remove_variants):

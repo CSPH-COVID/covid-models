@@ -9,9 +9,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 ### Local Imports ###
 from covid_model import CovidModel
-from covid_model.utils import IndentLogger, setup, get_filepath_prefix
+from covid_model.utils import IndentLogger, setup, get_filepath_prefix, db_engine
+
 logger = IndentLogger(logging.getLogger(''), {})
-from covid_model.db import db_engine
 from covid_model.analysis.charts import plot_transmission_control
 from covid_model.runnable_functions import do_create_report, do_build_legacy_output_df
 
