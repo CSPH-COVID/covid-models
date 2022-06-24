@@ -443,10 +443,8 @@ class CovidModel:
         self.__tend = (self.end_date - self.start_date).days
         self.__trange = range(self.tstart, self.tend + 1)
         self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
-        self.__tc = {(t - tshift): tc for t, tc in self.__tc.items() if t >= tshift}
-        if 0 not in self.__tc.keys() and any(tc_t < 0 for tc_t in self.__tc.keys()):
-            self.__tc[0] = self.__tc[max(tc_t for tc_t in self.__tc.keys() if tc_t < 0)]
-        if any(tc_t >= self.tstart for tc_t in self.__tc.keys()):
+        self.__tc = {(t - tshift): tc for t, tc in self.__tc.items()}
+        if len(self.tc) > 0:
             self.tc_t_prev_lookup = [max(t for t in self.__tc.keys() if t <= t_int) for t_int in self.trange]
         self.recently_updated_properties.append('start_date')
 
@@ -457,13 +455,12 @@ class CovidModel:
     @end_date.setter
     def end_date(self, value):
         end_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
-        # truncate tc if end date shortens
         self.__end_date = end_date
         self.__tend = (self.end_date - self.start_date).days
         self.__trange = range(self.tstart, self.tend + 1)
         self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
-        self.__tc = {t: tc for t, tc in self.__tc.items() if t <= self.tend}
-        if any(tc_t <= self.tend for tc_t in self.__tc.keys()):
+        # TC doesn't need updating, but TC t prev lookup needs a value for each t in trange and trange may have changed.
+        if len(self.tc) > 0:
             self.tc_t_prev_lookup = [max(t for t in self.__tc.keys() if t <= t_int) for t_int in self.trange]
         self.recently_updated_properties.append('end_date')
 
@@ -481,6 +478,9 @@ class CovidModel:
         self.__end_date = self.start_date + dt.timedelta(days=value)
         self.__trange = range(self.tstart, self.tend + 1)
         self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
+        # TC doesn't need updating, but TC t prev lookup needs a value for each t in trange and trange may have changed.
+        if len(self.tc) > 0:
+            self.tc_t_prev_lookup = [max(t for t in self.__tc.keys() if t <= t_int) for t_int in self.trange]
         self.recently_updated_properties.append('end_date')
 
     @property
