@@ -11,8 +11,8 @@ import pmdarima
 import arch
 from sqlalchemy.orm import Session
 ### Local Imports ###
-from covid_model.db import db_engine, get_sqa_table
-from covid_model import CovidModel
+from covid_model.utils import get_sqa_table
+from covid_model import CovidModel, db_engine
 
 
 def forecast_timeseries(data, horizon=1, sims=10, arima_order='auto', use_garch=False):
