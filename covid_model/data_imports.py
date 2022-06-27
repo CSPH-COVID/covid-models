@@ -8,10 +8,21 @@ import pandas as pd
 
 
 def normalize_date(date):
+    """Convert datetime to date if necessary
+
+    Args:
+        date: either a dt.datetime.date or dt.datetime object
+
+    Returns: dt.datetime.date object
+
+    """
     return date if type(date) == dt.date or date is None else date.date()
 
 
 class ExternalData:
+    """Base class for loading external data, either from file or database
+
+    """
     def __init__(self, engine=None, t0_date=None, fill_from_date=None, fill_to_date=None):
         self.engine = engine
         self.t0_date = normalize_date(t0_date) if t0_date is not None else None
@@ -19,6 +30,16 @@ class ExternalData:
         self.fill_to_date = normalize_date(fill_to_date) if fill_to_date is not None else None
 
     def fetch(self, fpath=None, rerun=True, **args):
+        """Template function for retrieving data and optionally saving to a file
+
+        Args:
+            fpath: optional location to save data
+            rerun: whether to fetch the data again
+            **args: additional arguments passed to self.fetch_from_db
+
+        Returns:
+
+        """
         if rerun:
             df = self.fetch_from_db(**args)
             if fpath is not None:
@@ -42,24 +63,64 @@ class ExternalData:
         return df
 
     def fetch_from_db(self, **args) -> pd.DataFrame:
+        """fetch data from database and return Pandas Dataframe
+
+        Args:
+            **args: arguments for pandas.read_sql function
+
+        Returns: pandas dataframe of loaded data
+
+        """
         # return pd.read_sql(args['sql'], self.engine)
         return pd.read_sql(con=self.engine, **args)
 
 
 class ExternalHospsEMR(ExternalData):
+    """Class for Retrieving EMResource hospitalization data from database
+
+    """
     def fetch_from_db(self):
+        """Retrieve hospitalization data from database using query in emresource_hospitalizations.sql
+
+        Returns: Pandas dataframe of hospitalization data
+
+        """
         sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
         return pd.read_sql(sql, self.engine, index_col=['measure_date'])
 
+
 class ExternalHospsCOPHS(ExternalData):
-    def fetch_from_db(self, county_ids):
+    """Class for Retrieving COPHS hospitalization data from database
+
+    """
+    def fetch_from_db(self, county_ids: list):
+        """Retrieve hospitalization data from database using query in hospitalized_county_subset.sql
+
+        COPHS contains county level hospitalizations, so optionally you can specify a subset of counties to query for.
+
+        Args:
+            county_ids: list of county FIPS codes that you want hospitalization data for
+
+        Returns: Pandas dataframe of hospitalization data
+
+        """
         sql = open('covid_model/sql/hospitalized_county_subset.sql', 'r').read()
         return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
 
 
-
 class ExternalVacc(ExternalData):
-    def fetch_from_db(self, county_ids=None):
+    """Class for retrieving vaccinations data from database
+
+    """
+    def fetch_from_db(self, county_ids: list=None):
+        """Retrieve vaccinations from database using query in sql file, either for entire state or for a subset of counties
+
+        Args:
+            county_ids: list of county FIPS codes that you want vaccinations for (optional)
+
+        Returns:
+
+        """
         if county_ids is None:
             sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
@@ -68,92 +129,17 @@ class ExternalVacc(ExternalData):
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 
-class ExternalVaccWithProjections(ExternalData):
-    def fetch_from_db(self, proj_params=None, group_pop=None):
-        sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
-
-        proj_params = proj_params if type(proj_params) == dict else json.load(open(proj_params))
-        proj_lookback = proj_params['lookback'] if 'lookback' in proj_params.keys() else 7
-        proj_fixed_rates = proj_params['fixed_rates'] if 'fixed_rates' in proj_params.keys() else None
-        max_cumu = proj_params['max_cumu'] if 'max_cumu' in proj_params.keys() else 0
-        max_rate_per_remaining = proj_params['max_rate_per_remaining'] if 'max_rate_per_remaining' in proj_params.keys() else 1.0
-        realloc_priority = proj_params['realloc_priority'] if 'realloc_priority' in proj_params.keys() else None
-
-        df = pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
-        shots = list(df.columns)
-
-        # add projections
-        proj_from_date = df.index.get_level_values('measure_date').max() + dt.timedelta(days=1)
-        if self.fill_to_date >= proj_from_date:
-            proj_date_range = pd.date_range(proj_from_date, self.fill_to_date)
-            # project rates based on the last {proj_lookback} days of data
-            projected_rates = df.loc[(proj_from_date - dt.timedelta(days=proj_lookback)):].groupby('age').sum() / float(proj_lookback)
-            # override rates using fixed values from proj_fixed_rates, when present
-            if proj_fixed_rates:
-                for shot in shots:
-                    projected_rates[shot] = pd.DataFrame(proj_fixed_rates)[shot]
-            # build projections
-            projections = pd.concat({d.date(): projected_rates for d in proj_date_range}).rename_axis(index=['measure_date', 'age'])
-
-            # reduce rates to prevent cumulative vaccination from exceeding max_cumu
-            if max_cumu:
-                cumu_vacc = df.groupby('age').sum()
-                groups = realloc_priority if realloc_priority else projections.index.unique('age')
-                # vaccs = df.index.unique('vacc')
-                for d in projections.index.unique('measure_date'):
-                    this_max_cumu = get_params(max_cumu.copy(), (d - self.fill_from_date).days)
-                    max_cumu_df = pd.DataFrame(this_max_cumu) * pd.DataFrame(group_pop, index=shots).transpose()
-                    for i in range(len(groups)):
-                        group = groups[i]
-                        current_rate = projections.loc[(d, group)]
-                        max_rate = max_rate_per_remaining * (max_cumu_df.loc[group] - cumu_vacc.loc[group])
-                        excess_rate = (projections.loc[(d, group)] - max_rate).clip(lower=0)
-                        projections.loc[(d, group)] -= excess_rate
-                        # if a reallocate_order is provided, reallocate excess rate to other groups
-                        if i < len(groups) - 1 and realloc_priority is not None:
-                            projections.loc[(d, groups[i + 1])] += excess_rate
-
-                    cumu_vacc += projections.loc[d]
-
-            df = pd.concat({False: df, True: projections}).rename_axis(index=['is_projected', 'measure_date', 'age']).reorder_levels(['measure_date', 'age', 'is_projected']).sort_index()
-
-        return df
-
-
-def get_hosps_df(engine):
-    return pd.read_sql(open('sql/emresource_hospitalizations.sql').read(), engine, parse_dates=['measure_date']).set_index('measure_date')['currently_hospitalized']
-
-
-def get_hosps_by_age(engine, fname):
-    df = pd.read_csv(fname, parse_dates=['dates']).set_index('dates')
-    df = df[[col for col in df.columns if col[:17] == 'HospCOVIDPatients']]
-    df = df.rename(columns={col: col.replace('HospCOVIDPatients', '').replace('to', '-').replace('plus', '+') for col in df.columns})
-    df = df.stack()
-    df.index = df.index.set_names(['measure_date', 'age'])
-    cophs_total = df.groupby('measure_date').sum()
-    emr_total = get_hosps_df(engine)
-    return df * emr_total / cophs_total
-
-
-def get_vaccinations_by_county(engine):
-    sql = open('sql/vaccinations_by_age_by_county.sql', 'r').read()
-    df = pd.read_sql(sql, engine)
-    return df
-
-
-def get_corrected_emresource(fpath):
-    raw_hosps = pd.read_excel(fpath, 'COVID hospitalized_confirmed', engine='openpyxl', index_col='Resource facility name').drop(index='Grand Total').rename(columns=pd.to_datetime).stack()
-    raw_hosps.index = raw_hosps.index.set_names(['facility', 'date'])
-
-    raw_reports = pd.read_excel(fpath, 'Latest EMR update', engine='openpyxl', index_col='Resource facility name').drop(index='Grand Total').rename(columns=pd.to_datetime).stack()
-    raw_reports.index = raw_reports.index.set_names(['facility', 'date'])
-    raw_reports = pd.to_datetime(raw_reports).rename('last_report_date').sort_index()
-
-    print(raw_reports)
-    print(pd.to_datetime(pd.to_numeric(raw_reports).groupby('facility').rolling(20).agg(np.max)))
-
-
 def get_region_mobility_from_db(engine, county_ids=None, fpath=None) -> pd.DataFrame:
+    """Standalone function to retrieve mobility data from database and possibly write to a file
+
+    Args:
+        engine: connection to database
+        county_ids: list of FIPS codes to retrieve mobility data for
+        fpath: file path to save the mobility data once downloaded (optional)
+
+    Returns:
+
+    """
     if county_ids is None:
         with open('covid_model/sql/mobility_dwell_hours.sql') as f:
             df = pd.read_sql(f.read(), engine, index_col=['measure_date'])
@@ -162,11 +148,4 @@ def get_region_mobility_from_db(engine, county_ids=None, fpath=None) -> pd.DataF
             df = pd.read_sql(f.read(), engine, index_col=['measure_date'], params={'county_ids': county_ids})
     if fpath:
         df.to_csv(fpath)
-    return df
-
-
-def get_region_mobility_from_file(fpath) -> pd.DataFrame:
-    dtype = {'origin_county_id': str, 'destination_county_id': str}
-    df = pd.read_csv(fpath, dtype=dtype, index_col=['measure_date'], parse_dates=['measure_date'])
-    df[['origin_county_id', 'destination_county_id']] = df[['origin_county_id', 'destination_county_id']].replace(np.nan, None)
     return df

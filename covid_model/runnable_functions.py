@@ -23,7 +23,7 @@ logger = IndentLogger(logging.getLogger(''), {})
 def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=None, tend=None, regions=None):
     # define initial states
     regions = model.regions if regions is None else regions
-    tc = {t: model.tc[t] for t in model.tc.keys() if t >= tstart and t <= tend}
+    tc = {t: model.tc[t] for t in model.tc.keys() if tstart <= t <= tend}
     tc_ts  = list(tc.keys())
     yd_start = model.y0_dict if yd_start is None else yd_start
     y0 = model.y0_from_dict(yd_start)
@@ -32,6 +32,14 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
 
     # convert tc output by curve_fit to a dict like in our model.
     def tc_list_to_dict(tc_list):
+        """
+
+        Args:
+            tc_list:
+
+        Returns:
+
+        """
         i = 0
         tc_dict = {t: {} for t in tc_ts}
         for tc_t in tc.keys():
@@ -42,6 +50,15 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
 
     # function to be optimized
     def func(trange, *test_tc):
+        """
+
+        Args:
+            trange:
+            *test_tc:
+
+        Returns:
+
+        """
         model.update_tc(tc_list_to_dict(test_tc), replace=False, update_lookup=False)
         model.solve_seir(y0=y0, tstart=tstart, tend=tend)
         return model.solution_sum_Ih(tstart, tend, regions=regions)
@@ -70,8 +87,34 @@ def do_single_fit(tc_0=0.75,  # default value for TC
                   write_batch_results=False,  # Should we write output to the database after each fit
                   model_class = CovidModel,
                   **model_args):
+    """
 
+    Args:
+        tc_0:
+        tc_min:
+        tc_max:
+        tc_window_size:
+        tc_window_batch_size:
+        tc_batch_increment:
+        last_tc_window_min_size:
+        fit_start_date:
+        fit_end_date:
+        prep_model:
+        outdir:
+        write_results:
+        write_batch_results:
+        model_class:
+        **model_args:
+
+    Returns:
+
+    """
     def forward_sim_plot(model):
+        """
+
+        Args:
+            model:
+        """
         # TODO: refactor into charts?
         logger.info(f'{str(model.tags)}: Running forward sim')
         fig, axs = plt.subplots(2, len(model.regions), figsize=(10*len(model.regions), 10), dpi=300, sharex=True, sharey=False, squeeze=False)
@@ -103,7 +146,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
     elif fit_end_date > model.end_date:
         ermsg = f'Fit needs to end on or before model end date. Opted to stop fitting at {fit_end_date} but model end date is {model.end_date}'
     elif fit_end_date > model.hosps.index.get_level_values(1).max():
-        ermsg = f'Fit needs to end on or before last date with hospitalization data. Opted to stop fitting at {fit_end_date} but last date with hospitalization data is {model.observed_hosp.index.max()}'
+        ermsg = f'Fit needs to end on or before last date with hospitalization data. Opted to stop fitting at {fit_end_date} but last date with hospitalization data is {model.hosps.index.get_level_values(1).max()}'
     if ermsg is not None:
         logger.exception(f"{str(model.tags)}" + ermsg)
         raise ValueError(ermsg)
@@ -125,7 +168,7 @@ def do_single_fit(tc_0=0.75,  # default value for TC
         model.update_tc(tc)
 
     # Get start/end for each batch
-    relevant_tc_ts = [t for t in model.tc.keys() if t >= fit_tstart and t <= fit_tend]
+    relevant_tc_ts = [t for t in model.tc.keys() if fit_tstart <= t <= fit_tend]
     batch_tstarts =  relevant_tc_ts[:-tc_window_batch_size:tc_batch_increment] + [relevant_tc_ts[-tc_window_batch_size]]
     batch_tends = [t - 1 for t in relevant_tc_ts[tc_window_batch_size::tc_batch_increment]] + [fit_tend]
 
@@ -162,16 +205,42 @@ def do_single_fit(tc_0=0.75,  # default value for TC
 
 
 def do_single_fit_wrapper_parallel(args):
+    """
+
+    Args:
+        args:
+
+    Returns:
+
+    """
     setup(os.path.basename(__file__), 'info')
     logger = IndentLogger(logging.getLogger(''), {})
     return do_single_fit(**args, write_results=False)
 
 
 def do_single_fit_wrapper_nonparallel(args):
+    """
+
+    Args:
+        args:
+
+    Returns:
+
+    """
     return do_single_fit(**args, write_results=False)
 
 
 def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
+    """
+
+    Args:
+        model_args_list:
+        fit_args:
+        multiprocess:
+
+    Returns:
+
+    """
     # generate list of arguments
     fit_args2 = {key: val for key, val in fit_args.items() if key not in ['write_results', 'write_batch_output']}
     args_list = list(map(lambda x: {**x, **fit_args}, model_args_list))
@@ -194,13 +263,34 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
 
 
 def do_regions_fit(model_args, fit_args, multiprocess=None):
+    """
+
+    Args:
+        model_args:
+        fit_args:
+        multiprocess:
+    """
     regions = model_args['regions']
     non_region_model_args = {key: val for key, val in model_args.items() if key != 'regions'}
     model_args_list = list(map(lambda x: {'regions': [x], **non_region_model_args, 'tags':{'region': x}}, regions))
     do_multiple_fits(model_args_list, fit_args, multiprocess=multiprocess)
 
 
-def do_create_report(model, outdir, immun_variants=('ba2121'), from_date=None, to_date=None, prep_model=False, solve_model=False):
+def do_create_report(model, outdir, immun_variants=('ba2121',), from_date=None, to_date=None, prep_model=False, solve_model=False):
+    """
+
+    Args:
+        model:
+        outdir:
+        immun_variants:
+        from_date:
+        to_date:
+        prep_model:
+        solve_model:
+
+    Returns:
+
+    """
     from_date = model.start_date if from_date is None else from_date
     from_date = dt.datetime.strptime(from_date, '%Y-%m-%d').date() if isinstance(from_date, str) else from_date
     to_date = model.end_date if to_date is None else to_date
@@ -290,16 +380,39 @@ def do_create_report(model, outdir, immun_variants=('ba2121'), from_date=None, t
 
 
 def do_create_report_wrapper_parallel(args):
+    """
+
+    Args:
+        args:
+
+    Returns:
+
+    """
     setup(os.path.basename(__file__), 'info')
     logger = IndentLogger(logging.getLogger(''), {})
     return do_create_report(**args)
 
 
 def do_create_report_wrapper_nonparallel(args):
+    """
+
+    Args:
+        args:
+
+    Returns:
+
+    """
     return do_create_report(**args)
 
 
 def do_create_multiple_reports(models, multiprocess=None, **report_args):
+    """
+
+    Args:
+        models:
+        multiprocess:
+        **report_args:
+    """
     # generate list of arguments
     args_list = list(map(lambda x: {'model': x, **report_args}, models))
     # run each scenario
@@ -312,6 +425,14 @@ def do_create_multiple_reports(models, multiprocess=None, **report_args):
 
 
 def do_build_legacy_output_df(model: CovidModel):
+    """
+
+    Args:
+        model:
+
+    Returns:
+
+    """
     totals = model.solution_sum_df(['seir', 'region']).stack(level=1)
     totals['region_pop'] = totals.sum(axis=1)
     totals = totals.rename(columns={'Ih': 'Iht', 'D': 'Dt', 'E': 'Etotal'})
@@ -326,6 +447,17 @@ def do_build_legacy_output_df(model: CovidModel):
 
 
 def do_fit_scenarios(base_model_args, scenario_args_list, fit_args, multiprocess = None):
+    """
+
+    Args:
+        base_model_args:
+        scenario_args_list:
+        fit_args:
+        multiprocess:
+
+    Returns:
+
+    """
     # construct model args from base model args and scenario args list
     model_args_list = []
     for scenario_args in scenario_args_list:
