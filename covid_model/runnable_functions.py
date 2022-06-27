@@ -1,4 +1,4 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import copy
 import os
 from multiprocessing import Pool
@@ -6,14 +6,13 @@ import logging
 import json
 from time import perf_counter
 import datetime as dt
-### Third Party Imports ###
+""" Third Party Imports """
 from multiprocessing_logging import install_mp_handler
-import numpy as np
 import pandas as pd
 from scipy import optimize as spo
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mtick
-### Local Imports ###
+""" Local Imports """
 from covid_model import CovidModel
 from covid_model.analysis.charts import plot_transmission_control
 from covid_model.utils import IndentLogger, setup, get_filepath_prefix, db_engine

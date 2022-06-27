@@ -1,14 +1,14 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import copy
 import os
 import datetime as dt
 import json
 import logging
 import numpy as np
-### Third Party Imports ###
+""" Third Party Imports """
 from collections import OrderedDict
 from matplotlib import pyplot as plt
-### Local Imports ###
+""" Local Imports """
 from covid_model import CovidModel
 from covid_model.runnable_functions import do_create_report, do_fit_scenarios
 from covid_model.utils import setup, get_filepath_prefix, db_engine
@@ -74,7 +74,7 @@ def main():
         model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_states_full.csv')
 
         model.end_date = '2022-09-15'
-        model.update(db_engine())
+        model.update_data(db_engine())
         do_create_report(model, outdir, prep_model=True, solve_model=True)
 
         model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir) + f'{"_".join(str(key) + "_" + str(val) for key, val in model.tags.items())}_states_seir_variant_immun_total_all_at_once_forecast.csv')

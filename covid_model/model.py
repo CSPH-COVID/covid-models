@@ -1,4 +1,4 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import json
 import math
 import datetime as dt
@@ -8,7 +8,7 @@ import itertools
 from collections import OrderedDict, defaultdict
 import logging
 import pickle
-### Third Party Imports ###
+""" Third Party Imports """
 import numpy as np
 import pandas as pd
 import sympy as sym
@@ -18,7 +18,7 @@ import scipy.sparse as spsp
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sortedcontainers import SortedDict
-### Local Imports ###
+""" Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
 from covid_model.utils import get_params, IndentLogger, get_filepath_prefix, get_sqa_table, db_engine

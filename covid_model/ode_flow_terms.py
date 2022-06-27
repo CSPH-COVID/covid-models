@@ -1,8 +1,8 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import copy
 from operator import itemgetter
-### Third Party Imports ###
-### Local Imports ###
+""" Third Party Imports """
+""" Local Imports """
 
 
 class ODEFlowTerm:

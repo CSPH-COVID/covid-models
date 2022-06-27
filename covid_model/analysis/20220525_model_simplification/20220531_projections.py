@@ -1,13 +1,13 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import copy
 import os
 import datetime as dt
 import json
 import logging
 import numpy as np
-### Third Party Imports ###
+""" Third Party Imports """
 from matplotlib import pyplot as plt
-### Local Imports ###
+""" Local Imports """
 from covid_model import CovidModel
 from covid_model.utils import IndentLogger, setup, get_filepath_prefix, db_engine
 

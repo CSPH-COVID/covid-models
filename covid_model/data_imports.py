@@ -1,11 +1,10 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import datetime as dt
 import json
-### Third Party Imports ###
+""" Third Party Imports """
 import numpy as np
 import pandas as pd
-### Local Imports ###
-from covid_model.utils import get_params
+""" Local Imports """
 
 
 def normalize_date(date):

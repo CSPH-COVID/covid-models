@@ -1,10 +1,11 @@
-### Python Standard Library ###
+""" Python Standard Library """
 from os.path import join
 import datetime as dt
 import logging
 import traceback
 import os
-### Third Party Imports ###
+
+""" Third Party Imports """
 from sqlalchemy import create_engine
 from sqlalchemy import MetaData, Table
 ### Local Imports ###

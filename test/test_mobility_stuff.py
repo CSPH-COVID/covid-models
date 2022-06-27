@@ -1,13 +1,13 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import os
 import json
 import unittest
 from collections import OrderedDict
-### Third Party Imports ###
+""" Third Party Imports """
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
-### Local Imports ###
+""" Local Imports """
 from covid_model.data_imports import get_region_mobility_from_db, get_region_mobility_from_file
 from covid_model.utils import db_engine
 

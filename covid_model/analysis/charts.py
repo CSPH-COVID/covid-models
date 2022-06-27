@@ -1,7 +1,7 @@
-### Python Standard Library ###
+""" Python Standard Library """
 from time import perf_counter
 import datetime as dt
-### Third Party Imports ###
+""" Third Party Imports """
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ import scipy.stats as sps
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import matplotlib.dates as mdates
-### Local Imports ###
+""" Local Imports """
 from covid_model.model import CovidModel
 from covid_model.utils import db_engine
 from covid_model.data_imports import ExternalHospsEMR, ExternalHospsCOPHS

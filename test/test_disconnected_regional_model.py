@@ -1,9 +1,9 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import unittest
 import json
 import os
-### Third Party Imports ###
-### Local Imports ###
+""" Third Party Imports """
+""" Local Imports """
 
 
 class MyTestCase(unittest.TestCase):

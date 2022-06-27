@@ -1,8 +1,8 @@
-### Python Standard Library ###
+""" Python Standard Library """
 from unittest import TestCase
-### Third Party Imports ###
+""" Third Party Imports """
 import numpy as np
-### Local Imports ###
+""" Local Imports """
 from covid_model.model_fit import CovidModelFit
 from covid_model.model import CovidModel
 from covid_model.db import db_engine

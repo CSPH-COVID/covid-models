@@ -1,8 +1,8 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import datetime as dt
 from unittest import TestCase
-### Third Party Imports ###
-### Local Imports ###
+""" Third Party Imports """
+""" Local Imports """
 from covid_model.utils import get_sqa_table, db_engine
 from covid_model.model import CovidModel
 
