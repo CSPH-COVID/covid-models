@@ -58,3 +58,5 @@ sympy==1.9
 threadpoolctl==3.0.0
 tqdm==4.62.3
 urllib3==1.26.8
+sortedcontainers==2.4.0
+multiprocessing-logging==0.3.3
