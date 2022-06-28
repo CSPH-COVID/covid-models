@@ -12,15 +12,20 @@ from covid_model.analysis.charts import plot_transmission_control
 
 
 """
-Welcome! This script will demonstrate how to do some basic things with the model. You will need access to the database
-as well as all required python packages installed.
+Welcome! This script is a companion to the Jupyter notebook 00000000_hello_world.ipynb.
+That notebook is structured around the narrative of introducing someone to using our models for the first time.
+This script is meant to be an example of how modeling might look in practice, without all the tangents and sidebars of
+the notebook. 
+We suggest you start there first, then revisit this file to see how it all comes together.
 
-This file is heavily commented for your benefit!
+This file does two things: 
+1. It defines a `main()` function, which fits multiple models and produces projections under multiple scenarios.
+2. It runs the `main()` function.
+The rationale of doing this is so the function could potentially be imported by another script or process and run from there.
 
-This file only does two things: defines a function called main(), then calls the function. This is good practice for a 
-Python script, as it makes it possible for another script to load this same main function and run it at will.
-
-The main function shows a few different ways to build and fit models.
+Things to remember when running this script:
+- Run this script from the covid_model base directory
+- make sure the `gcp_project` and `GOOGLE_APPLICATION_CREDENTIALS` environment variables are set appropriately
 
 """
 
@@ -29,87 +34,87 @@ def main():
     ####################################################################################################################
     # Set Up
 
-    # the `setup` function sets up loggin, as well as determines the output directory for this script.
-    # logging enables us to make print statements look prettier and allows for logging to the terminal window and to a text file simultaneously.
-    # the output directory `outdir` is based on this file's name, so it's easy to see what output was produced by this script
-    # by passing `outdir` to functions below, we ensure all the output from those functions is saved in the same location.
     outdir = setup(os.path.basename(__file__))
 
-    # we can test that the logging is working by trying to log a message like so:
-    logging.info("This is a logging message")
-    # when you run this file, you should see this message printed to the console and also saved in the log file.
-    # By default, debug messages will not be printed to the console but will be saved in the log file:
-    logging.debug("You won't see this message in the console, but you will see it in the console")
-
-    # This dictionary defines the arguments to use when fitting the model. There are many options, but they all have
-    # defaults, so it's only necessary to specify the non-default options here.
     fit_args = {
-        'outdir': outdir                    # Where to save output from fitting
+        'fit_start_date': None,
+        'fit_end_date': None,
+        'tc_min': 0.0,
+        'tc_max': 0.999,
+        'tc_window_size': 14,
+        'tc_window_batch_size': 5,
+        'tc_batch_increment': 2,
+        'last_tc_window_min_size': 14,
+        'outdir': outdir
     }
-
-    # This dictionary specifies arguments for the model. The model is an instance of CovidModel, and any attribute of CovidModel can be specified here.
-    model_args = {
-        'params_defs': 'covid_model/analysis/00000000_hello_world/params.json',     # the file that defines all the parameters for the model
-        'region_defs': 'covid_model/input/region_definitions.json',                     # the file that defines all the regions used in the model
-        'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',                  # the file that defines how vaccines projections will be made in the event we lack recent vaccination data
-        'start_date': dt.datetime.strptime('2020-01-24', "%Y-%m-%d").date(),            # The start date of the model.
-        'end_date': dt.datetime.strptime('2021-11-09', "%Y-%m-%d").date(),              # The end date of the model.
-        'max_step_size': 1.0,                                                           # The biggest allowable step (in days) that the ODE solver is allowed to take.
-        'ode_method': 'RK23'                                                            # what method to use when solving the ODE
+    # This set of base model arguments will be used for each scenario we are fitting below
+    base_model_args = {
+        'params_defs': json.load(open('covid_model/analysis/00000000_hello_world/base_params_for_scenarios.json')),
+        'region_defs': 'covid_model/input/region_definitions.json',
+        'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
+        'regions': ['co'],
+        'mobility_mode': None,
+        'start_date': '2020-01-24',
+        'end_date': '2022-09-15',
+        'max_step_size': 1.0,
+        'ode_method': 'RK45'
     }
+    # How many different Python processes should we run at a time?
+    multiprocess = 6
 
-    # it's a good idea to log the fit args and the model args we are using
-    logging.info(json.dumps({"fit_args": fit_args}, default=str))
-    logging.info(json.dumps({"model_args": model_args}, default=str))
+    # log the above arguments to the log file for the record
+    logging.debug(json.dumps({"fit_args": fit_args}, default=str))
+    logging.debug(json.dumps({"base_model_args": base_model_args}, default=str))
 
     ####################################################################################################################
-    # Creating a model
-    logging.info('Building Models')
+    # Build scenarios and fit models
+    logging.info('Compiling scenarios list')
 
-    # A model is just an instance of the CovidModel class.
-    # Models can be created in several ways, below are some examples:
+    # Build the list of additional parameters that will be added to the base model arguments to create the individual scenarios
+    # notice how we specify the tags to reflect the scenario being run
+    scenario_args_list = []
+    for beta_mult in [1.00, 0.95, 1.05]:
+        for (weak_escape, strong_escape) in [(0.75, 0.1), (0.8, 0.2)]:
+            weak_param = [{"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2"]}, "to_attrs": {"variant": ["ba45"]},  "vals": {"2020-01-01": weak_escape},  "desc": "weak"}]
+            strong_param = [{"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2"]}, "to_attrs": {"variant": ["ba45"]},  "vals": {"2020-01-01": strong_escape},  "desc": "strong"}]
+            beta_param_adjustment = [{"param": "betta",  "attrs": {"variant": "ba45"}, "mults":  {"2020-01-01": beta_mult}, "desc": "sensitivity"}]
+            # these args will literally be passed as arguments when constructing the model for each scenario.
+            scenario_args_list.append({'params_defs': base_model_args['params_defs'] + beta_param_adjustment + weak_param + strong_param,
+                                       'tags': {'beta_mult': beta_mult, 'ba45_escape_weak': weak_escape, 'ba45_escape_strong': strong_escape},
+                                       'hosp_reporting_frac': {"2020-01-01": 1, "2022-03-10": 0.8}})
 
-    # We can create a model using some model arguments
-    m1 = CovidModel(**model_args)
-    # Note: this is equivalent to writing CovidModel(params_defs = 'covid_model/analysis/00000000_hello_world/params.json', region_defs = ... ) etc.
-    # It's nice to define all the model arguments in the dictionary above so we can see them all at a glance and it's easy to dump them to the log file.
+    # run the scenarios, using the do_fit_scenarios function. This will fit several scenarios at a time, as specified by the `multiprocess` argument
+    logging.info('Running Scenarios')
+    models = do_fit_scenarios(base_model_args, scenario_args_list, fit_args, multiprocess=multiprocess)
 
+    # now that we've fit all the models, let's run a projection for each one.
 
-    #base_model_args = {'base_spec_id': 2710, 'params_defs': json.load(open('covid_model/analysis/20220606_GovBriefing/params_no_ba45_immuneescape.json'))}
+    logging.info('Projecting')
+    for model in models:
+        logging.info('')
+        #model.prep()  # don't think we need to prep anymore.
+        model.solve_seir()
 
+        model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_seir_variant_immun_total_all_at_once_projection.csv')
+        model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_full_projection.csv')
 
-    # run the scenarios
-    logging.info('Fitting Model')
+        logging.info(f'{str(model.tags)}: Running forward sim')
+        fig = plt.figure(figsize=(10, 10), dpi=300)
+        ax = fig.add_subplot(211)
+        hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
+        hosps_df.plot(ax=ax)
+        ax.set_xlim(dt.datetime.strptime('2022-01-01', "%Y-%m-%d").date(), dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date())
+        ax = fig.add_subplot(212)
+        plot_transmission_control(model, ax=ax)
+        ax.set_xlim(dt.datetime.strptime('2022-01-01', "%Y-%m-%d").date(), dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date())
+        plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast.png')
+        plt.close()
+        hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
+        json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
 
-    model = do_single_fit(**fit_args, tc_window_batch_size=2, tc_batch_increment=1, write_results=False, **model_args)
-    model = do_single_fit(**fit_args, tc_window_batch_size=4, tc_batch_increment=2, write_results=True, tc_0=None, base_model = model)
-
-    #logging.info('Projecting')
-
-    #logging.info('')
-
-    #model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_seir_variant_immun_total_all_at_once_projection.csv')
-    #model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_full_projection.csv')
-
-    #logging.info(f'{str(model.tags)}: Running forward sim')
-    #fig = plt.figure(figsize=(10, 10), dpi=300)
-    #ax = fig.add_subplot(211)
-    #hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
-    #hosps_df.plot(ax=ax)
-    #ax.set_xlim(dt.datetime.strptime('2022-01-01', "%Y-%m-%d").date(), dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date())
-    #ax = fig.add_subplot(212)
-    #plot_transmission_control(model, ax=ax)
-    #ax.set_xlim(dt.datetime.strptime('2022-01-01', "%Y-%m-%d").date(), dt.datetime.strptime('2022-09-15', "%Y-%m-%d").date())
-    #plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast.png')
-    ##plt.close()
-    #hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
-    #json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
-
-
-
-
-
-
+    # create reports
+    logging.info('Running reports')
+    do_create_multiple_reports(models, multiprocess=multiprocess, outdir=outdir, prep_model=False, solve_model=True, immun_variants=['ba2121', 'ba45'], from_date='2022-01-01')
 
 
 if __name__ == "__main__":
