@@ -1138,29 +1138,35 @@ class CovidModel:
     ### Prepping and Running
 
     def get_vacc_per_available(self):
-        """
+        """Compute fraction of people in a region / age group that are eligible for a shot who receive the shot on a particular day
 
         Returns:
 
         """
+        # Construct a cleaned version of how many of each shot are given on each day to each age group in each region
         vacc_rates = self.get_vacc_rates()
         missing_dates = pd.DataFrame({'date': [d for d in self.daterange if d < min(vacc_rates.index.get_level_values('date'))]})
         missing_shots = missing_dates.merge(pd.DataFrame(index=vacc_rates.reset_index('date').index.unique(), columns=vacc_rates.columns).fillna(0).reset_index(), 'cross').set_index(['date', 'region', 'age'])
         vacc_rates = pd.concat([missing_shots, vacc_rates])
         vacc_rates['t'] = [self.date_to_t(d) for d in vacc_rates.index.get_level_values('date')]
         vacc_rates = vacc_rates.set_index('t', append=True)
+        # get the population of each age group (in each region) at each point in time. Should work with changing populations, but right now pop is static
+        # also, attrs doesn't matter since the `region_age_pop` is just specific to an age group and region
         populations = self.get_param_for_attrs_by_t('region_age_pop', attrs={'vacc': 'none', 'variant': 'none', 'immun': 'none'}).reset_index([an for an in self.param_attr_names if an not in ['region', 'age']])[['region_age_pop']]
         vacc_rates_ts = vacc_rates.index.get_level_values('t').unique()
-        populations = populations.iloc[[t in vacc_rates_ts for t in populations.index.get_level_values('t')]].reorder_levels(['region', 'age', 't'])
+        populations = populations.iloc[[t in vacc_rates_ts for t in populations.index.get_level_values('t')]].reorder_levels(['region', 'age', 't']).sort_index()
         populations.rename(columns={'region_age_pop': 'population'}, inplace=True)
-        cumu_vacc = vacc_rates.groupby(['region', 'age']).cumsum()
+        # compute the cumulative number of each shot to each age group in each region
+        cumu_vacc = vacc_rates.sort_index().groupby(['region', 'age']).cumsum()
+        # compute how many people's last shot is shot1, shot2, etc. by subtracting shot1 from shot2, etc.
         cumu_vacc_final_shot = cumu_vacc - cumu_vacc.shift(-1, axis=1).fillna(0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.join(populations)
+        # compute how many people have had no shots
         # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
         cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
         cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
-
+        # compute what fraction of the eligible population got each shot on a given day.
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
         vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'date', 'region', 'age']).sort_index()
         # because vaccinations exceed the population, we can get rates greater than 1. To prevent compartments have negative people, we have to cap the rate at 1
