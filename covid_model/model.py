@@ -21,7 +21,7 @@ from sortedcontainers import SortedDict
 """ Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
-from covid_model.utils import get_params, IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
+from covid_model.utils import IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
 
 logger = IndentLogger(logging.getLogger(''), {})
 
@@ -29,11 +29,17 @@ logger = IndentLogger(logging.getLogger(''), {})
 # class used to run the model given a set of parameters, including transmission control (ef)
 class CovidModel:
     ####################################################################################################################
-    ### Setup
-    def log_and_raise(self, ermsg, ErrorType):
-        logger.exception(f"{str(self.tags)}" + ermsg)
-        raise ErrorType(ermsg)
+    """ Setup """
 
+    def log_and_raise(self, ermsg, errortype):
+        """
+
+        Args:
+            ermsg:
+            errortype:
+        """
+        logger.exception(f"{str(self.tags)}" + ermsg)
+        raise errortype(ermsg)
 
     ####################################################################################################################
     ### Initialization and Updating
@@ -43,48 +49,55 @@ class CovidModel:
 
         # basic model data
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
-                             'age': ['0-19', '20-39', '40-64', '65+'],
-                             'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                             'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45'],
-                             'immun': ['none', 'weak', 'strong'],
-                             'region': ['co']})
-
+                                    'age': ['0-19', '20-39', '40-64', '65+'],
+                                    'vacc': ['none', 'shot1', 'shot2', 'shot3'],
+                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45'],
+                                    'immun': ['none', 'weak', 'strong'],
+                                    'region': ['co']})
+        # labels used when logging and writing to db.
         self.tags = {}
 
-        self.__start_date = dt.datetime.strptime("2020-01-01", "%Y-%m-%d").date()
-        self.__end_date = dt.datetime.strptime("2023-01-01", "%Y-%m-%d").date()
+        # start and end date/time
+        self.__start_date = dt.datetime.strptime('2020-01-01', "%Y-%m-%d").date()
+        self.__end_date = dt.datetime.strptime('2023-01-01', "%Y-%m-%d").date()
+        self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
+        self.__tend = (self.end_date - self.start_date).days
+        self.__trange = range(self.tstart, self.tend + 1)
 
+        # Transmission Control
         self.__tc = {}
         self.tc_t_prev_lookup = []
-        self.tc_cov = None
 
-        self.solution_y = None
-
+        # Model compartments, lookups, and ODE solution
         self.compartments_as_index = None
         self.Ih_compartments = None
         self.compartments = None
         self.cmpt_idx_lookup = None
         self.param_compartments = None
+        self.params_trange = None
+        self.solution_y = None
 
-        # model data
-        self.__params_defs = None
-        self.__region_defs = None
-        self.regions = self.attrs['region']
+        # data related params
+        self.__params_defs = json.load(open('covid_model/input/params.json'))  # default params
+        self.__region_defs = json.load(open('covid_model/input/region_definitions.json'))  # default value
+        self.__hosp_reporting_frac = None
         self.__vacc_proj_params = None
         self.__mobility_mode = None
+        self.__mobility_proj_params = None
         self.actual_mobility = None
-        self.mobility_proj_params = None
+        self.proj_mobility = None
         self.actual_vacc_df = None
         self.proj_vacc_df = None
         self.hosps = None
-        self.__hosp_reporting_frac = None
 
+        self.regions = self.attrs['region']  # also updates compartments
+
+        # database info
         self.base_spec_id = None
         self.spec_id = None
-        self.region_fit_spec_ids = None
-        self.region_fit_result_ids = None
+        self.result_id = None
 
-        # ode data
+        # ode stuff
         self.ode_method = 'RK45'
         self.t_prev_lookup = None
         self.terms = None
@@ -95,6 +108,7 @@ class CovidModel:
         self.linear_matrix = None
         self.nonlinear_matrices = None
         self.constant_vector = None
+        self.region_picker_matrix = None
         self.max_step_size = np.inf
 
         if base_model is not None and base_spec_id is not None:
@@ -120,37 +134,49 @@ class CovidModel:
             self.recently_updated_properties.append(key)
 
         if update_derived_properties:
-            self.update(engine)
+            self.update_data(engine)
 
-    # some properties are derived / computed / constructed from other properties. If the non-derived
-    # properties are updated, the derived properties may need recomputing
-    def update(self, engine):
-        if any([p in self.recently_updated_properties for p in ['regions', 'region_defs']]):
+    def update_data(self, engine=None):
+        """ Update data from database to be consistent with other model properties
+
+        Hospitalizations, vaccinations, and mobility data are dependent on start date, end date, and other parameters
+        specifying how data should be projected forward to fill in any gaps.
+        This function will only update data as required based on what model properties have recently changed.
+        Nothing will happen if no updates are necessary.
+
+        Args:
+            engine: connection to database engine
+        """
+        if engine is None:
+            engine = db_engine()
+
+        if any([p in self.recently_updated_properties for p in ['start_date', 'end_date', 'regions', 'region_defs']]):
             logger.debug(f"{str(self.tags)} Updating actual vaccines")
             self.set_actual_vacc(engine)
 
-        if any([p in self.recently_updated_properties for p in ['end_date', 'vacc_proj_params']]) and self.vacc_proj_params is not None:
+        if any([p in self.recently_updated_properties for p in
+                ['start_date', 'end_date', 'vacc_proj_params']]) and self.vacc_proj_params is not None:
             logger.debug(f"{str(self.tags)} Updating Projected Vaccines")
             self.set_proj_vacc()
 
-        if any([p in self.recently_updated_properties for p in ['end_date', 'mobility_mode']]) and self.mobility_mode is not None:
+        if any([p in self.recently_updated_properties for p in
+                ['start_date', 'end_date', 'mobility_mode']]) and self.mobility_mode is not None:
             logger.debug(f"{str(self.tags)} Updating Actual Mobility")
             self.set_actual_mobility(engine)
 
-        if any([p in self.recently_updated_properties for p in ['end_date', 'mobility_mode', 'mobility_proj_params']]) and self.mobility_mode is not None:
+        if any([p in self.recently_updated_properties for p in
+                ['start_date', 'end_date', 'mobility_mode', 'mobility_proj_params']]) and self.mobility_mode is not None:
             logger.debug(f"{str(self.tags)} Updating Projected Mobility")
             self.set_proj_mobility()
 
-        if any([p in self.recently_updated_properties for p in ['end_date', 'model_mobility_mode', 'mobility_proj_params']]):
+        if any([p in self.recently_updated_properties for p in
+                ['start_date', 'end_date', 'model_mobility_mode', 'mobility_proj_params']]):
             if self.mobility_mode is not None and self.mobility_mode != "none":
                 logger.debug(f"{str(self.tags)} Getting Mobility As Parameters")
                 self.params_defs.extend(self.get_mobility_as_params())
 
-        #if any([p in self.recently_updated_properties for p in ['region_fit_spec_ids', 'region_fit_result_ids']]):
-            #logger.debug(f"{str(self.tags)} Getting kappas as parameters using region fits")
-            #self.params_defs.extend(self.get_kappas_as_params_using_region_fits(engine))
-
-        if any([p in self.recently_updated_properties for p in ['start_date', 'regions', 'region_defs', 'hosp_reporting_frac']]):
+        if any([p in self.recently_updated_properties for p in
+                ['start_date', 'end_date', 'regions', 'region_defs', 'hosp_reporting_frac']]):
             logger.debug(f"{str(self.tags)} Setting Hospitalizations")
             self.set_hosp(engine)
 
@@ -159,7 +185,12 @@ class CovidModel:
     ####################################################################################################################
     ### Functions to Update Derived Properites and Retrieve Data
 
-    def set_actual_vacc(self, engine=None, actual_vacc_df=None):
+    def set_actual_vacc(self, engine=None):
+        """
+
+        Args:
+            engine:
+        """
         logger.info(f"{str(self.tags)} Retrieving vaccinations data")
         if engine is None:
             engine = db_engine()
@@ -173,6 +204,9 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} Vaccinations span from {self.actual_vacc_df.index.get_level_values(0).min()} to {self.actual_vacc_df.index.get_level_values(0).max()}")
 
     def set_proj_vacc(self):
+        """
+
+        """
         logger.info(f"{str(self.tags)} Constructing vaccination projections")
         proj_lookback = self.vacc_proj_params['lookback']
         proj_fixed_rates = self.vacc_proj_params['fixed_rates']
@@ -189,10 +223,10 @@ class CovidModel:
         if proj_to_date >= proj_from_date:
             proj_date_range = pd.date_range(proj_from_date, proj_to_date).date
             # project daily vaccination rates based on the last {proj_lookback} days of data
-            projected_rates = self.actual_vacc_df[self.actual_vacc_df.index.get_level_values(0) >= proj_from_date-dt.timedelta(days=proj_lookback)].groupby(['region', 'age']).sum()/proj_lookback
+            projected_rates = self.actual_vacc_df[self.actual_vacc_df.index.get_level_values(0) >= proj_from_date - dt.timedelta(days=proj_lookback)].groupby(['region', 'age']).sum() / proj_lookback
             # override rates using fixed values from proj_fixed_rates, when present
             if proj_fixed_rates:
-                proj_fixed_rates_df = pd.DataFrame(proj_fixed_rates).rename_axis(index='age').reset_index().merge(region_df,how='cross').set_index(['region', 'age'])
+                proj_fixed_rates_df = pd.DataFrame(proj_fixed_rates).rename_axis(index='age').reset_index().merge(region_df, how='cross').set_index(['region', 'age'])
                 for shot in shots:
                     # Note: currently treats all regions the same. Need to change if finer control desired
                     projected_rates[shot] = proj_fixed_rates_df[shot]
@@ -202,12 +236,13 @@ class CovidModel:
             # reduce rates to prevent cumulative vaccination from exceeding max_cumu
             if max_cumu:
                 cumu_vacc = self.actual_vacc_df.groupby(['region', 'age']).sum()
-                groups = realloc_priority if realloc_priority else projections.groupby(['region','age']).sum().index
+                groups = realloc_priority if realloc_priority else projections.groupby(['region', 'age']).sum().index
                 # self.params_by_t hasn't necessarily been built yet, so use a workaround
                 populations = pd.DataFrame([{'region': param_dict['attrs']['region'], 'age': param_dict['attrs']['age'], 'population': list(param_dict['vals'].values())[0]} for param_dict in self.params_defs if param_dict['param'] == 'region_age_pop' and param_dict['attrs']['region'] in self.regions])
 
                 for d in projections.index.unique('date'):
-                    this_max_cumu = get_params(max_cumu.copy(), d)
+                    # Note: I simplified this, so max_cumu can't vary in time. wasn't being used anyways, and it used the old 'tslices' paradigm (-Alex Fout)
+                    this_max_cumu = max_cumu.copy()
 
                     # Note: currently treats all regions the same. Need to change if finer control desired
                     max_cumu_df = pd.DataFrame(this_max_cumu).rename_axis(index='age').reset_index().merge(region_df, how='cross').set_index(['region', 'age']).sort_index()
@@ -232,14 +267,19 @@ class CovidModel:
             logger.info(f"{str(self.tags)} No vaccine projections necessary")
 
     def set_actual_mobility(self, engine=None):
+        """
+
+        Args:
+            engine:
+        """
         logger.info(f"{str(self.tags)} Retrieving mobility data")
         if engine is None:
             engine = db_engine()
         regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
                                                  'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
         # get mobility and add regions to it
-        df = get_region_mobility_from_db(engine, county_ids=regions_lookup['county_id'].to_list()).reset_index('measure_date').rename(columns={'measure_date': 'date'})\
-            .join(regions_lookup.rename(columns={'county_id': 'origin_county_id', 'region': 'from_region'}).set_index('origin_county_id'), on='origin_county_id')\
+        df = get_region_mobility_from_db(engine, county_ids=regions_lookup['county_id'].to_list()).reset_index('measure_date').rename(columns={'measure_date': 'date'}) \
+            .join(regions_lookup.rename(columns={'county_id': 'origin_county_id', 'region': 'from_region'}).set_index('origin_county_id'), on='origin_county_id') \
             .join(regions_lookup.rename(columns={'county_id': 'destination_county_id', 'region': 'to_region'}).set_index('destination_county_id'), on='destination_county_id')
 
         # aggregate by t and origin / dest regions
@@ -251,22 +291,30 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} mobility spans from {self.actual_mobility.index.get_level_values(0).min()} to {self.actual_mobility.index.get_level_values(0).max()}")
 
     def set_proj_mobility(self):
+        """
+
+        """
         # TODO: implement mobility projections
         logger.info(f"{str(self.tags)} Constructing Mobility projections")
-        #self.proj_mobility = pd.DataFrame(columns = self.actual_mobility.columns)
+        # self.proj_mobility = pd.DataFrame(columns = self.actual_mobility.columns)
         self.proj_mobility = None
         logger.warning(f"{str(self.tags)} mobility projections not yet implemented")
 
     def get_mobility_as_params(self):
+        """
+
+        Returns:
+
+        """
         logger.info(f"{str(self.tags)} Converting mobility data into parameters")
         # compute fraction in and fraction from
         mobility = pd.concat([self.actual_mobility, self.proj_mobility]) if self.proj_mobility is not None else self.actual_mobility
-        mobility = mobility\
-            .join(mobility.groupby(['date', 'from_region']).aggregate(total_from_hrs=('total_hrs', 'sum')))\
-            .join(mobility.groupby(['date', 'to_region']).aggregate(total_to_hrs=('total_hrs', 'sum')))\
+        mobility = mobility \
+            .join(mobility.groupby(['date', 'from_region']).aggregate(total_from_hrs=('total_hrs', 'sum'))) \
+            .join(mobility.groupby(['date', 'to_region']).aggregate(total_to_hrs=('total_hrs', 'sum'))) \
             .reorder_levels([1, 2, 0]).sort_index()
         mobility['frac_of_from'] = mobility['total_hrs'] / mobility['total_from_hrs']  # fraction of "from"'s hours spent in "to"
-        mobility['frac_of_to'] = mobility['total_hrs'] / mobility['total_to_hrs']   # fraction of hours spent in "to" that are from "from".
+        mobility['frac_of_to'] = mobility['total_hrs'] / mobility['total_to_hrs']  # fraction of hours spent in "to" that are from "from".
 
         # convert index to string, so they can be serialized more easily.
         mobility.reset_index('date', inplace=True)
@@ -276,105 +324,37 @@ class CovidModel:
         params = []
         if self.mobility_mode == 'population_attached':
             # self join to compute the dot product over all intermediate regions
-            S_in_region = mobility[['frac_of_from']].reset_index(['to_region', 'from_region'])\
-                .rename(columns={'to_region': 'intermediate_region', 'from_region': 'susceptible_region', 'frac_of_from': 'frac_of_susceptible_region' })\
+            S_in_region = mobility[['frac_of_from']].reset_index(['to_region', 'from_region']) \
+                .rename(columns={'to_region': 'intermediate_region', 'from_region': 'susceptible_region', 'frac_of_from': 'frac_of_susceptible_region'}) \
                 .set_index(['susceptible_region', 'intermediate_region'], append=True)
-            I_in_region = mobility[['frac_of_to']].reset_index(['to_region', 'from_region'])\
-                .rename(columns={'to_region': 'intermediate_region', 'from_region': 'infectious_region', 'frac_of_to': 'frac_from_infectious_region' }) \
+            I_in_region = mobility[['frac_of_to']].reset_index(['to_region', 'from_region']) \
+                .rename(columns={'to_region': 'intermediate_region', 'from_region': 'infectious_region', 'frac_of_to': 'frac_from_infectious_region'}) \
                 .set_index(['infectious_region', 'intermediate_region'], append=True)
-            I_S_contact = S_in_region.join(I_in_region)\
-                .reorder_levels(['date', 'susceptible_region', 'infectious_region', 'intermediate_region'])\
-                .assign(I_S_contact = lambda x: x['frac_of_susceptible_region'] * x['frac_from_infectious_region'])\
-                .groupby(['date', 'susceptible_region', 'infectious_region'])\
-                .aggregate(I_S_contact = ('I_S_contact', 'sum'))\
+            I_S_contact = S_in_region.join(I_in_region) \
+                .reorder_levels(['date', 'susceptible_region', 'infectious_region', 'intermediate_region']) \
+                .assign(I_S_contact=lambda x: x['frac_of_susceptible_region'] * x['frac_from_infectious_region']) \
+                .groupby(['date', 'susceptible_region', 'infectious_region']) \
+                .aggregate(I_S_contact=('I_S_contact', 'sum')) \
                 .reorder_levels(['susceptible_region', 'infectious_region', 'date']).sort_index()
 
             for S_region in I_S_contact.index.get_level_values('susceptible_region').unique():
                 for I_region in I_S_contact.index.get_level_values('infectious_region').unique():
-                    params.extend([{'param': f'mob_{S_region}_exposure_from_{I_region}',  'attrs': {}, 'vals': I_S_contact.loc[(S_region, I_region)]['I_S_contact'].to_dict()}])
+                    params.extend([{'param': f'mob_{S_region}_exposure_from_{I_region}', 'attrs': {}, 'vals': I_S_contact.loc[(S_region, I_region)]['I_S_contact'].to_dict()}])
 
         elif self.mobility_mode == 'location_attached':
             for from_region in mobility.index.get_level_values('from_region').unique():
                 for to_region in mobility.index.get_level_values('to_region').unique():
-                    params.extend([{'param': f'mob_{from_region}_frac_in_{to_region}',  'attrs': {}, 'vals': mobility.loc[(from_region, to_region)]['frac_of_from'].to_dict()}])
+                    params.extend([{'param': f'mob_{from_region}_frac_in_{to_region}', 'attrs': {}, 'vals': mobility.loc[(from_region, to_region)]['frac_of_from'].to_dict()}])
                     params.extend([{'param': f'mob_{to_region}_frac_from_{from_region}', 'attrs': {}, 'vals': mobility.loc[(from_region, to_region)]['frac_of_to'].to_dict()}])
 
         return params
 
-    def get_kappas_as_params_using_region_fits(self, engine=None):
-        if engine is None:
-            engine = db_engine()
-        # will set TC = 0.0 for the model and scale the "kappa" parameter for each region according to its fitted TC values so the forward sim can be run.
-        # This approach does not currently support fitting, since only TC can be fit and there's only one set of TC for the model.
-        results_list = []
-        for i, (region, spec_id) in enumerate(zip(self.regions, self.region_fit_spec_ids)):
-            # load tslices and tcs from the database
-            df = pd.read_sql_query(f"select regions, start_date, end_date, tslices, tc, from covid_model.specifications where spec_id = {spec_id}", con=engine, coerce_float=True).loc[0]
-            # make sure region in run spec matches our region
-            if json.loads(df['regions'])[0] != region:
-                self.log_and_raise(f'spec_id {spec_id} has region {json.loads(df["regions"])[0]} which does not match model\'s {i}th region: {region}', ValueError)
-            tslices = [(df['start_date'] + dt.timedelta(days=d) - self.start_date).days for d in [0] + df['tslices']]
-            tc = df['tc']
-            results_list.append(pd.DataFrame.from_dict({'tslices': tslices, region: tc}).set_index('tslices'))
-        # union all the region tslices
-        df_tcs = pd.concat(results_list, axis=1)
-        tslices = df_tcs.index.to_list()
-
-        # retrieve prevalence data from db if allowing mobility
-        prev_df = None
-        if self.mobility_mode is not None:
-            results_list = []
-            for region, spec_id, result_id in zip(self.regions, self.region_fit_spec_ids, self.region_fit_result_ids):
-                df = pd.read_sql_query(f"SELECT date, vals FROM covid_model.results_v2 WHERE spec_id = {spec_id} AND result_id = {result_id} order by t", con=engine, coerce_float=True)
-                df['infected'] = [sum(itemgetter('I', 'Ih')(json.loads(row))) for row in df['vals']]
-                df['pop'] = [sum(json.loads(row).values()) for row in df['vals']]
-                df = df.groupby('date').sum(['infected', 'pop'])
-                df[region]=df['infected']/df['pop']
-                df = df.drop(columns=['infected', 'pop'])
-                results_list.append(df)
-            prev_df = pd.concat(results_list, axis=1)
-            prev_df['t'] = [self.date_to_t(d) for d in prev_df.index]
-
-        # compute kappa parameter for each region and apply to model parameters
-        params = {}
-        if self.mobility_mode is None:
-            self.__tc = [0.0] * (len(tslices) + 1)
-            params = [{'param': 'kappa', 'attrs': {'region':region}, 'vals': dict(zip(tslices, [(1-tc) for tc in df_tcs[region]]))} for region in df_tcs.columns]
-        elif self.mobility_mode == 'location_attached':
-            # TODO: Implement
-            params = []
-        elif self.mobility_mode == 'population_attached':
-            # average the mobility over each tc window from the region tc fits
-            zero_mat = np.zeros_like(list(self.actual_mobility.values())[0]['dwell'])
-            mobility_ave_for_tc_interval = {t: {'dwell': zero_mat.copy(), 'dwell_rownorm': zero_mat.copy(), 'dwell_colnorm': zero_mat.copy()} for t in df_tcs.index}
-            for t0, t1 in zip(list(self.actual_mobility.keys())[:-1], list(self.actual_mobility.keys())[1:]):
-                if t0 > max(df_tcs.index):
-                    break
-                t_tc0 = [t for t in df_tcs.index if t <= t0][-1]
-                t_tc1 = [t for t in df_tcs.index if t_tc0 < t][0]
-                t_tc2 = [t for t in df_tcs.index if t_tc1 < t][0] if t_tc1 != max(df_tcs.index) else None
-                days_in_t_tc0 = min(t_tc1, t1) - max(t_tc0, t0)
-                days_in_t_tc1 = t1 - t0 - days_in_t_tc0
-                for key in ['dwell', 'dwell_rownorm', 'dwell_colnorm']:
-                    mobility_ave_for_tc_interval[t_tc0][key] += np.array(self.actual_mobility[t0][key]) * days_in_t_tc0 / (t_tc1-t_tc0)
-                    mobility_ave_for_tc_interval[t_tc1][key] += np.array(self.actual_mobility[t0][key]) * [days_in_t_tc1 / (t_tc2-t_tc1) if t_tc2 is not None else 1][0]
-            # average the prevalence over each tc window from the region tc fits
-            prev_t_rounded_down_to_mob_tslices = pd.cut(prev_df['t'], list(df_tcs.index) + [self.tend], right=False, retbins=False, labels=df_tcs.index)
-            prev_df_binned = prev_df.groupby(prev_t_rounded_down_to_mob_tslices).mean().drop(columns=['t'])
-
-            kappas = np.zeros(shape=df_tcs.shape)
-            for i, t in enumerate(df_tcs.index):
-                tc = df_tcs.loc[t].to_numpy()
-                prev = prev_df_binned.loc[t]
-                mobs = mobility_ave_for_tc_interval[t]
-                kappas[i, :] = (1-tc) * prev / np.linalg.multi_dot([mobs['dwell_rownorm'], np.transpose(mobs['dwell_colnorm']), np.transpose(prev)])
-            np.nan_to_num(kappas, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
-            self.update_tc([0.0] * len(self.__tc))
-            dates = [self.t_to_date(d) for d in df_tcs.index]
-            params = [{'param': 'kappa_pa', 'attrs': {'region': region}, 'vals': dict(zip(dates, kappas[:, j].tolist())), 'desc': ''} for j, region in enumerate(self.regions)]
-        return params
-
     def hosp_reporting_frac_by_t(self):
+        """
+
+        Returns:
+
+        """
         # currently assigns the same hrf to all regions.
         hrf = pd.DataFrame(index=self.daterange)
         hrf['hosp_reporting_frac'] = np.nan
@@ -390,33 +370,38 @@ class CovidModel:
             hrf.iloc[0] = self.hosp_reporting_frac[dt.datetime.strftime(max(early_dates), "%Y-%m-%d")]
         hrf = hrf.ffill()
         hrf.index.name = 'date'
-        hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True).reorder_levels([1,0])
+        hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True).reorder_levels([1, 0])
         return hrf
 
     # pulls hospitalizations for only the first region, since the model only fits one region at a time
     def set_hosp(self, engine=None):
+        """
+
+        Args:
+            engine:
+        """
         if engine is None:
             engine = db_engine()
         logger.info(f"{str(self.tags)} Retrieving hospitalizations data")
         # makes sure we pull from EMResource if region is CO
-        #county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
+        # county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
         regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
                                                  'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
         # TODO: fix for CO
         if self.regions != ['co']:
-            hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list())\
-                .join(regions_lookup.set_index('county_id'), on='county_id')\
-                .groupby(['measure_date', 'region'])\
-                .aggregate(observed=('observed_hosp', 'sum'))\
-                .reset_index('measure_date')\
-                .rename(columns={'measure_date': 'date'})\
+            hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list()) \
+                .join(regions_lookup.set_index('county_id'), on='county_id') \
+                .groupby(['measure_date', 'region']) \
+                .aggregate(observed=('observed_hosp', 'sum')) \
+                .reset_index('measure_date') \
+                .rename(columns={'measure_date': 'date'}) \
                 .set_index('date', append=True).sort_index()
         else:
-            hosps = ExternalHospsEMR(engine).fetch()\
-                .rename(columns={'currently_hospitalized': 'observed'})\
-                .assign(region='co')\
-                .reset_index('measure_date')\
-                .rename(columns={'measure_date': 'date'})\
+            hosps = ExternalHospsEMR(engine).fetch() \
+                .rename(columns={'currently_hospitalized': 'observed'}) \
+                .assign(region='co') \
+                .reset_index('measure_date') \
+                .rename(columns={'measure_date': 'date'}) \
                 .set_index(['region', 'date']).sort_index()
         # fill in the beginning if necessary, or truncate if necessary
         hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values(1))).date], names=['region', 'date']), fill_value=0)
@@ -425,20 +410,24 @@ class CovidModel:
         hosps['estimated_actual'] = hosps['observed'] / hosps['hosp_reporting_frac']
         self.hosps = hosps
 
-
     ####################################################################################################################
     ### Properites
 
     ### Date / Time. Updating start date and end date updates other date/time attributes also
     @property
     def start_date(self):
+        """
+
+        Returns:
+
+        """
         return self.__start_date
 
     @start_date.setter
     def start_date(self, value):
         start_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
         # shift tc to the right if start date is earlier; shift left and possibly truncate TC if start date is later
-        tshift = (start_date-self.start_date).days
+        tshift = (start_date - self.start_date).days
         self.__start_date = start_date
         self.__tend = (self.end_date - self.start_date).days
         self.__trange = range(self.tstart, self.tend + 1)
@@ -450,6 +439,11 @@ class CovidModel:
 
     @property
     def end_date(self):
+        """
+
+        Returns:
+
+        """
         return self.__end_date
 
     @end_date.setter
@@ -466,10 +460,20 @@ class CovidModel:
 
     @property
     def tstart(self):
+        """
+
+        Returns:
+
+        """
         return 0
 
     @property
     def tend(self):
+        """
+
+        Returns:
+
+        """
         return self.__tend
 
     @tend.setter
@@ -485,22 +489,45 @@ class CovidModel:
 
     @property
     def trange(self):
+        """
+
+        Returns:
+
+        """
         return self.__trange
 
     @property
     def daterange(self):
+        """
+
+        Returns:
+
+        """
         return self.__daterange
 
     @property
     def attr_names(self):
+        """
+
+        Returns:
+
+        """
         return list(self.attrs.keys())
 
     @property
     def param_attr_names(self):
+        """
+
+        Returns:
+
+        """
         return self.attr_names[1:]
 
     ### attributes and regions
     def update_compartments(self):
+        """
+
+        """
         self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attr_names)
         self.Ih_compartments = self.compartments_as_index.get_level_values(0) == "Ih"
         self.compartments = list(self.compartments_as_index)
@@ -509,6 +536,11 @@ class CovidModel:
 
     @property
     def regions(self):
+        """
+
+        Returns:
+
+        """
         return self.__regions
 
     @regions.setter
@@ -521,6 +553,11 @@ class CovidModel:
 
     @property
     def attrs(self):
+        """
+
+        Returns:
+
+        """
         return self.__attrs
 
     @attrs.setter
@@ -533,6 +570,11 @@ class CovidModel:
     ### things which are dictionaries but which may be given as a path to a json file
     @property
     def params_defs(self):
+        """
+
+        Returns:
+
+        """
         return self.__params_defs
 
     @params_defs.setter
@@ -542,6 +584,11 @@ class CovidModel:
 
     @property
     def vacc_proj_params(self):
+        """
+
+        Returns:
+
+        """
         return self.__vacc_proj_params
 
     @vacc_proj_params.setter
@@ -550,7 +597,26 @@ class CovidModel:
         self.recently_updated_properties.append('vacc_proj_params')
 
     @property
+    def mobility_proj_params(self):
+        """
+
+        Returns:
+
+        """
+        return self.__mobility_proj_params
+
+    @mobility_proj_params.setter
+    def mobility_proj_params(self, value):
+        self.__mobility_proj_params = value if isinstance(value, dict) else json.load(open(value))
+        self.recently_updated_properties.append('mobility_proj_params')
+
+    @property
     def region_defs(self):
+        """
+
+        Returns:
+
+        """
         return self.__region_defs
 
     @region_defs.setter
@@ -560,6 +626,11 @@ class CovidModel:
 
     @property
     def mobility_mode(self):
+        """
+
+        Returns:
+
+        """
         return self.__mobility_mode
 
     @mobility_mode.setter
@@ -569,6 +640,11 @@ class CovidModel:
 
     @property
     def hosp_reporting_frac(self):
+        """
+
+        Returns:
+
+        """
         return self.__hosp_reporting_frac if self.__hosp_reporting_frac is not None else {dt.datetime.strftime(self.start_date, "%Y-%m-%d"): 1}
 
     @hosp_reporting_frac.setter
@@ -581,6 +657,11 @@ class CovidModel:
     # initial state y0, expressed as a dictionary with non-empty compartments as keys
     @property
     def y0_dict(self):
+        """
+
+        Returns:
+
+        """
         if self.__y0_dict is None:
             group_pops = self.get_param_for_attrs_by_t('region_age_pop', attrs={'vacc': 'none', 'variant': 'none', 'immun': 'none'}).loc[0].reset_index().drop(columns=['vacc', 'variant', 'immun'])
             y0d = {('S', row['age'], 'none', 'none', 'none', row['region']): row['region_age_pop'] for i, row in group_pops.iterrows()}
@@ -602,12 +683,24 @@ class CovidModel:
 
     @property
     def tc(self):
-        return self.__tc
+        """
 
+        Returns:
+
+        """
+        return self.__tc
 
     # return the parameters as nested dictionaries
     @property
     def params_as_dict(self, params=None):
+        """
+
+        Args:
+            params:
+
+        Returns:
+
+        """
         params_dict = {}
         for cmpt, cmpt_dict in self.params_by_t.items():
             key = f"({','.join(cmpt)})" if isinstance(cmpt, tuple) else cmpt
@@ -616,14 +709,29 @@ class CovidModel:
 
     @property
     def n_compartments(self):
+        """
+
+        Returns:
+
+        """
         return len(self.cmpt_idx_lookup)
 
     @property
     def solution_ydf(self):
+        """
+
+        Returns:
+
+        """
         return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
     @property
     def new_infections(self):
+        """
+
+        Returns:
+
+        """
         param_df = self.get_param_for_attrs_by_t('alpha', attrs={}, convert_to_dates=True)
         combined = self.solution_sum_df()[['E']].stack(self.param_attr_names).join(param_df)
         combined['Enew'] = (combined['E'] / combined['alpha'])
@@ -632,38 +740,79 @@ class CovidModel:
 
     @property
     def re_estimates(self):
+        """
+
+        Returns:
+
+        """
         param_df = self.get_params_for_attrs_by_t(['gamm', 'alpha'], attrs={}, convert_to_dates=True)
         combined = self.solution_sum_df()[['I', 'A', 'E']].stack(self.param_attr_names).join(param_df)
-        combined['infect_duration'] = 1/combined['gamm']
+        combined['infect_duration'] = 1 / combined['gamm']
         combined['lagged_infected'] = combined.groupby('region').shift(3)[['I', 'A']].sum(axis=1)
         combined['new_infected'] = combined['E'] / combined['alpha']
-        combined = combined.groupby(['date', 'region']).agg({'new_infected':'sum', 'lagged_infected': 'sum', 'infect_duration': 'mean'})
+        combined = combined.groupby(['date', 'region']).agg({'new_infected': 'sum', 'lagged_infected': 'sum', 'infect_duration': 'mean'})
         combined['re'] = combined['new_infected'] * combined['infect_duration'] / combined['lagged_infected']
         return combined[['re']]
-
 
     ####################################################################################################################
     ### useful getters
 
     def date_to_t(self, date):
+        """
+
+        Args:
+            date:
+
+        Returns:
+
+        """
         if isinstance(date, str):
             return (dt.datetime.strptime(date, "%Y-%m-%d").date() - self.start_date).days
         else:
             return (date - self.start_date).days
 
     def t_to_date(self, t):
+        """
+
+        Args:
+            t:
+
+        Returns:
+
+        """
         return self.start_date + dt.timedelta(days=t)
 
     def get_vacc_rates(self):
+        """
+
+        Returns:
+
+        """
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
         return df
 
     # get the state at time t as a dictionary
     def y_dict(self, t):
+        """
+
+        Args:
+            t:
+
+        Returns:
+
+        """
         return {cmpt: y for cmpt, y in zip(self.compartments, self.solution_y[t, :])}
 
     # create a y0 vector with all values as 0, except those designated in y0_dict
     def y0_from_dict(self, y0_dict):
+        """
+
+        Args:
+            y0_dict:
+
+        Returns:
+
+        """
         y0 = [0] * self.n_compartments
         for cmpt, n in y0_dict.items():
             y0[self.cmpt_idx_lookup[cmpt]] = n
@@ -671,15 +820,39 @@ class CovidModel:
 
     # returns list of fips codes for each county in the given region, or every region in this model if not given
     def get_all_county_fips(self, regions=None):
+        """
+
+        Args:
+            regions:
+
+        Returns:
+
+        """
         regions = self.regions if regions is None else regions
         return [county_fips for region in regions for county_fips in self.region_defs[region]['counties_fips']]
 
     # convert y-array to series with compartment attributes as multiindex
     def y_to_series(self, y):
+        """
+
+        Args:
+            y:
+
+        Returns:
+
+        """
         return pd.Series(index=self.compartments_as_index, data=y)
 
     # give the counts for all compartments over time, but group by the compartment attributes listed
     def solution_sum_df(self, group_by_attr_levels=None):
+        """
+
+        Args:
+            group_by_attr_levels:
+
+        Returns:
+
+        """
         df = self.solution_ydf
         if group_by_attr_levels is not None:
             df = df.groupby(group_by_attr_levels, axis=1).sum()
@@ -689,17 +862,38 @@ class CovidModel:
 
     # gives hospitalizations, separated by region, as a numpy array where rows are time and columns are region
     def solution_sum_Ih(self, tstart=0, tend=None, regions=None):
+        """
+
+        Args:
+            tstart:
+            tend:
+            regions:
+
+        Returns:
+
+        """
         tend = self.tend if tend is None else tend
         regions = self.regions if regions is None else regions
 
         region_levels = self.compartments_as_index.get_level_values(-1)
-        Ih = np.concatenate([self.solution_y[tstart:(tend+1), self.Ih_compartments & (region_levels == region)].sum(axis=1) for region in regions])
+        Ih = np.concatenate([self.solution_y[tstart:(tend + 1), self.Ih_compartments & (region_levels == region)].sum(axis=1) for region in regions])
         return Ih
 
     # Get the immunity against a given variant.
-    # I.e. if everyone were exposed today, what fraction of people who WOULD be normally infected if the had no immunity, are NOT infected because they are immune?
+    # I.e. if everyone were exposed today, what fraction of people who WOULD be normally infected if they had no immunity, are NOT infected because they are immune?
     # or, if to_hosp=True, then what fraction of people who WOULD be normally hospitalized if they had no immunity, are NOT hospitalized because they are immune?
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
+        """
+
+        Args:
+            variant:
+            vacc_only:
+            to_hosp:
+            age:
+
+        Returns:
+
+        """
         group_by_attr_names = self.param_attr_names
         n = self.solution_sum_df(group_by_attr_names).stack(level=group_by_attr_names)
         if age is not None:
@@ -725,32 +919,55 @@ class CovidModel:
             params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
             params.loc[params.index.get_level_values('vacc') == 'none', 'severe_immunity'] = 0
 
-        params['effective_inf_rate'] = 1-params['immunity'] * (1-params['immune_escape'])
+        params['effective_inf_rate'] = 1 - params['immunity'] * (1 - params['immune_escape'])
         if to_hosp:
             # weights = people who would be hospitalized if noone had any immunity
-            weights = n * params['hosp'] * (1-params['mab_prev']-params['pax_prev'] + params['mab_prev']*params['mab_hosp_adj'] + params['pax_prev']*params['pax_hosp_adj'])
-            params['effective_hosp_rate'] = params['effective_inf_rate'] * (1-params['severe_immunity'])
+            weights = n * params['hosp'] * (1 - params['mab_prev'] - params['pax_prev'] + params['mab_prev'] * params['mab_hosp_adj'] + params['pax_prev'] * params['pax_hosp_adj'])
+            params['effective_hosp_rate'] = params['effective_inf_rate'] * (1 - params['severe_immunity'])
             return (weights * (1 - params['effective_hosp_rate'])).groupby('date').sum() / weights.groupby('date').sum()
-            #return (n * (1 - params['effective_hosp_rate'])).groupby('date').sum() / n.groupby('date').sum()
+            # return (n * (1 - params['effective_hosp_rate'])).groupby('date').sum() / n.groupby('date').sum()
         else:
             return (n * (1 - params['effective_inf_rate'])).groupby('date').sum() / n.groupby('date').sum()
 
     # risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
     def risk(self, variant=None, to_hosp=False, age=None):
+        """
+
+        Args:
+            variant:
+            to_hosp:
+            age:
+        """
         pass
 
-
     def modeled_vs_observed_hosps(self):
+        """
+
+        Returns:
+
+        """
         df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled_actual').to_frame()
         df = df.join(self.hosps)
         df['hosp_reporting_frac'].ffill(inplace=True)
         df['modeled_observed'] = df['modeled_actual'] * df['hosp_reporting_frac']
         df = df.reindex(columns=['observed', 'estimated_actual', 'modeled_actual', 'modeled_observed'])
-        df = df.reorder_levels([1,0]).sort_index() # put region first
+        df = df.reorder_levels([1, 0]).sort_index()  # put region first
         return df
 
     # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
     def get_param_for_attrs_by_t(self, param, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
+        """
+
+        Args:
+            param:
+            attrs:
+            from_attrs:
+            to_attrs:
+            convert_to_dates:
+
+        Returns:
+
+        """
         # get the keys for the parameters we want
         df_list = []
         if attrs is not None:
@@ -768,7 +985,7 @@ class CovidModel:
                 for to_cmpt in to_cmpts:
                     param_key = self.get_param_key_for_param_and_cmpts(param, from_cmpt=from_cmpt, to_cmpt=to_cmpt, is_param_cmpt=True)
                     to_from_cols = ["from_" + name for name in self.param_attr_names] + ['to_' + name for name in self.param_attr_names]
-                    df = pd.DataFrame(index=self.trange, columns=to_from_cols, data=[from_cmpt + to_cmpt for t in self.trange])\
+                    df = pd.DataFrame(index=self.trange, columns=to_from_cols, data=[from_cmpt + to_cmpt for t in self.trange]) \
                         .rename_axis('t').set_index(to_from_cols, append=True).assign(**{param: np.nan})
                     for t, val in self.params_by_t[param_key][param].items():
                         df[param][t] = val
@@ -780,19 +997,57 @@ class CovidModel:
         return df
 
     def get_params_for_attrs_by_t(self, params: list, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
+        """
+
+        Args:
+            params:
+            attrs:
+            from_attrs:
+            to_attrs:
+            convert_to_dates:
+
+        Returns:
+
+        """
         return pd.concat([self.get_param_for_attrs_by_t(param, attrs, from_attrs, to_attrs, convert_to_dates) for param in params], axis=1)
 
     # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
+        """
+
+        Args:
+            from_cmpt:
+            to_cmpt:
+
+        Returns:
+
+        """
         return [term for term in self.terms if term.from_cmpt_idx == self.cmpt_idx_lookup[from_cmpt] and term.to_cmpt_idx == self.cmpt_idx_lookup[to_cmpt]]
 
     # get the terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
     def get_terms_by_attr(self, from_attrs, to_attrs):
-        idx = [i for i, term in enumerate(self.terms) if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs)]
+        """
+
+        Args:
+            from_attrs:
+            to_attrs:
+
+        Returns:
+
+        """
+        idx = [i for i, term in enumerate(self.terms) if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx],to_attrs)]
         return [self.terms[i] for i in idx]
 
-    # create a json string capturing all of the ode terms: nonlinear, linear, and constant
+    # create a json string capturing all the ode terms: nonlinear, linear, and constant
     def ode_terms_as_json(self, compact=False):
+        """
+
+        Args:
+            compact:
+
+        Returns:
+
+        """
         if compact:
             cm = ", ".join([f'[{i},{c}]' for i, c in enumerate(self.compartments)])
             cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
@@ -802,21 +1057,37 @@ class CovidModel:
             return json.dumps({"compartments": cm, "constant_vector": cv, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
         else:
             def fcm(i):
+                """
+
+                Args:
+                    i:
+
+                Returns:
+
+                """
                 return f'{",".join(self.compartments[i])}'
 
             cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
             cv = {t: {fcm(idx): f'{val:.2e}' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())} for t, m in cv}
             lm = {t: {f'({fcm(idx1)};{fcm(idx2)}': f'{val:.2e}' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[0].tolist())} for t, m in self.linear_matrix.items() if len(m.nonzero()[0]) > 0}
-            nl = {t: {f'({";".join([f"{fcm(k)}" for k in keys])})': {f'({fcm(idx1)};{fcm(idx2)})': f'{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[ 0].tolist()) if val != 0} for keys, m in mat_dict.items()} for t, mat_dict in self.nonlinear_matrices.items() if len(mat_dict) > 0}
+            nl = {t: {f'({";".join([f"{fcm(k)}" for k in keys])})': {f'({fcm(idx1)};{fcm(idx2)})': f'{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[0].tolist()) if val != 0} for keys, m in mat_dict.items()} for t, mat_dict in self.nonlinear_matrices.items() if len(mat_dict) > 0}
             return json.dumps({"constant_vector": cv, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
-
-
 
     ####################################################################################################################
     ### ODE related functions
 
     # check if a cmpt matches a dictionary of attributes
     def does_cmpt_have_attrs(self, cmpt, attrs, is_param_cmpts=False):
+        """
+
+        Args:
+            cmpt:
+            attrs:
+            is_param_cmpts:
+
+        Returns:
+
+        """
         return all(
             cmpt[self.param_attr_names.index(attr_name) if is_param_cmpts else list(self.attr_names).index(attr_name)]
             in ([attr_val] if isinstance(attr_val, str) else attr_val)
@@ -824,19 +1095,39 @@ class CovidModel:
 
     # return compartments that match a dictionary of attributes
     def get_cmpts_matching_attrs(self, attrs, is_param_cmpts=False):
+        """
+
+        Args:
+            attrs:
+            is_param_cmpts:
+
+        Returns:
+
+        """
         # it's actually faster to construct compartments than filtering them.
         # if compartments become no longer the cartesian product of attributes, then this will break
+        # noinspection GrazieInspection
         attrs = {key: val if isinstance(val, list) else [val] for key, val in attrs.items()}  # convert strings to lists of length 1
         new_attrs = copy.deepcopy(self.attrs)
         if is_param_cmpts:
             _ = [new_attrs.pop(key) for key in [name for name in self.attr_names if name not in self.param_attr_names]]
         new_attrs.update(attrs)
         return list(itertools.product(*list(new_attrs.values())))
-        #return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
+        # return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
     # given a compartment tuple, update the corresponding elements with items from attrs dict.
     # if one or more values in attrs dict is a list, then create all combinations of matching compartments
-    def update_cmpt_tuple_with_attrs(self, cmpt: tuple, attrs: dict, is_param_cmpt=False):
+    def update_cmpt_tuple_with_attrs(self, cmpt, attrs: dict, is_param_cmpt=False):
+        """
+
+        Args:
+            cmpt:
+            attrs:
+            is_param_cmpt:
+
+        Returns:
+
+        """
         cmpt = list(cmpt)
         cmpt_attrs = {attr_name: attr_val for attr_name, attr_val in zip(self.param_attr_names if is_param_cmpt else self.attrs, cmpt)}
         for attr_name, new_attr_val in attrs.items():
@@ -847,6 +1138,11 @@ class CovidModel:
     ### Prepping and Running
 
     def get_vacc_per_available(self):
+        """
+
+        Returns:
+
+        """
         vacc_rates = self.get_vacc_rates()
         missing_dates = pd.DataFrame({'date': [d for d in self.daterange if d < min(vacc_rates.index.get_level_values('date'))]})
         missing_shots = missing_dates.merge(pd.DataFrame(index=vacc_rates.reset_index('date').index.unique(), columns=vacc_rates.columns).fillna(0).reset_index(), 'cross').set_index(['date', 'region', 'age'])
@@ -871,7 +1167,17 @@ class CovidModel:
         vacc_per_available = vacc_per_available.clip(upper=1)
         return vacc_per_available
 
-    def set_param_by_t(self, param, vals: dict, mults: dict,  cmpt=None, from_cmpt=None, to_cmpt=None):
+    def set_param_by_t(self, param, vals: dict, mults: dict, cmpt=None, from_cmpt=None, to_cmpt=None):
+        """
+
+        Args:
+            param:
+            vals:
+            mults:
+            cmpt:
+            from_cmpt:
+            to_cmpt:
+        """
         param_key = cmpt if cmpt is not None else (from_cmpt, to_cmpt)
         # cmpts are added to params greedily to reduce space allocation
         if param_key not in self.params_by_t.keys():
@@ -899,13 +1205,22 @@ class CovidModel:
                     self.params_by_t[param_key][param][t] = self.params_by_t[param_key][param][t_left]
             # multiply
             mults2 = SortedDict({self.date_to_t(d): val for d, val in mults.items()})
-            for t in self.params_by_t[param_key][param].keys(): #
+            for t in self.params_by_t[param_key][param].keys():  #
                 idx_left = mults2.bisect_right(t) - 1
                 if idx_left >= 0:  # there is a multiplier that applies to this time.
                     self.params_by_t[param_key][param][t] *= mults2[list(mults2.keys())[idx_left]]
 
     # set values for a single parameter based on param_tslices
-    def set_compartment_param(self, param, attrs: dict=None, vals: dict=None, mults: dict=None, desc=None):
+    def set_compartment_param(self, param, attrs: dict = None, vals: dict = None, mults: dict = None, desc=None):
+        """
+
+        Args:
+            param:
+            attrs:
+            vals:
+            mults:
+            desc:
+        """
         # get only the compartments we want
         cmpts = ['all'] if attrs is None else self.get_cmpts_matching_attrs(attrs, is_param_cmpts=True)
         # update the parameter
@@ -914,6 +1229,16 @@ class CovidModel:
 
     # set values for a single parameter based on param_tslices
     def set_from_to_compartment_param(self, param, from_attrs: dict = None, to_attrs: dict = None, vals: dict = None, mults: dict = None, desc=None):
+        """
+
+        Args:
+            param:
+            from_attrs:
+            to_attrs:
+            vals:
+            mults:
+            desc:
+        """
         # get only the compartments we want
         from_cmpts = ['all'] if from_attrs is None else self.get_cmpts_matching_attrs(from_attrs, is_param_cmpts=True)
         # update the parameter
@@ -927,6 +1252,12 @@ class CovidModel:
 
     # combine param_defs, vaccine_defs, etc. into a time indexed parameters dictionary
     def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
+        """
+
+        Args:
+            apply_vaccines:
+            vacc_delay:
+        """
         logger.debug(f"{str(self.tags)} Building param lookups")
         # clear model params if they exist
         self.params_by_t = {'all': {}}
@@ -949,7 +1280,7 @@ class CovidModel:
             vacc_per_available = vacc_per_available.groupby(['region', 'age']).shift(vacc_delay).fillna(0)
 
             # group vacc_per_available by trange interval
-            #bins = self.params_trange + [self.tend] if self.tend not in self.params_trange else self.params_trange
+            # bins = self.params_trange + [self.tend] if self.tend not in self.params_trange else self.params_trange
             bins = list(range(self.tstart, self.tend, 7))
             bins = bins + [self.tend] if self.tend not in bins else bins
             t_index_rounded_down_to_tslices = pd.cut(vacc_per_available.index.get_level_values('t'), bins, right=False, retbins=False, labels=bins[:-1])
@@ -975,6 +1306,13 @@ class CovidModel:
 
     # set TC by slice, and update non-linear multiplier; defaults to reseting the last TC values
     def update_tc(self, tc, replace=True, update_lookup=True):
+        """
+
+        Args:
+            tc:
+            replace:
+            update_lookup:
+        """
         if replace:
             self.__tc = tc
         else:
@@ -987,6 +1325,9 @@ class CovidModel:
 
     # assign default values to matrices
     def reset_ode(self):
+        """
+
+        """
         self.terms = []
         self.linear_matrix = {t: spsp.lil_matrix((self.n_compartments, self.n_compartments)) for t in self.params_trange}
         self.nonlinear_matrices = {t: defaultdict(self._default_nonlinear_matrix) for t in self.params_trange}
@@ -994,6 +1335,19 @@ class CovidModel:
 
     # given a parameter, find its definition in params_by_t for the desired compartment(s). Useful because of the "all" default, so we may have to hunt a bit for the param
     def get_param_key_for_param_and_cmpts(self, param, cmpt=None, from_cmpt=None, to_cmpt=None, nomatch_okay=False, is_param_cmpt=False):
+        """
+
+        Args:
+            param:
+            cmpt:
+            from_cmpt:
+            to_cmpt:
+            nomatch_okay:
+            is_param_cmpt:
+
+        Returns:
+
+        """
         param_key = None
         if cmpt is not None:
             key = cmpt if is_param_cmpt else tuple(attr for attr, level in zip(cmpt, self.attr_names) if level in self.param_attr_names)
@@ -1006,7 +1360,7 @@ class CovidModel:
         else:
             key0 = from_cmpt if is_param_cmpt else tuple(attr for attr, level in zip(from_cmpt, self.attr_names) if level in self.param_attr_names)
             key1 = to_cmpt if is_param_cmpt else tuple(attr for attr, level in zip(to_cmpt, self.attr_names) if level in self.param_attr_names)
-            for key_option in [(key0, key1), ('all', key1), (key0, 'all'), ('all','all')]:
+            for key_option in [(key0, key1), ('all', key1), (key0, 'all'), ('all', 'all')]:
                 if key_option in self.params_by_t.keys() and param in self.params_by_t[key_option]:
                     param_key = key_option
                     break
@@ -1014,10 +1368,21 @@ class CovidModel:
                 self.log_and_raise(f"parameter {param} not defined for from-compartment {from_cmpt} and to-compartment {to_cmpt}", ValueError)
         return param_key
 
-
     # takes a symbolic expression (coef), and looks up variable names in params to provide a computed output for each t in params_trange
     # cmpt_key may be a single compartment tuple or a tuple of two compartment tuples (for a pair-specific parameter)
     def calc_coef_by_t(self, coef, cmpt=None, from_cmpt=None, to_cmpt=None, lambdified_coef=None):
+        """
+
+        Args:
+            coef:
+            cmpt:
+            from_cmpt:
+            to_cmpt:
+            lambdified_coef:
+
+        Returns:
+
+        """
         if isinstance(coef, dict):
             return {t: coef[t] if t in coef.keys() else 0 for t in self.params_trange}
         elif callable(coef):
@@ -1053,6 +1418,18 @@ class CovidModel:
 
     # add a flow term, and add new flow to ODE matrices
     def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, from_coef=None, to_coef=None, from_to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
+        """
+
+        Args:
+            from_cmpt:
+            to_cmpt:
+            from_coef:
+            to_coef:
+            from_to_coef:
+            scale_by_cmpts:
+            scale_by_cmpts_coef:
+            constant:
+        """
         if len(from_cmpt) < len(self.attr_names):
             self.log_and_raise(f'Source compartment `{to_cmpt}` does not have the right number of attributes.', ValueError)
         if len(to_cmpt) < len(self.attr_names):
@@ -1075,15 +1452,15 @@ class CovidModel:
         if to_coef is not None:
             parsed_coef = parse_expr(to_coef)  # parsing and lambdifying the coef ahead of time saves doing it for every t
             relevant_params = [str(s) for s in parsed_coef.free_symbols]
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(parse_expr(to_coef), cmpt=to_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
+            coef_by_t = {t: coef_by_t[t] * coef for t, coef in self.calc_coef_by_t(parse_expr(to_coef), cmpt=to_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
         if from_coef is not None:
             parsed_coef = parse_expr(from_coef)  # parsing and lambdifying the coef ahead of time saves doing it for every t
             relevant_params = [str(s) for s in parsed_coef.free_symbols]
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(parse_expr(from_coef), cmpt=from_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
+            coef_by_t = {t: coef_by_t[t] * coef for t, coef in self.calc_coef_by_t(parse_expr(from_coef), cmpt=from_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
         if from_to_coef is not None:
             parsed_coef = parse_expr(from_to_coef)  # parsing and lambdifying the coef ahead of time saves doing it for every t
             relevant_params = [str(s) for s in parsed_coef.free_symbols]
-            coef_by_t = {t: coef_by_t[t]*coef for t, coef in self.calc_coef_by_t(parse_expr(from_to_coef), from_cmpt=from_cmpt, to_cmpt=to_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
+            coef_by_t = {t: coef_by_t[t] * coef for t, coef in self.calc_coef_by_t(parse_expr(from_to_coef), from_cmpt=from_cmpt, to_cmpt=to_cmpt, lambdified_coef=sym.lambdify(relevant_params, parsed_coef)).items()}
 
         term = ODEFlowTerm.build(
             from_cmpt_idx=self.cmpt_idx_lookup[from_cmpt],
@@ -1110,6 +1487,18 @@ class CovidModel:
     # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
     # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
     def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, from_to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
+        """
+
+        Args:
+            from_attrs:
+            to_attrs:
+            from_coef:
+            to_coef:
+            from_to_coef:
+            scale_by_attrs:
+            scale_by_coef:
+            constant:
+        """
         # Create string summarizing the flow
         from_attrs_str = '(' + ','.join(from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
         to_attrs_str = '(' + ','.join(to_attrs[p] if p in to_attrs.keys() else from_attrs[p] if p in from_attrs.keys() else "\"" for p in self.attrs) + ')'
@@ -1139,6 +1528,9 @@ class CovidModel:
 
     # build ODE
     def build_ode_flows(self):
+        """
+
+        """
         logger.debug(f"{str(self.tags)} Building ode flows")
         self.flows_string = self.flows_string = '(' + ','.join(self.attr_names) + ')'
         self.reset_ode()
@@ -1163,7 +1555,7 @@ class CovidModel:
             if variant == 'none':
                 continue
             seed_param = f'{variant}_seed'
-            from_variant = self.attrs['variant'][0]   # first variant
+            from_variant = self.attrs['variant'][0]  # first variant
             self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '40-64', 'vacc': 'none', 'variant': from_variant, 'immun': 'none'}, {'seir': 'E', 'variant': variant}, constant=seed_param)
 
         # exposure
@@ -1175,26 +1567,26 @@ class CovidModel:
             if self.mobility_mode is None or self.mobility_mode == "none":
                 for region in self.attrs['region']:
                     self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef='betta', from_coef=f'(1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
                     self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': region})
-                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
+                    self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': region}, {'seir': 'E', 'variant': variant}, to_coef="betta", from_coef=f'immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': region})
             # Transmission parameters attached to the susceptible population
             elif self.mobility_mode == "population_attached":
                 for infecting_region in self.attrs['region']:
                     for susceptible_region in self.attrs['region']:
                         self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef='betta', from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
                         self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
-                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
+                        self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="betta", from_coef=f'mob_{susceptible_region}_exposure_from_{infecting_region} * immunity * kappa / region_pop', from_to_coef='immune_escape',scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
             # Transmission parameters attached to the transmission location
             elif self.mobility_mode == "location_attached":
                 for infecting_region in self.attrs['region']:
                     for susceptible_region in self.attrs['region']:
                         for transmission_region in self.attrs['region']:
                             self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef='lamb * betta', from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       'betta', from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
-                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef=       "betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef='betta', from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * (1 - immunity) * kappa / region_pop', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="lamb * betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop',from_to_coef='immune_escape', scale_by_attrs={'seir': 'I', 'variant': variant, 'region': infecting_region})
+                            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'region': susceptible_region}, {'seir': 'E', 'variant': variant}, to_coef="betta", from_coef=f'mob_{transmission_region}_frac_from_{infecting_region} * mob_{susceptible_region}_frac_in_{transmission_region} * immunity * kappa / region_pop', from_to_coef='immune_escape', scale_by_attrs={'seir': 'A', 'variant': variant, 'region': infecting_region})
 
         # disease progression
         logger.debug(f"{str(self.tags)} Building disease progression flows")
@@ -1231,15 +1623,21 @@ class CovidModel:
     # a matrix which picks out the r
     # possibly could be used in the future to modify TC for subgroups as well e.g. for scenario exploration.
     def build_region_picker_matrix(self):
+        """
+
+        """
         logger.debug(f"{str(self.tags)} creating region picker matrix")
         picker = spsp.lil_matrix((self.n_compartments, len(self.regions)))
         for i, region in enumerate(self.regions):
             region_idx = [self.cmpt_idx_lookup[cmpt] for cmpt in self.get_cmpts_matching_attrs({'region': region})]
-            picker[region_idx,i] = 1
+            picker[region_idx, i] = 1
         self.region_picker_matrix = picker
 
     # convert ODE matrices to CSR format, to (massively) improve performance
     def compile(self):
+        """
+
+        """
         logger.debug(f"{str(self.tags)} compiling ODE")
         for t in self.params_trange:
             self.linear_matrix[t] = self.linear_matrix[t].tocsr()
@@ -1249,6 +1647,15 @@ class CovidModel:
 
     # ODE step forward
     def ode(self, t: float, y: list):
+        """
+
+        Args:
+            t:
+            y:
+
+        Returns:
+
+        """
         dy = [0] * self.n_compartments
         t_int = self.t_prev_lookup[math.floor(t)]
         t_tc = self.tc_t_prev_lookup[math.floor(t)]
@@ -1260,7 +1667,7 @@ class CovidModel:
 
         # apply non-linear terms
         for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
-            dy += nlm_vec * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * (matrix).dot(y)
+            dy += nlm_vec * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * matrix.dot(y)
 
         # apply constant terms
         dy += self.constant_vector[t_int]
@@ -1269,13 +1676,20 @@ class CovidModel:
 
     # solve ODE using scipy.solve_ivp, and put solution in solution_y
     def solve_seir(self, y0=None, tstart=None, tend=None):
+        """
+
+        Args:
+            y0:
+            tstart:
+            tend:
+        """
         if len(self.tc) == 0:
             self.log_and_raise("Trying to solve SEIR, but no TC is set", RuntimeError)
         elif self.linear_matrix is None:
             self.log_and_raise("Trying to solve SEIR, but model not prepped yet", RuntimeError)
         tstart = self.tstart if tstart is None else tstart
         tend = self.tend if tend is None else tend
-        trange = range(tstart, tend + 1) # simulate up to and including tend
+        trange = range(tstart, tend + 1)  # simulate up to and including tend
         if y0 is None:
             y0 = self.y0_from_dict(self.y0_dict)
         solution = spi.solve_ivp(
@@ -1289,10 +1703,18 @@ class CovidModel:
         if not solution.success:
             self.log_and_raise(f'ODE solver failed with message: {solution.message}', RuntimeError)
         # replace the part of the solution we simulated
-        self.solution_y[tstart:(tend+1), ] = np.transpose(solution.y)
+        self.solution_y[tstart:(tend + 1), ] = np.transpose(solution.y)
 
     # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, pickle_matrices=True, outdir=None, **build_param_lookup_args):
+        """
+
+        Args:
+            rebuild_param_lookups:
+            pickle_matrices:
+            outdir:
+            **build_param_lookup_args:
+        """
         logger.info(f"{str(self.tags)} Prepping Model")
         if rebuild_param_lookups:
             self.build_param_lookups(**build_param_lookup_args)
@@ -1306,58 +1728,143 @@ class CovidModel:
 
     ####################################################################################################################
     ### Reading and Writing Data
-    def serialize_vacc(self, df):
+    @staticmethod
+    def serialize_vacc(df):
+        """
+
+        Args:
+            df:
+
+        Returns:
+
+        """
         df = df.reset_index()
         df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
         return df.to_dict('records')
 
     @classmethod
     def unserialize_vacc(cls, vdict):
+        """
+
+        Args:
+            vdict:
+
+        Returns:
+
+        """
         df = pd.DataFrame.from_dict(vdict)
         df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
         return df.set_index(['date', 'region', 'age'])
 
-    def serialize_hosp(self, df):
+    @staticmethod
+    def serialize_hosp(df):
+        """
+
+        Args:
+            df:
+
+        Returns:
+
+        """
         df = df.reset_index()
         df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
         return df.to_dict('records')
 
     @classmethod
     def unserialize_hosp(cls, hdict):
+        """
+
+        Args:
+            hdict:
+
+        Returns:
+
+        """
         df = pd.DataFrame.from_dict(hdict)
         df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
         return df.set_index(['region', 'date']).sort_index()
 
-    def serialize_mob(self, df):
+    @staticmethod
+    def serialize_mob(df):
+        """
+
+        Args:
+            df:
+
+        Returns:
+
+        """
         df = df.reset_index()
         df['date'] = [dt.datetime.strftime(d, "%Y-%m-%d") for d in df['date']]
         return df.to_dict('records')
 
     @classmethod
     def unserialize_mob(cls, mdict):
+        """
+
+        Args:
+            mdict:
+
+        Returns:
+
+        """
         df = pd.DataFrame.from_dict(mdict)
         df['date'] = [dt.datetime.strptime(d, "%Y-%m-%d").date() for d in df['date']]
         return df.set_index(['date', 'from_region', 'to_region']).sort_index()
 
     @classmethod
     def unserialize_tc(cls, tc_dict):
+        """
+
+        Args:
+            tc_dict:
+
+        Returns:
+
+        """
         # JSON can't handle numbers as dict keys
         return {int(key): val for key, val in tc_dict.items()}
 
-    def serialize_y0_dict(self, y0_dict):
+    @staticmethod
+    def serialize_y0_dict(y0_dict):
+        """
+
+        Args:
+            y0_dict:
+
+        Returns:
+
+        """
         return [list(key) + [val] for key, val in y0_dict.items()]
 
     @classmethod
     def unserialize_y0_dict(cls, y0_list):
+        """
+
+        Args:
+            y0_list:
+
+        Returns:
+
+        """
         return {tuple(li[:-1]): float(li[-1]) for li in y0_list} if y0_list is not None else None
 
     # serializes SOME of this model's properties to a json format which can be written to database
     # model needs prepping still
     def to_json_string(self):
+        """
+
+        Returns:
+
+        """
         logger.debug(f"{str(self.tags)} Serializing model to json")
-        keys = ['base_spec_id', 'spec_id', 'region_fit_spec_ids', 'region_fit_result_ids', 'tags', '_CovidModel__start_date', '_CovidModel__end_date', '__attrs', '_CovidModel__tc', 'tc_cov', 'tc_t_prev_lookup', '_CovidModel__params_defs',
-                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params', '_CovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility', 'mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df',  'hosps', '_CovidModel__hosp_reporting_frac',
-                '_CovidModel__y0_dict', 'max_step_size']
+        keys = ['base_spec_id', 'spec_id', 'tags',
+                '_CovidModel__start_date', '_CovidModel__end_date', '_CovidModel__attrs', '_CovidModel__tc',
+                'tc_t_prev_lookup', '_CovidModel__params_defs',
+                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params',
+                '_CovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility',
+                '_CovidModel__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps', '_CovidModel__hosp_reporting_frac',
+                '_CovidModel__y0_dict', 'max_step_size', 'ode_method']
         # add in proj_mobility
         serial_dict = OrderedDict()
         for key in keys:
@@ -1381,6 +1888,11 @@ class CovidModel:
         return json.dumps(serial_dict)
 
     def from_json_string(self, s):
+        """
+
+        Args:
+            s:
+        """
         logger.debug(f"{str(self.tags)} repopulating model from serialized json")
         raw = json.loads(s)
         for key, val in raw.items():
@@ -1388,9 +1900,6 @@ class CovidModel:
                 self.__dict__[key] = dt.datetime.strptime(val, "%Y-%m-%d").date()
             elif key == '_CovidModel__tc':
                 self.__dict__[key] = CovidModel.unserialize_tc(val)
-            elif key == "tc_cov":
-                #TODO
-                pass
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
                 self.__dict__[key] = CovidModel.unserialize_vacc(val)
             elif key in ['actual_mobility', 'proj_mobility'] and val is not None:
@@ -1407,14 +1916,19 @@ class CovidModel:
         # triggers updating of tend, trange, etc.
         self.end_date = self.end_date
 
-    def write_specs_to_db(self, engine):
+    def write_specs_to_db(self, engine=None):
+        """
+
+        Args:
+            engine:
+        """
         if engine is None:
             engine = db_engine()
         logger.debug(f"{str(self.tags)} writing specs to db")
         # returns all the data you would need to write to the database but doesn't actually write to the database
 
         with Session(engine) as session:
-            # generate a spec_id so we can assign it to ourselves
+            # generate a spec_id, so we can assign it to ourselves
             specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
             max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
             self.spec_id = max_spec_id + 1
@@ -1428,7 +1942,7 @@ class CovidModel:
                 ("tags", json.dumps(self.tags)),
                 ("regions", json.dumps(self.regions)),
                 ("tslices", list(self.__tc.keys())),
-                #("tc", list(self.__tc.values())), # doesn't work now that TC is a nested dict, This field in the DB is a list.
+                # ("tc", list(self.__tc.values())), # doesn't work now that TC is a nested dict, This field in the DB is a list.
                 ("serialized_model", self.to_json_string())
             ]))
             session.execute(stmt)
@@ -1436,9 +1950,15 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} spec_id: {self.spec_id}")
 
     def read_from_base_spec_id(self, engine):
+        """
+
+        Args:
+            engine:
+        """
         if engine is None:
             engine = db_engine()
-        df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {self.base_spec_id}", con=engine, coerce_float=True)
+        df = pd.read_sql_query(f"select * from covid_model.specifications where spec_id = {self.base_spec_id}",
+                               con=engine, coerce_float=True)
         if len(df) == 0:
             self.log_and_raise(f'{self.base_spec_id} is not a valid spec ID.', ValueError)
         row = df.iloc[0]
@@ -1447,10 +1967,23 @@ class CovidModel:
         self.base_spec_id = self.spec_id
         self.spec_id = None
 
-    def _col_to_json(self, d):
+    @staticmethod
+    def _col_to_json(d):
         return json.dumps(d, ensure_ascii=False)
 
-    def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir', cmpts_json_attrs=('region', 'age', 'vacc')):
+    def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir',
+                            cmpts_json_attrs=('region', 'age', 'vacc')):
+        """
+
+        Args:
+            engine:
+            new_spec:
+            vals_json_attr:
+            cmpts_json_attrs:
+
+        Returns:
+
+        """
         if engine is None:
             engine = db_engine()
         logger.debug(f"{str(self.tags)} writing results to db")
@@ -1486,6 +2019,11 @@ class CovidModel:
         return df
 
     def pickle_ode_matrices(self, outdir=None):
+        """
+
+        Args:
+            outdir:
+        """
         logger.debug("Pickling ODE matrices")
         with open(get_filepath_prefix(outdir, self.tags) + "ode_matrices.pkl", 'wb') as f:
             pickle.dump(self.constant_vector, f)
@@ -1495,6 +2033,11 @@ class CovidModel:
             pickle.dump(self.t_prev_lookup, f)
 
     def unpickle_ode_matrices(self, filepath):
+        """
+
+        Args:
+            filepath:
+        """
         logger.debug("Unpickling ODE matrices")
         with open(filepath, "rb") as f:
             self.constant_vector = pickle.load(f)
