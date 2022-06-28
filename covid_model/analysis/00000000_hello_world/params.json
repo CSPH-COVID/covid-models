@@ -370,10 +370,9 @@
   {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["omicron", "ba2", "ba2121"]},  "vals": {"2020-01-01": 0.1},  "desc":  ""},
   {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["omicron", "ba2"]}, "to_attrs": {"variant": ["ba2121"]},  "vals": {"2020-01-01": 0.1},  "desc": ""},
   {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121"]}, "to_attrs": {"variant": ["ba45"]},  "vals": {"2020-01-01": 0.1},  "desc": "strong"},
-  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
-  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["omicron", "ba2"]}, "to_attrs": {"variant": ["ba2121", "ba45"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["omicron", "ba2", "ba2121"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["omicron", "ba2"]}, "to_attrs": {"variant": ["ba2121"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
   {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["ba2121"]}, "to_attrs": {"variant": ["ba45"]},  "vals": {"2020-01-01": 0.75},  "desc": "weak"},
-
 
   {"param": "imm_decay_days",	"attrs": null,	"vals": {"2020-01-01": 360},	"desc": ""},
   {"param": "imm_decay_days",	"attrs": {"vacc": "shot3"},	"mults": {"2020-01-01": 1.25},	"desc": "Booster immunity decays more slowly than 2-dose immunity."},

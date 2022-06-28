@@ -29,8 +29,13 @@ Things to remember when running this script:
 
 """
 
-# Here's the main function, all the code we want run will live in this function
+
 def main():
+    """Here's the main function, all the code we want run will live in this function
+
+    Returns: None
+
+    """
     ####################################################################################################################
     # Set Up
 
@@ -84,21 +89,24 @@ def main():
                                        'hosp_reporting_frac': {"2020-01-01": 1, "2022-03-10": 0.8}})
 
     # run the scenarios, using the do_fit_scenarios function. This will fit several scenarios at a time, as specified by the `multiprocess` argument
+    # even though the model end dates are 9/15, fitting will only occur for dates where hospitalization data is available.
     logging.info('Running Scenarios')
     models = do_fit_scenarios(base_model_args, scenario_args_list, fit_args, multiprocess=multiprocess)
 
     # now that we've fit all the models, let's run a projection for each one.
+    # This amounts to running the ODEs forward all the way until the model end dates, using the fitted tc values
+    # unless you specify otherwise with the model.update_tc function, the last fitted tc value will persist for all the projected dates
 
     logging.info('Projecting')
     for model in models:
-        logging.info('')
-        #model.prep()  # don't think we need to prep anymore.
+        logging.info(f'{str(model.tags)}: Projecting')
         model.solve_seir()
-
+        # save the model output, grouping by seir stats, variant, and immunity status
         model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_seir_variant_immun_total_all_at_once_projection.csv')
+        # save the model output, keeping all compartments separate
         model.solution_sum_df().unstack().to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'states_full_projection.csv')
-
-        logging.info(f'{str(model.tags)}: Running forward sim')
+        # produce some plots showing the projection
+        logging.info(f'{str(model.tags)}: Creating plots')
         fig = plt.figure(figsize=(10, 10), dpi=300)
         ax = fig.add_subplot(211)
         hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
@@ -112,7 +120,7 @@ def main():
         hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
         json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
 
-    # create reports
+    # create a report for each model, meaning just produce a collection of plots and output files for each model.
     logging.info('Running reports')
     do_create_multiple_reports(models, multiprocess=multiprocess, outdir=outdir, prep_model=False, solve_model=True, immun_variants=['ba2121', 'ba45'], from_date='2022-01-01')
 
