@@ -34,8 +34,6 @@ pmdarima==1.8.4
 property-cached==1.6.4
 proto-plus==1.20.3
 protobuf==3.19.4
-psycopg==3.0.8
-psycopg2-binary==2.9.3
 pyarrow==7.0.0
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
@@ -59,5 +57,3 @@ sympy==1.9
 threadpoolctl==3.0.0
 tqdm==4.62.3
 urllib3==1.26.8
-sortedcontainers==2.4.0
-multiprocessing-logging==0.3.3
