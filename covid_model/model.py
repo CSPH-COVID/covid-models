@@ -792,15 +792,17 @@ class CovidModel:
 
     ### Properties that take a little computation to get
 
-    # initial state y0, expressed as a dictionary with non-empty compartments as keys
     @property
     def y0_dict(self):
-        """
+        """initial state y0, expressed as a dictionary with non-empty compartments as keys
 
-        Returns:
+        Default value is to place everyone in a susceptible compartment with no prior infection and no vaccination / immunity status
+
+        Returns: a dictionary where the keys are tuples of attributes describing the compartments, and the values are a count of how many people are in that compartment
 
         """
         if self.__y0_dict is None:
+            # get the population of each age group in each region.
             group_pops = self.get_param_for_attrs_by_t('region_age_pop', attrs={'vacc': 'none', 'variant': 'none', 'immun': 'none'}).loc[0].reset_index().drop(columns=['vacc', 'variant', 'immun'])
             y0d = {('S', row['age'], 'none', 'none', 'none', row['region']): row['region_age_pop'] for i, row in group_pops.iterrows()}
             self.__y0_dict = y0d
@@ -810,6 +812,11 @@ class CovidModel:
 
     @y0_dict.setter
     def y0_dict(self, val: dict):
+        """Sets the value of y0_dict
+
+        Args:
+            val: A dictionary where the keys are tuples of attributes describing compartments, and the values are a count of how many people ar in that compartment.
+        """
         # set everything to zero at first
         y0d = {}
         for cmpt, v in val.items():
@@ -821,22 +828,25 @@ class CovidModel:
 
     @property
     def tc(self):
-        """
+        """Transmission control, which controls the rate of transmission
 
-        Returns:
+        TC is a dictionary, where the keys are t values (time in days since start date), and the values are
+        dictionaries. The inner dictionaries record the TC for each region, with the key being the region and the value
+        being TC.
+
+        TC is a property so it can't be set directly. instead, the update_tc function should be used, because that will
+        enforce some consistency with other properties, and also allows updating just a subset of tc values.
+
+        Returns: TC dictionary
 
         """
         return self.__tc
 
-    # return the parameters as nested dictionaries
     @property
-    def params_as_dict(self, params=None):
-        """
+    def params_as_dict(self):
+        """Return model parameters as a nested dictionary
 
-        Args:
-            params:
-
-        Returns:
+        Returns: model parameters as a nested dictionary
 
         """
         params_dict = {}
@@ -847,27 +857,31 @@ class CovidModel:
 
     @property
     def n_compartments(self):
-        """
+        """The number of compartments in the model
 
-        Returns:
+        Returns: The number of compartments in the model
 
         """
         return len(self.cmpt_idx_lookup)
 
     @property
     def solution_ydf(self):
-        """
+        """Solution to the model's system of ODEs, expressed as a dataframe. Each column is a compartment, each row is a
+        date.
 
-        Returns:
+        Returns: Pandas DataFrame of the model's ODE solution.
 
         """
         return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
     @property
     def new_infections(self):
-        """
+        """Compute the estimated number of new exposures each day
 
-        Returns:
+        Estimation is done by dividing the number of current exposed individuals by the mean dwelling time in the
+        exposed state ('alpha')
+
+        Returns: Pandas DataFrame where the row index is date / region and the column is estimated new infections, Enew
 
         """
         param_df = self.get_param_for_attrs_by_t('alpha', attrs={}, convert_to_dates=True)
@@ -878,9 +892,9 @@ class CovidModel:
 
     @property
     def re_estimates(self):
-        """
+        """Compute the estimated effective reproduction number from the model
 
-        Returns:
+        Returns: Pandas series where the index is date / region and the value is Re.
 
         """
         param_df = self.get_params_for_attrs_by_t(['gamm', 'alpha'], attrs={}, convert_to_dates=True)
@@ -896,12 +910,12 @@ class CovidModel:
     ### useful getters
 
     def date_to_t(self, date):
-        """
+        """Convert a date (string or date object) to t, number of days since model start date.
 
         Args:
-            date:
+            date: either a string in the format 'YYYY-MM-DD' or a date object.
 
-        Returns:
+        Returns: integer t, number of days since model start date.
 
         """
         if isinstance(date, str):
@@ -910,45 +924,43 @@ class CovidModel:
             return (date - self.start_date).days
 
     def t_to_date(self, t):
-        """
+        """Convert a t, number of days since model start date, to a date object.
 
         Args:
-            t:
+            t: number of days since model start date.
 
-        Returns:
+        Returns: date object representing the t in question.
 
         """
         return self.start_date + dt.timedelta(days=t)
 
     def get_vacc_rates(self):
-        """
+        """Combine the actual vaccinations and the projected vaccinations into a single Pandas DataFrame.
 
-        Returns:
+        Returns: Pandas DataFrame of vaccination rates for all model dates.
 
         """
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
         return df
 
-    # get the state at time t as a dictionary
     def y_dict(self, t):
-        """
+        """Get a dictionary representing the model's ODE solution at time t
 
         Args:
-            t:
+            t: number of days after the start date to get the model solution
 
-        Returns:
+        Returns: Dictionary, where the keys are tuples of attributes representing compartments, and the values are the number of people in the compartment.
 
         """
         return {cmpt: y for cmpt, y in zip(self.compartments, self.solution_y[t, :])}
 
-    # create a y0 vector with all values as 0, except those designated in y0_dict
     def y0_from_dict(self, y0_dict):
-        """
+        """create a y0 vector with all values as 0, except those designated in y0_dict
 
         Args:
-            y0_dict:
+            y0_dict: Dictionary, where the keys are tuples of attributes representing compartments, and the values are the number of people in the compartment.
 
-        Returns:
+        Returns: vector of counts, each element corresponding to the compartment described by the same element in self.compartments_as_index
 
         """
         y0 = [0] * self.n_compartments
@@ -956,39 +968,37 @@ class CovidModel:
             y0[self.cmpt_idx_lookup[cmpt]] = n
         return y0
 
-    # returns list of fips codes for each county in the given region, or every region in this model if not given
     def get_all_county_fips(self, regions=None):
-        """
+        """returns list of fips codes for each county in the given region, or every region in this model if not given
 
         Args:
-            regions:
+            regions: list of regions for which fips codes are desired (defaults to all regions)
 
-        Returns:
+        Returns: list of fips codes associated with any of the regions provided.
 
         """
         regions = self.regions if regions is None else regions
         return [county_fips for region in regions for county_fips in self.region_defs[region]['counties_fips']]
 
-    # convert y-array to series with compartment attributes as multiindex
+    #
     def y_to_series(self, y):
-        """
+        """convert y-array to series with compartment attributes as multiindex
 
         Args:
-            y:
+            y: an array, where each element gives the count for one of the compartments, ordered the same as self.compartments_as_index
 
-        Returns:
+        Returns: Pandas Series with multiindex giving the compartment attributes, and values matching what's provided in y
 
         """
         return pd.Series(index=self.compartments_as_index, data=y)
 
-    # give the counts for all compartments over time, but group by the compartment attributes listed
     def solution_sum_df(self, group_by_attr_levels=None):
-        """
+        """give the counts for all compartments over time, but group/aggregate by the compartment attributes provided
 
         Args:
-            group_by_attr_levels:
+            group_by_attr_levels: list of attribute names to group by. e.g. ['seir', 'age'] will group by disease status and age group.
 
-        Returns:
+        Returns: Pandas DataFrame, with row index date/region, and column index grouped compartments. Values are counts.
 
         """
         df = self.solution_ydf
@@ -998,36 +1008,40 @@ class CovidModel:
         df = df.set_index('date')
         return df
 
-    # gives hospitalizations, separated by region, as a numpy array where rows are time and columns are region
     def solution_sum_Ih(self, tstart=0, tend=None, regions=None):
-        """
+        """gives hospitalizations, separated by region, as a numpy array where rows are time and columns are region
+
+        This function is used primarily for fitting, where the curve_fit function needs a numpy array as output to
+        compare against the observed data. the hosps from each region are just concatenated, making the array harder to
+        interpret on its own, but the curve_fit function doesn't care.
 
         Args:
-            tstart:
-            tend:
-            regions:
+            tstart: starting time desired (defaults to t=0)
+            tend: ending time desired (defaults to t=tend)
+            regions: which regions hospitalizations are desired for (defaults to all model regions)
 
-        Returns:
+        Returns: Numpy array of hospitalizations over time for the given regions.
 
         """
         tend = self.tend if tend is None else tend
         regions = self.regions if regions is None else regions
-
         region_levels = self.compartments_as_index.get_level_values(-1)
         Ih = np.concatenate([self.solution_y[tstart:(tend + 1), self.Ih_compartments & (region_levels == region)].sum(axis=1) for region in regions])
         return Ih
 
-    # Get the immunity against a given variant.
-    # I.e. if everyone were exposed today, what fraction of people who WOULD be normally infected if they had no immunity, are NOT infected because they are immune?
-    # or, if to_hosp=True, then what fraction of people who WOULD be normally hospitalized if they had no immunity, are NOT hospitalized because they are immune?
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
-        """
+        """Compute the immunity of the population against a given variant.
+
+        If everyone were exposed today, what fraction of people who WOULD be normally infected if they had no immunity,
+        are NOT infected because they are immune? or, if to_hosp=True, then what fraction of people who WOULD be
+        normally hospitalized if they had no immunity, are NOT hospitalized because they are immune?
+
 
         Args:
-            variant:
-            vacc_only:
-            to_hosp:
-            age:
+            variant: The variant against which to compute immunity
+            vacc_only: Ignore individuals who are not vaccinated. Caution: The people left may be immune from vaccination, but may also be immune because of prior infection
+            to_hosp: boolean. if true, compute immunity against hospitalization ('severe_disease'), if false, compute immunity against infection
+            age: which age group to compute immunity for (default is all age groups combined)
 
         Returns:
 
@@ -1067,9 +1081,10 @@ class CovidModel:
         else:
             return (n * (1 - params['effective_inf_rate'])).groupby('date').sum() / n.groupby('date').sum()
 
-    # risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
     def risk(self, variant=None, to_hosp=False, age=None):
-        """
+        """risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
+
+        TODO: This hasn't been implemented yet, and may or may not be valuable to have.
 
         Args:
             variant:
@@ -1079,9 +1094,15 @@ class CovidModel:
         pass
 
     def modeled_vs_observed_hosps(self):
-        """
+        """Create dataframe comparing hospitalization data to modeled hospitalizations
 
-        Returns:
+        This dataframe actually has four columns:
+            - observed: the data we get from the database
+            - estimated_actual: adjusted number based on dividing the observed number by the hospital reporting fraction
+            - modeled_actual: raw model output number of hospitalizations
+            - modeled_observed: adjusted number based on multiplying the modeled_actual number by the hospital reporting fraction
+
+        Returns: Pandas DataFrame with row index date / region, and four columns.
 
         """
         df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled_actual').to_frame()
@@ -1092,18 +1113,22 @@ class CovidModel:
         df = df.reorder_levels([1, 0]).sort_index()  # put region first
         return df
 
-    # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
     def get_param_for_attrs_by_t(self, param, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
-        """
+        """Get a model parameter for a given set of attributes and trange.
+
+        for compartment parameters, specify attrs and leave from_attrs and to_attrs as None
+        for compartment-pair parameters, specify from_attrs and to_attrs and leave attrs as None
+
+        See README.md for more info on how parameters are specified.
 
         Args:
-            param:
-            attrs:
-            from_attrs:
-            to_attrs:
-            convert_to_dates:
+            param: name of the parameter desired
+            attrs: for compartment parameters, dictionary of attributes defining the compartment or compartments that this parameter is desired for
+            from_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "from" compartment in the compartment pair
+            to_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "to" compartment in the compartment pair
+            convert_to_dates: boolean, whether to index the rows using dates (as opposed to t)
 
-        Returns:
+        Returns: Pandas DataFrame where rows are date or t, and column is the parameter desired.
 
         """
         # get the keys for the parameters we want
@@ -1135,40 +1160,45 @@ class CovidModel:
         return df
 
     def get_params_for_attrs_by_t(self, params: list, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
-        """
+        """Get one ore more model parameter for a given set of attributes and trange.
+
+        for compartment parameters, specify attrs and leave from_attrs and to_attrs as None
+        for compartment-pair parameters, specify from_attrs and to_attrs and leave attrs as None
+
+        See README.md for more info on how parameters are specified.
 
         Args:
-            params:
-            attrs:
-            from_attrs:
-            to_attrs:
-            convert_to_dates:
+            params: list of parameter names desired.
+            attrs: for compartment parameters, dictionary of attributes defining the compartment or compartments that this parameter is desired for
+            from_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "from" compartment in the compartment pair
+            to_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "to" compartment in the compartment pair
+            convert_to_dates: boolean, whether to index the rows using dates (as opposed to t)
 
-        Returns:
+        Returns: Pandas DataFrame where rows are date or t, and column is the parameter desired.
 
         """
         return pd.concat([self.get_param_for_attrs_by_t(param, attrs, from_attrs, to_attrs, convert_to_dates) for param in params], axis=1)
 
-    # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
-        """
+        """get all ODE terms that refer to flow from one specific compartment to another
 
         Args:
-            from_cmpt:
-            to_cmpt:
+            from_cmpt: tuple of attributes describing the "from" compartment
+            to_cmpt: tuple of attributes describing the "to" compartment
 
-        Returns:
+        Returns: list of ODE flow terms which apply to the compartments in question.
 
         """
         return [term for term in self.terms if term.from_cmpt_idx == self.cmpt_idx_lookup[from_cmpt] and term.to_cmpt_idx == self.cmpt_idx_lookup[to_cmpt]]
 
-    # get the terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
     def get_terms_by_attr(self, from_attrs, to_attrs):
-        """
+        """get the terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
+
+        See README.md for more information on how attribute dictionaries are used to select compartments
 
         Args:
-            from_attrs:
-            to_attrs:
+            from_attrs: dictionary of attributes describing the "from" compartments of interest
+            to_attrs: dictionary of attributes describing the "to" compartments of interest
 
         Returns:
 
@@ -1178,12 +1208,12 @@ class CovidModel:
 
     # create a json string capturing all the ode terms: nonlinear, linear, and constant
     def ode_terms_as_json(self, compact=False):
-        """
+        """Convert all of the model's ODE terms into a JSON string, either compact or slightly more verbose
 
         Args:
-            compact:
+            compact: boolean, whether to use the compact representation or the slightly more verbose representation
 
-        Returns:
+        Returns: String in JSON format of all the ODE terms, including the flow values, between all compartments.
 
         """
         if compact:
@@ -1195,14 +1225,6 @@ class CovidModel:
             return json.dumps({"compartments": cm, "constant_vector": cv, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
         else:
             def fcm(i):
-                """
-
-                Args:
-                    i:
-
-                Returns:
-
-                """
                 return f'{",".join(self.compartments[i])}'
 
             cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
@@ -1214,16 +1236,15 @@ class CovidModel:
     ####################################################################################################################
     ### ODE related functions
 
-    # check if a cmpt matches a dictionary of attributes
     def does_cmpt_have_attrs(self, cmpt, attrs, is_param_cmpts=False):
-        """
+        """check if a given cmpt matches a dictionary of attributes
 
         Args:
-            cmpt:
-            attrs:
-            is_param_cmpts:
+            cmpt: A tuple of attributes specifying a compartment
+            attrs: A dictionary of attributes, where the key is an attribute name and the value is a list of attribute levels
+            is_param_cmpts: Whether the compartment is just using parameter-attributes (true) or all attributes (false)
 
-        Returns:
+        Returns: Boolean, true if the compartment matches the attributes dictionary
 
         """
         return all(
@@ -1231,13 +1252,12 @@ class CovidModel:
             in ([attr_val] if isinstance(attr_val, str) else attr_val)
             for attr_name, attr_val in attrs.items())
 
-    # return compartments that match a dictionary of attributes
     def get_cmpts_matching_attrs(self, attrs, is_param_cmpts=False):
-        """
+        """return all compartments that match a dictionary of attributes
 
         Args:
-            attrs:
-            is_param_cmpts:
+            attrs: dictionary of attributes to match
+            is_param_cmpts: whether using just parameter-attributes (true), or all attributes (false)
 
         Returns:
 
@@ -1253,17 +1273,17 @@ class CovidModel:
         return list(itertools.product(*list(new_attrs.values())))
         # return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
-    # given a compartment tuple, update the corresponding elements with items from attrs dict.
-    # if one or more values in attrs dict is a list, then create all combinations of matching compartments
     def update_cmpt_tuple_with_attrs(self, cmpt, attrs: dict, is_param_cmpt=False):
-        """
+        """given a compartment tuple, update the corresponding elements with items from attrs dict.
+
+        if one or more values in attrs dict is a list, then create all combinations of matching compartments
 
         Args:
-            cmpt:
-            attrs:
-            is_param_cmpt:
+            cmpt: the compartment to update
+            attrs: dictionary of attributes to use to update the compartment
+            is_param_cmpt: whether using just parameter-attributes (true), or all attributes (false)
 
-        Returns:
+        Returns: list of compartments that are updated based on the attrs dictionary
 
         """
         cmpt = list(cmpt)
@@ -1278,7 +1298,7 @@ class CovidModel:
     def get_vacc_per_available(self):
         """Compute fraction of people in a region / age group that are eligible for a shot who receive the shot on a particular day
 
-        Returns:
+        Returns: Pandas DataFrame with row index date / region, and columns are the different shots.
 
         """
         # Construct a cleaned version of how many of each shot are given on each day to each age group in each region
