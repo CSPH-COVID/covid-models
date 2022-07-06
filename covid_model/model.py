@@ -32,11 +32,11 @@ class CovidModel:
     """ Setup """
 
     def log_and_raise(self, ermsg, errortype):
-        """
+        """Log an error message to the logger, then raise the appropriate exception
 
         Args:
-            ermsg:
-            errortype:
+            ermsg: message to log and also give to the exception which will be raised.
+            errortype: Some error class, e.g. ValueError, RuntimeError to be raised.
         """
         logger.exception(f"{str(self.tags)}" + ermsg)
         raise errortype(ermsg)
@@ -186,10 +186,10 @@ class CovidModel:
     ### Functions to Update Derived Properites and Retrieve Data
 
     def set_actual_vacc(self, engine=None):
-        """
+        """Retrieve vaccination data from the database and format it slightly, before storing it in self.actual_vacc_df
 
         Args:
-            engine:
+            engine: a database connection. if None, we will make a new connection in this method
         """
         logger.info(f"{str(self.tags)} Retrieving vaccinations data")
         if engine is None:
@@ -204,7 +204,9 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} Vaccinations span from {self.actual_vacc_df.index.get_level_values(0).min()} to {self.actual_vacc_df.index.get_level_values(0).max()}")
 
     def set_proj_vacc(self):
-        """
+        """Create projections for vaccines to fill in any gaps between actual vaccinations and the model end_date
+
+        This method relies on the vacc_proj_params to specify how projections should be made.
 
         """
         logger.info(f"{str(self.tags)} Constructing vaccination projections")
@@ -267,10 +269,10 @@ class CovidModel:
             logger.info(f"{str(self.tags)} No vaccine projections necessary")
 
     def set_actual_mobility(self, engine=None):
-        """
+        """Load mobility data from the database and format it for the model.
 
         Args:
-            engine:
+            engine: a database connection. if None, we will make a new connection in this method
         """
         logger.info(f"{str(self.tags)} Retrieving mobility data")
         if engine is None:
@@ -291,7 +293,10 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} mobility spans from {self.actual_mobility.index.get_level_values(0).min()} to {self.actual_mobility.index.get_level_values(0).max()}")
 
     def set_proj_mobility(self):
-        """
+        """Create projections for mobility to fill in any gaps between actual mobility and the model end_date
+
+        This isn't implemented yet (we have to decide how to project mobility), but the vision is to specify parameters
+        for projection using mobility_proj_params
 
         """
         # TODO: implement mobility projections
@@ -301,9 +306,9 @@ class CovidModel:
         logger.warning(f"{str(self.tags)} mobility projections not yet implemented")
 
     def get_mobility_as_params(self):
-        """
+        """Converts mobility data into parameters, which get added onto the end of the model's parameters
 
-        Returns:
+        Returns: list of params that follows the format of the params_defs list
 
         """
         logger.info(f"{str(self.tags)} Converting mobility data into parameters")
@@ -350,9 +355,9 @@ class CovidModel:
         return params
 
     def hosp_reporting_frac_by_t(self):
-        """
+        """Construct a pandas DataFrame of the hospital reporting fraction over time
 
-        Returns:
+        Returns: a Pandas DataFrame with rows spanning the model's daterange and a column for hosp reporting fraction
 
         """
         # currently assigns the same hrf to all regions.
@@ -373,21 +378,22 @@ class CovidModel:
         hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True).reorder_levels([1, 0])
         return hrf
 
-    # pulls hospitalizations for only the first region, since the model only fits one region at a time
+
     def set_hosp(self, engine=None):
-        """
+        """Retrieve hospitalizations from the database for each region of interest, and store in the model
+
+        Also computes the estimated actual hospitalizations using the hospital reporting fraction, which is what the
+        model actually fits to.
 
         Args:
-            engine:
+            engine: a database connection. if None, we will make a new connection in this method
         """
         if engine is None:
             engine = db_engine()
         logger.info(f"{str(self.tags)} Retrieving hospitalizations data")
         # makes sure we pull from EMResource if region is CO
-        # county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
         regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
                                                  'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
-        # TODO: fix for CO
         if self.regions != ['co']:
             hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list()) \
                 .join(regions_lookup.set_index('county_id'), on='county_id') \
@@ -403,7 +409,7 @@ class CovidModel:
                 .reset_index('measure_date') \
                 .rename(columns={'measure_date': 'date'}) \
                 .set_index(['region', 'date']).sort_index()
-        # fill in the beginning if necessary, or truncate if necessary
+        # fill in the beginning with zeros if necessary, or truncate if necessary
         hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values(1))).date], names=['region', 'date']), fill_value=0)
 
         hosps = hosps.join(self.hosp_reporting_frac_by_t())
@@ -416,15 +422,27 @@ class CovidModel:
     ### Date / Time. Updating start date and end date updates other date/time attributes also
     @property
     def start_date(self):
-        """
+        """The start date of the model, stored as a dt.datetime.date
 
-        Returns:
+        Returns: the start date of the model
 
         """
         return self.__start_date
 
     @start_date.setter
     def start_date(self, value):
+        """Sets the model start date, and updates other model properties as necessary
+
+        Even though the start date may change, tstart is still always zero, so things that are recorded in terms of t
+        (e.g. tend, tc) may have to be adjusted to a new t that refers to the same date as before start date was changed
+
+        Other necessary changes being made:
+        - Adjust tend so as to maintain the same end date
+        - Update the model trange and daterange to reflect the new start date
+        - Update all the t's in TC so they still refer to the same dates. Also ensure that we still have TC values at time t=0
+        - Update tc_t_prev_lookup if necessary
+
+        """
         start_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
         # shift tc to the right if start date is earlier; shift left and possibly truncate TC if start date is later
         tshift = (start_date - self.start_date).days
@@ -439,15 +457,23 @@ class CovidModel:
 
     @property
     def end_date(self):
-        """
+        """The end date of the model, stored as a dt.datetime.date
 
-        Returns:
+        Returns: the end date of the model
 
         """
         return self.__end_date
 
     @end_date.setter
     def end_date(self, value):
+        """Sets the model end date, and updates other model properties as necessary
+
+        Other necessary changes being made:
+        - Adjust tend to match the new end_date
+        - Update the model trange and daterange to reflect the new end date
+        - Remove any tc's that are after the new end_date
+
+        """
         end_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
         self.__end_date = end_date
         self.__tend = (self.end_date - self.start_date).days
@@ -460,24 +486,32 @@ class CovidModel:
 
     @property
     def tstart(self):
-        """
+        """ The start t of the model, this is always 0
 
-        Returns:
+        Returns: 0
 
         """
         return 0
 
     @property
     def tend(self):
-        """
+        """ The end t of the model, this is a positive integer indicating the number of days that the end date is after the start date
 
-        Returns:
+        Returns: The number of days that the end date is after the start date
 
         """
         return self.__tend
 
     @tend.setter
     def tend(self, value):
+        """Sets the model end t, and updates other model properties as necessary
+
+        Other necessary changes being made:
+        - Adjust end_date to match the new tend
+        - Update the model trange and daterange to reflect the new tend
+        - Remove any tc's that are after the new tend
+
+        """
         self.__tend = value
         self.__end_date = self.start_date + dt.timedelta(days=value)
         self.__trange = range(self.tstart, self.tend + 1)
@@ -489,43 +523,57 @@ class CovidModel:
 
     @property
     def trange(self):
-        """
+        """A python range starting at tstart and ending at tend
 
-        Returns:
+        Returns: range(self.tstart, self.tend+1)
 
         """
         return self.__trange
 
     @property
     def daterange(self):
-        """
+        """A Pandas date_range starting at self.start_date and ending at self.end_date
 
-        Returns:
+        Returns: Pandas date_range
 
         """
         return self.__daterange
 
+    ### attributes
     @property
     def attr_names(self):
-        """
+        """A list of the attributes being used to define compartments
 
-        Returns:
+        Returns: A list of attribute names
 
         """
         return list(self.attrs.keys())
 
     @property
     def param_attr_names(self):
-        """
+        """A list of the attributes that can be assigned a parameter (all attributes except SEIR status)
 
-        Returns:
+        Not all attributes can be used to specify model parameters. In particular, you can't specify a parameter for
+        someone of a particular SEIR status (the reasoning for this predates me -amf). So the "parameter attributes"
+        are those attributes that can be used to specify model parameters. They include everything except the SEIR
+        status for now.
+
+        Returns: a list of parameter-attribute names
 
         """
         return self.attr_names[1:]
 
-    ### attributes and regions
     def update_compartments(self):
-        """
+        """Construct compartments using the attributes, and other convenience data structures related to compartments
+
+        The compartments of the model are constructed by taking the Cartesian product of the model attributes.
+
+        Constructs the following:
+            - A Pandas multi-index containing the attributes for each compartment
+            - A binary array indicating which indices contain hospitalized folks
+            - A list version of the multi-index; this is formally the list of compartments
+            - A dictionary which keys are tuples of the compartment attributes, and values are the array index for that compartment
+            - A list of just the "parameter compartments" which is the Cartesian product of the "parameter attributes"
 
         """
         self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attr_names)
@@ -534,17 +582,28 @@ class CovidModel:
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
+    ### Regions
     @property
     def regions(self):
-        """
+        """ The regions covered by this model. Will always match self.attrs['region']
 
-        Returns:
+        Returns: list of strings indicating the regions covered by the model
 
         """
         return self.__regions
 
     @regions.setter
     def regions(self, value: list):
+        """Sets the regions of the model, and updates attributes and compartments appropriately
+
+        Args:
+            value: a list of strings indicating the new regions of the model.
+
+        Does the following:
+            - Updates the model regions,
+            - Updates self.attrs['region'] to match
+            - Updates the compartments of the model because the attributes have changed.
+        """
         self.__regions = value
         # if regions changes, update the compartment attributes, and everything derived from that as well.
         self.__attrs['region'] = value
@@ -553,102 +612,181 @@ class CovidModel:
 
     @property
     def attrs(self):
-        """
+        """The list of attributes which define the comparments of the model.
 
-        Returns:
+        Returns: The list of attributes which define the compartments of the model.
 
         """
         return self.__attrs
 
     @attrs.setter
     def attrs(self, value: OrderedDict):
+        """Sets the attributes to use in the model, and updates the regions and compartments appropriately
+
+        Args:
+            value: An ordered dictionary containing the new attributes
+
+        """
         self.__attrs = value
         self.__regions = value['region']
         self.update_compartments()
         self.recently_updated_properties.append('regions')
 
-    ### things which are dictionaries but which may be given as a path to a json file
+    ### things which are dictionaries or a list but which may be given as a path to a json file
     @property
     def params_defs(self):
-        """
+        """Defines the parameters in the model
 
-        Returns:
+        This should be a list, where each entry is a dictionary. See README.md for more details.
+
+        Returns: the list of parameters defining the model.
 
         """
         return self.__params_defs
 
     @params_defs.setter
     def params_defs(self, value):
+        """Set the value of params_defs, either by passing a list, or a path to a json file defining the list.
+
+        You can either pass a list of dictionaries defining the model parameters, or a string containing the path to a
+        json file. If the latter, then this will automatically load the json file and store the contents as params_defs.
+
+        Args:
+            value: Either a list defining the parameters, or a string filepath to a json file.
+
+        """
         self.__params_defs = value if isinstance(value, list) else json.load(open(value))
         self.recently_updated_properties.append('params_defs')
 
     @property
     def vacc_proj_params(self):
-        """
+        """dictionary defining how vaccine projections are conducted.
 
-        Returns:
+        Returns: the dictionary of vaccine projection parameters
 
         """
         return self.__vacc_proj_params
 
     @vacc_proj_params.setter
     def vacc_proj_params(self, value):
+        """Set the vaccine projection parameters, either by passing a dictionary, or a path to a json file.
+
+        Args:
+            value: Either a dictionary or a json file pointing to a json file which will become a dictionary when read.
+
+        """
         self.__vacc_proj_params = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('vacc_proj_params')
 
     @property
     def mobility_proj_params(self):
-        """
+        """dictionary defining how mobility projections are conducted.
 
-        Returns:
+        Note: this property is a placeholder, and its format hasn't been defined yet, because mobility projections
+        haven't been defined yet.
+
+        Returns: the dictionary of mobility projection parameters
 
         """
         return self.__mobility_proj_params
 
     @mobility_proj_params.setter
     def mobility_proj_params(self, value):
+        """Set the mobility projection parameters, either by passing a dictionary, or a path to a json file.
+
+        Note: this property is a placeholder, and its format hasn't been defined yet, because mobility projections
+        haven't been defined yet.
+
+        Args:
+            value: Either a dictionary or a string pointing to a json file which will become a dictionary when read.
+
+        """
         self.__mobility_proj_params = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('mobility_proj_params')
 
     @property
     def region_defs(self):
-        """
+        """A dictionary defining the different regions used in the model
 
-        Returns:
+        The dictionary contains dictionaries, one for each region being defined.
+        Each region dictionary has the following keys:
+        - "name": A longer, human readable name for this region
+        - "counties": a list of county names belonging to this region
+        - "coutnies_fips": a list of county fips codes beloging to this region
+
+        Returns: Dictionary of region definitions
 
         """
         return self.__region_defs
 
     @region_defs.setter
     def region_defs(self, value):
+        """Set the region definitions, either passing a dictionary or a path to a json file
+
+        Args:
+            value: Either a dictionary or a string pointing to a json file which will become a dictionary when read.
+
+        Returns:
+
+        """
         self.__region_defs = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('region_defs')
 
     @property
     def mobility_mode(self):
-        """
+        """How to parameterize mobility.
 
-        Returns:
+        In particular which TC value should be used when deciding how transmission occurs between regions. Options
+        include:
+            - none: no contact between regions
+            - location_attached: The TC's controlling transmission are those associated with the region in which transmission is occurring
+            - population_attached: The TC's controlling transmission are those associated with the susceptible population
 
         """
         return self.__mobility_mode
 
     @mobility_mode.setter
-    def mobility_mode(self, value):
+    def mobility_mode(self, value: str):
+        """Set the mobility mode
+
+        Args:
+            value: the desired mobility mode
+
+        Returns:
+
+        """
         self.__mobility_mode = value if value != 'none' else None
         self.recently_updated_properties.append('mobility_mode')
 
     @property
     def hosp_reporting_frac(self):
-        """
+        """Dictionary defining the hospitalization reporting fraction at different points in time.
 
-        Returns:
+        This factor gets applied to reported hospitalizations to account for incomplete hospitalization reporting. The
+        number reflects what proportion of COVID hospitalizations are actually present in the data.
+
+        Currently assumed the same for all regions, but can modify in the future to work like TC, with time indexed
+        first, and region specified in a nested dictionary. Then you could update self.hosp_reporting_frac_by_t() to
+        construct the dataframe with both date and region as indices, and the adjustments should be applied on a region
+        specific basis.
+
+        This is specified by date, similar to how parameter values are specified.
+        e.g. {'2020-01-01': 1, '2020-02-01': 0.5} means hosp reporting fraction dropped to 50% on Feb 2nd 2020 and
+        stayed that way
+
+        Returns: the hospitalization reporting fraction. Defaults to 1.
 
         """
         return self.__hosp_reporting_frac if self.__hosp_reporting_frac is not None else {dt.datetime.strftime(self.start_date, "%Y-%m-%d"): 1}
 
     @hosp_reporting_frac.setter
-    def hosp_reporting_frac(self, value):
+    def hosp_reporting_frac(self, value: dict):
+        """Sets the hospitalization reporting fraction.
+
+        Args:
+            value: a dictionary where keys are strings representing dates, and values are the fraction. e.g. {'2020-01-01': 1, '2020-02-01': 0.5}
+
+        """
         self.__hosp_reporting_frac = value
         self.recently_updated_properties.append('hosp_reporting_frac')
 
