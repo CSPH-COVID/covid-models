@@ -181,14 +181,15 @@ def do_single_fit(tc_0=0.75,
     # replace the TC and tslices within the fit window
     fit_tstart = model.date_to_t(fit_start_date)
     fit_tend = model.date_to_t(fit_end_date)
-    tc = {t: tc for t, tc in model.tc.items() if t < fit_tstart or t > fit_tend}
     if tc_0 is not None:
+        tc = {t: tc for t, tc in model.tc.items() if t < fit_tstart or t > fit_tend}
         tc.update({t: {region: tc_0 for region in model.regions} for t in range(fit_tstart, fit_tend - last_tc_window_min_size, tc_window_size)})
         model.update_tc(tc)
 
     # Get start/end for each batch
     relevant_tc_ts = [t for t in model.tc.keys() if fit_tstart <= t <= fit_tend]
-    batch_tstarts =  relevant_tc_ts[:-tc_window_batch_size:tc_batch_increment] + [relevant_tc_ts[-tc_window_batch_size]]
+    last_batch_start_index = -min(tc_window_batch_size, len(relevant_tc_ts))
+    batch_tstarts =  relevant_tc_ts[:last_batch_start_index:tc_batch_increment] + [relevant_tc_ts[last_batch_start_index]]
     batch_tends = [t - 1 for t in relevant_tc_ts[tc_window_batch_size::tc_batch_increment]] + [fit_tend]
 
     logger.info(f'{str(model.tags)} Will fit {len(batch_tstarts)} times')
