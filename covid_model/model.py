@@ -32,18 +32,18 @@ class CovidModel:
     """ Setup """
 
     def log_and_raise(self, ermsg, errortype):
-        """
+        """Log an error message to the logger, then raise the appropriate exception
 
         Args:
-            ermsg:
-            errortype:
+            ermsg: message to log and also give to the exception which will be raised.
+            errortype: Some error class, e.g. ValueError, RuntimeError to be raised.
         """
         logger.exception(f"{str(self.tags)}" + ermsg)
         raise errortype(ermsg)
 
     ####################################################################################################################
     ### Initialization and Updating
-    def __init__(self, engine=None, base_model=None, update_derived_properties=True, base_spec_id=None, **margs):
+    def __init__(self, engine=None, base_model=None, update_data=True, base_spec_id=None, **margs):
         # margs can be any model property
         self.recently_updated_properties = []
 
@@ -133,7 +133,7 @@ class CovidModel:
             setattr(self, key, copy.deepcopy(val))
             self.recently_updated_properties.append(key)
 
-        if update_derived_properties:
+        if update_data:
             self.update_data(engine)
 
     def update_data(self, engine=None):
@@ -186,10 +186,10 @@ class CovidModel:
     ### Functions to Update Derived Properites and Retrieve Data
 
     def set_actual_vacc(self, engine=None):
-        """
+        """Retrieve vaccination data from the database and format it slightly, before storing it in self.actual_vacc_df
 
         Args:
-            engine:
+            engine: a database connection. if None, we will make a new connection in this method
         """
         logger.info(f"{str(self.tags)} Retrieving vaccinations data")
         if engine is None:
@@ -204,7 +204,9 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} Vaccinations span from {self.actual_vacc_df.index.get_level_values(0).min()} to {self.actual_vacc_df.index.get_level_values(0).max()}")
 
     def set_proj_vacc(self):
-        """
+        """Create projections for vaccines to fill in any gaps between actual vaccinations and the model end_date
+
+        This method relies on the vacc_proj_params to specify how projections should be made.
 
         """
         logger.info(f"{str(self.tags)} Constructing vaccination projections")
@@ -267,10 +269,10 @@ class CovidModel:
             logger.info(f"{str(self.tags)} No vaccine projections necessary")
 
     def set_actual_mobility(self, engine=None):
-        """
+        """Load mobility data from the database and format it for the model.
 
         Args:
-            engine:
+            engine: a database connection. if None, we will make a new connection in this method
         """
         logger.info(f"{str(self.tags)} Retrieving mobility data")
         if engine is None:
@@ -291,7 +293,10 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} mobility spans from {self.actual_mobility.index.get_level_values(0).min()} to {self.actual_mobility.index.get_level_values(0).max()}")
 
     def set_proj_mobility(self):
-        """
+        """Create projections for mobility to fill in any gaps between actual mobility and the model end_date
+
+        This isn't implemented yet (we have to decide how to project mobility), but the vision is to specify parameters
+        for projection using mobility_proj_params
 
         """
         # TODO: implement mobility projections
@@ -301,9 +306,9 @@ class CovidModel:
         logger.warning(f"{str(self.tags)} mobility projections not yet implemented")
 
     def get_mobility_as_params(self):
-        """
+        """Converts mobility data into parameters, which get added onto the end of the model's parameters
 
-        Returns:
+        Returns: list of params that follows the format of the params_defs list
 
         """
         logger.info(f"{str(self.tags)} Converting mobility data into parameters")
@@ -350,9 +355,9 @@ class CovidModel:
         return params
 
     def hosp_reporting_frac_by_t(self):
-        """
+        """Construct a pandas DataFrame of the hospital reporting fraction over time
 
-        Returns:
+        Returns: a Pandas DataFrame with rows spanning the model's daterange and a column for hosp reporting fraction
 
         """
         # currently assigns the same hrf to all regions.
@@ -373,21 +378,22 @@ class CovidModel:
         hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True).reorder_levels([1, 0])
         return hrf
 
-    # pulls hospitalizations for only the first region, since the model only fits one region at a time
+
     def set_hosp(self, engine=None):
-        """
+        """Retrieve hospitalizations from the database for each region of interest, and store in the model
+
+        Also computes the estimated actual hospitalizations using the hospital reporting fraction, which is what the
+        model actually fits to.
 
         Args:
-            engine:
+            engine: a database connection. if None, we will make a new connection in this method
         """
         if engine is None:
             engine = db_engine()
         logger.info(f"{str(self.tags)} Retrieving hospitalizations data")
         # makes sure we pull from EMResource if region is CO
-        # county_ids = self.region_defs[self.regions[0]]['counties_fips'] if self.regions[0] != 'co' else None
         regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
                                                  'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
-        # TODO: fix for CO
         if self.regions != ['co']:
             hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list()) \
                 .join(regions_lookup.set_index('county_id'), on='county_id') \
@@ -403,7 +409,7 @@ class CovidModel:
                 .reset_index('measure_date') \
                 .rename(columns={'measure_date': 'date'}) \
                 .set_index(['region', 'date']).sort_index()
-        # fill in the beginning if necessary, or truncate if necessary
+        # fill in the beginning with zeros if necessary, or truncate if necessary
         hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values(1))).date], names=['region', 'date']), fill_value=0)
 
         hosps = hosps.join(self.hosp_reporting_frac_by_t())
@@ -416,15 +422,27 @@ class CovidModel:
     ### Date / Time. Updating start date and end date updates other date/time attributes also
     @property
     def start_date(self):
-        """
+        """The start date of the model, stored as a dt.datetime.date
 
-        Returns:
+        Returns: the start date of the model
 
         """
         return self.__start_date
 
     @start_date.setter
     def start_date(self, value):
+        """Sets the model start date, and updates other model properties as necessary
+
+        Even though the start date may change, tstart is still always zero, so things that are recorded in terms of t
+        (e.g. tend, tc) may have to be adjusted to a new t that refers to the same date as before start date was changed
+
+        Other necessary changes being made:
+        - Adjust tend so as to maintain the same end date
+        - Update the model trange and daterange to reflect the new start date
+        - Update all the t's in TC so they still refer to the same dates. Also ensure that we still have TC values at time t=0
+        - Update tc_t_prev_lookup if necessary
+
+        """
         start_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
         # shift tc to the right if start date is earlier; shift left and possibly truncate TC if start date is later
         tshift = (start_date - self.start_date).days
@@ -439,15 +457,23 @@ class CovidModel:
 
     @property
     def end_date(self):
-        """
+        """The end date of the model, stored as a dt.datetime.date
 
-        Returns:
+        Returns: the end date of the model
 
         """
         return self.__end_date
 
     @end_date.setter
     def end_date(self, value):
+        """Sets the model end date, and updates other model properties as necessary
+
+        Other necessary changes being made:
+        - Adjust tend to match the new end_date
+        - Update the model trange and daterange to reflect the new end date
+        - Remove any tc's that are after the new end_date
+
+        """
         end_date = value if isinstance(value, dt.date) else dt.datetime.strptime(value, "%Y-%m-%d").date()
         self.__end_date = end_date
         self.__tend = (self.end_date - self.start_date).days
@@ -460,24 +486,32 @@ class CovidModel:
 
     @property
     def tstart(self):
-        """
+        """ The start t of the model, this is always 0
 
-        Returns:
+        Returns: 0
 
         """
         return 0
 
     @property
     def tend(self):
-        """
+        """ The end t of the model, this is a positive integer indicating the number of days that the end date is after the start date
 
-        Returns:
+        Returns: The number of days that the end date is after the start date
 
         """
         return self.__tend
 
     @tend.setter
     def tend(self, value):
+        """Sets the model end t, and updates other model properties as necessary
+
+        Other necessary changes being made:
+        - Adjust end_date to match the new tend
+        - Update the model trange and daterange to reflect the new tend
+        - Remove any tc's that are after the new tend
+
+        """
         self.__tend = value
         self.__end_date = self.start_date + dt.timedelta(days=value)
         self.__trange = range(self.tstart, self.tend + 1)
@@ -489,43 +523,57 @@ class CovidModel:
 
     @property
     def trange(self):
-        """
+        """A python range starting at tstart and ending at tend
 
-        Returns:
+        Returns: range(self.tstart, self.tend+1)
 
         """
         return self.__trange
 
     @property
     def daterange(self):
-        """
+        """A Pandas date_range starting at self.start_date and ending at self.end_date
 
-        Returns:
+        Returns: Pandas date_range
 
         """
         return self.__daterange
 
+    ### attributes
     @property
     def attr_names(self):
-        """
+        """A list of the attributes being used to define compartments
 
-        Returns:
+        Returns: A list of attribute names
 
         """
         return list(self.attrs.keys())
 
     @property
     def param_attr_names(self):
-        """
+        """A list of the attributes that can be assigned a parameter (all attributes except SEIR status)
 
-        Returns:
+        Not all attributes can be used to specify model parameters. In particular, you can't specify a parameter for
+        someone of a particular SEIR status (the reasoning for this predates me -amf). So the "parameter attributes"
+        are those attributes that can be used to specify model parameters. They include everything except the SEIR
+        status for now.
+
+        Returns: a list of parameter-attribute names
 
         """
         return self.attr_names[1:]
 
-    ### attributes and regions
     def update_compartments(self):
-        """
+        """Construct compartments using the attributes, and other convenience data structures related to compartments
+
+        The compartments of the model are constructed by taking the Cartesian product of the model attributes.
+
+        Constructs the following:
+            - A Pandas multi-index containing the attributes for each compartment
+            - A binary array indicating which indices contain hospitalized folks
+            - A list version of the multi-index; this is formally the list of compartments
+            - A dictionary which keys are tuples of the compartment attributes, and values are the array index for that compartment
+            - A list of just the "parameter compartments" which is the Cartesian product of the "parameter attributes"
 
         """
         self.compartments_as_index = pd.MultiIndex.from_product(self.attrs.values(), names=self.attr_names)
@@ -534,17 +582,28 @@ class CovidModel:
         self.cmpt_idx_lookup = pd.Series(index=self.compartments_as_index, data=range(len(self.compartments_as_index))).to_dict()
         self.param_compartments = list(set(tuple(attr_val for attr_val, attr_name in zip(cmpt, self.attr_names) if attr_name in self.param_attr_names) for cmpt in self.compartments))
 
+    ### Regions
     @property
     def regions(self):
-        """
+        """ The regions covered by this model. Will always match self.attrs['region']
 
-        Returns:
+        Returns: list of strings indicating the regions covered by the model
 
         """
         return self.__regions
 
     @regions.setter
     def regions(self, value: list):
+        """Sets the regions of the model, and updates attributes and compartments appropriately
+
+        Args:
+            value: a list of strings indicating the new regions of the model.
+
+        Does the following:
+            - Updates the model regions,
+            - Updates self.attrs['region'] to match
+            - Updates the compartments of the model because the attributes have changed.
+        """
         self.__regions = value
         # if regions changes, update the compartment attributes, and everything derived from that as well.
         self.__attrs['region'] = value
@@ -553,116 +612,197 @@ class CovidModel:
 
     @property
     def attrs(self):
-        """
+        """The list of attributes which define the comparments of the model.
 
-        Returns:
+        Returns: The list of attributes which define the compartments of the model.
 
         """
         return self.__attrs
 
     @attrs.setter
     def attrs(self, value: OrderedDict):
+        """Sets the attributes to use in the model, and updates the regions and compartments appropriately
+
+        Args:
+            value: An ordered dictionary containing the new attributes
+
+        """
         self.__attrs = value
         self.__regions = value['region']
         self.update_compartments()
         self.recently_updated_properties.append('regions')
 
-    ### things which are dictionaries but which may be given as a path to a json file
+    ### things which are dictionaries or a list but which may be given as a path to a json file
     @property
     def params_defs(self):
-        """
+        """Defines the parameters in the model
 
-        Returns:
+        This should be a list, where each entry is a dictionary. See README.md for more details.
+
+        Returns: the list of parameters defining the model.
 
         """
         return self.__params_defs
 
     @params_defs.setter
     def params_defs(self, value):
+        """Set the value of params_defs, either by passing a list, or a path to a json file defining the list.
+
+        You can either pass a list of dictionaries defining the model parameters, or a string containing the path to a
+        json file. If the latter, then this will automatically load the json file and store the contents as params_defs.
+
+        Args:
+            value: Either a list defining the parameters, or a string filepath to a json file.
+
+        """
         self.__params_defs = value if isinstance(value, list) else json.load(open(value))
         self.recently_updated_properties.append('params_defs')
 
     @property
     def vacc_proj_params(self):
-        """
+        """dictionary defining how vaccine projections are conducted.
 
-        Returns:
+        Returns: the dictionary of vaccine projection parameters
 
         """
         return self.__vacc_proj_params
 
     @vacc_proj_params.setter
     def vacc_proj_params(self, value):
+        """Set the vaccine projection parameters, either by passing a dictionary, or a path to a json file.
+
+        Args:
+            value: Either a dictionary or a json file pointing to a json file which will become a dictionary when read.
+
+        """
         self.__vacc_proj_params = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('vacc_proj_params')
 
     @property
     def mobility_proj_params(self):
-        """
+        """dictionary defining how mobility projections are conducted.
 
-        Returns:
+        Note: this property is a placeholder, and its format hasn't been defined yet, because mobility projections
+        haven't been defined yet.
+
+        Returns: the dictionary of mobility projection parameters
 
         """
         return self.__mobility_proj_params
 
     @mobility_proj_params.setter
     def mobility_proj_params(self, value):
+        """Set the mobility projection parameters, either by passing a dictionary, or a path to a json file.
+
+        Note: this property is a placeholder, and its format hasn't been defined yet, because mobility projections
+        haven't been defined yet.
+
+        Args:
+            value: Either a dictionary or a string pointing to a json file which will become a dictionary when read.
+
+        """
         self.__mobility_proj_params = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('mobility_proj_params')
 
     @property
     def region_defs(self):
-        """
+        """A dictionary defining the different regions used in the model
 
-        Returns:
+        The dictionary contains dictionaries, one for each region being defined.
+        Each region dictionary has the following keys:
+        - "name": A longer, human readable name for this region
+        - "counties": a list of county names belonging to this region
+        - "coutnies_fips": a list of county fips codes beloging to this region
+
+        Returns: Dictionary of region definitions
 
         """
         return self.__region_defs
 
     @region_defs.setter
     def region_defs(self, value):
+        """Set the region definitions, either passing a dictionary or a path to a json file
+
+        Args:
+            value: Either a dictionary or a string pointing to a json file which will become a dictionary when read.
+
+        Returns:
+
+        """
         self.__region_defs = value if isinstance(value, dict) else json.load(open(value))
         self.recently_updated_properties.append('region_defs')
 
     @property
     def mobility_mode(self):
-        """
+        """How to parameterize mobility.
 
-        Returns:
+        In particular which TC value should be used when deciding how transmission occurs between regions. Options
+        include:
+            - none: no contact between regions
+            - location_attached: The TC's controlling transmission are those associated with the region in which transmission is occurring
+            - population_attached: The TC's controlling transmission are those associated with the susceptible population
 
         """
         return self.__mobility_mode
 
     @mobility_mode.setter
-    def mobility_mode(self, value):
+    def mobility_mode(self, value: str):
+        """Set the mobility mode
+
+        Args:
+            value: the desired mobility mode
+
+        Returns:
+
+        """
         self.__mobility_mode = value if value != 'none' else None
         self.recently_updated_properties.append('mobility_mode')
 
     @property
     def hosp_reporting_frac(self):
-        """
+        """Dictionary defining the hospitalization reporting fraction at different points in time.
 
-        Returns:
+        This factor gets applied to reported hospitalizations to account for incomplete hospitalization reporting. The
+        number reflects what proportion of COVID hospitalizations are actually present in the data.
+
+        Currently assumed the same for all regions, but can modify in the future to work like TC, with time indexed
+        first, and region specified in a nested dictionary. Then you could update self.hosp_reporting_frac_by_t() to
+        construct the dataframe with both date and region as indices, and the adjustments should be applied on a region
+        specific basis.
+
+        This is specified by date, similar to how parameter values are specified.
+        e.g. {'2020-01-01': 1, '2020-02-01': 0.5} means hosp reporting fraction dropped to 50% on Feb 2nd 2020 and
+        stayed that way
+
+        Returns: the hospitalization reporting fraction. Defaults to 1.
 
         """
         return self.__hosp_reporting_frac if self.__hosp_reporting_frac is not None else {dt.datetime.strftime(self.start_date, "%Y-%m-%d"): 1}
 
     @hosp_reporting_frac.setter
-    def hosp_reporting_frac(self, value):
+    def hosp_reporting_frac(self, value: dict):
+        """Sets the hospitalization reporting fraction.
+
+        Args:
+            value: a dictionary where keys are strings representing dates, and values are the fraction. e.g. {'2020-01-01': 1, '2020-02-01': 0.5}
+
+        """
         self.__hosp_reporting_frac = value
         self.recently_updated_properties.append('hosp_reporting_frac')
 
     ### Properties that take a little computation to get
 
-    # initial state y0, expressed as a dictionary with non-empty compartments as keys
     @property
     def y0_dict(self):
-        """
+        """initial state y0, expressed as a dictionary with non-empty compartments as keys
 
-        Returns:
+        Default value is to place everyone in a susceptible compartment with no prior infection and no vaccination / immunity status
+
+        Returns: a dictionary where the keys are tuples of attributes describing the compartments, and the values are a count of how many people are in that compartment
 
         """
         if self.__y0_dict is None:
+            # get the population of each age group in each region.
             group_pops = self.get_param_for_attrs_by_t('region_age_pop', attrs={'vacc': 'none', 'variant': 'none', 'immun': 'none'}).loc[0].reset_index().drop(columns=['vacc', 'variant', 'immun'])
             y0d = {('S', row['age'], 'none', 'none', 'none', row['region']): row['region_age_pop'] for i, row in group_pops.iterrows()}
             self.__y0_dict = y0d
@@ -672,6 +812,11 @@ class CovidModel:
 
     @y0_dict.setter
     def y0_dict(self, val: dict):
+        """Sets the value of y0_dict
+
+        Args:
+            val: A dictionary where the keys are tuples of attributes describing compartments, and the values are a count of how many people ar in that compartment.
+        """
         # set everything to zero at first
         y0d = {}
         for cmpt, v in val.items():
@@ -683,22 +828,25 @@ class CovidModel:
 
     @property
     def tc(self):
-        """
+        """Transmission control, which controls the rate of transmission
 
-        Returns:
+        TC is a dictionary, where the keys are t values (time in days since start date), and the values are
+        dictionaries. The inner dictionaries record the TC for each region, with the key being the region and the value
+        being TC.
+
+        TC is a property so it can't be set directly. instead, the update_tc function should be used, because that will
+        enforce some consistency with other properties, and also allows updating just a subset of tc values.
+
+        Returns: TC dictionary
 
         """
         return self.__tc
 
-    # return the parameters as nested dictionaries
     @property
-    def params_as_dict(self, params=None):
-        """
+    def params_as_dict(self):
+        """Return model parameters as a nested dictionary
 
-        Args:
-            params:
-
-        Returns:
+        Returns: model parameters as a nested dictionary
 
         """
         params_dict = {}
@@ -709,27 +857,31 @@ class CovidModel:
 
     @property
     def n_compartments(self):
-        """
+        """The number of compartments in the model
 
-        Returns:
+        Returns: The number of compartments in the model
 
         """
         return len(self.cmpt_idx_lookup)
 
     @property
     def solution_ydf(self):
-        """
+        """Solution to the model's system of ODEs, expressed as a dataframe. Each column is a compartment, each row is a
+        date.
 
-        Returns:
+        Returns: Pandas DataFrame of the model's ODE solution.
 
         """
         return pd.concat([self.y_to_series(self.solution_y[t]) for t in self.trange], axis=1, keys=self.trange, names=['t']).transpose()
 
     @property
     def new_infections(self):
-        """
+        """Compute the estimated number of new exposures each day
 
-        Returns:
+        Estimation is done by dividing the number of current exposed individuals by the mean dwelling time in the
+        exposed state ('alpha')
+
+        Returns: Pandas DataFrame where the row index is date / region and the column is estimated new infections, Enew
 
         """
         param_df = self.get_param_for_attrs_by_t('alpha', attrs={}, convert_to_dates=True)
@@ -740,9 +892,9 @@ class CovidModel:
 
     @property
     def re_estimates(self):
-        """
+        """Compute the estimated effective reproduction number from the model
 
-        Returns:
+        Returns: Pandas series where the index is date / region and the value is Re.
 
         """
         param_df = self.get_params_for_attrs_by_t(['gamm', 'alpha'], attrs={}, convert_to_dates=True)
@@ -758,12 +910,12 @@ class CovidModel:
     ### useful getters
 
     def date_to_t(self, date):
-        """
+        """Convert a date (string or date object) to t, number of days since model start date.
 
         Args:
-            date:
+            date: either a string in the format 'YYYY-MM-DD' or a date object.
 
-        Returns:
+        Returns: integer t, number of days since model start date.
 
         """
         if isinstance(date, str):
@@ -772,45 +924,43 @@ class CovidModel:
             return (date - self.start_date).days
 
     def t_to_date(self, t):
-        """
+        """Convert a t, number of days since model start date, to a date object.
 
         Args:
-            t:
+            t: number of days since model start date.
 
-        Returns:
+        Returns: date object representing the t in question.
 
         """
         return self.start_date + dt.timedelta(days=t)
 
     def get_vacc_rates(self):
-        """
+        """Combine the actual vaccinations and the projected vaccinations into a single Pandas DataFrame.
 
-        Returns:
+        Returns: Pandas DataFrame of vaccination rates for all model dates.
 
         """
         df = pd.concat([self.actual_vacc_df, self.proj_vacc_df])
         return df
 
-    # get the state at time t as a dictionary
     def y_dict(self, t):
-        """
+        """Get a dictionary representing the model's ODE solution at time t
 
         Args:
-            t:
+            t: number of days after the start date to get the model solution
 
-        Returns:
+        Returns: Dictionary, where the keys are tuples of attributes representing compartments, and the values are the number of people in the compartment.
 
         """
         return {cmpt: y for cmpt, y in zip(self.compartments, self.solution_y[t, :])}
 
-    # create a y0 vector with all values as 0, except those designated in y0_dict
     def y0_from_dict(self, y0_dict):
-        """
+        """create a y0 vector with all values as 0, except those designated in y0_dict
 
         Args:
-            y0_dict:
+            y0_dict: Dictionary, where the keys are tuples of attributes representing compartments, and the values are the number of people in the compartment.
 
-        Returns:
+        Returns: vector of counts, each element corresponding to the compartment described by the same element in self.compartments_as_index
 
         """
         y0 = [0] * self.n_compartments
@@ -818,39 +968,37 @@ class CovidModel:
             y0[self.cmpt_idx_lookup[cmpt]] = n
         return y0
 
-    # returns list of fips codes for each county in the given region, or every region in this model if not given
     def get_all_county_fips(self, regions=None):
-        """
+        """returns list of fips codes for each county in the given region, or every region in this model if not given
 
         Args:
-            regions:
+            regions: list of regions for which fips codes are desired (defaults to all regions)
 
-        Returns:
+        Returns: list of fips codes associated with any of the regions provided.
 
         """
         regions = self.regions if regions is None else regions
         return [county_fips for region in regions for county_fips in self.region_defs[region]['counties_fips']]
 
-    # convert y-array to series with compartment attributes as multiindex
+    #
     def y_to_series(self, y):
-        """
+        """convert y-array to series with compartment attributes as multiindex
 
         Args:
-            y:
+            y: an array, where each element gives the count for one of the compartments, ordered the same as self.compartments_as_index
 
-        Returns:
+        Returns: Pandas Series with multiindex giving the compartment attributes, and values matching what's provided in y
 
         """
         return pd.Series(index=self.compartments_as_index, data=y)
 
-    # give the counts for all compartments over time, but group by the compartment attributes listed
     def solution_sum_df(self, group_by_attr_levels=None):
-        """
+        """give the counts for all compartments over time, but group/aggregate by the compartment attributes provided
 
         Args:
-            group_by_attr_levels:
+            group_by_attr_levels: list of attribute names to group by. e.g. ['seir', 'age'] will group by disease status and age group.
 
-        Returns:
+        Returns: Pandas DataFrame, with row index date/region, and column index grouped compartments. Values are counts.
 
         """
         df = self.solution_ydf
@@ -860,36 +1008,40 @@ class CovidModel:
         df = df.set_index('date')
         return df
 
-    # gives hospitalizations, separated by region, as a numpy array where rows are time and columns are region
     def solution_sum_Ih(self, tstart=0, tend=None, regions=None):
-        """
+        """gives hospitalizations, separated by region, as a numpy array where rows are time and columns are region
+
+        This function is used primarily for fitting, where the curve_fit function needs a numpy array as output to
+        compare against the observed data. the hosps from each region are just concatenated, making the array harder to
+        interpret on its own, but the curve_fit function doesn't care.
 
         Args:
-            tstart:
-            tend:
-            regions:
+            tstart: starting time desired (defaults to t=0)
+            tend: ending time desired (defaults to t=tend)
+            regions: which regions hospitalizations are desired for (defaults to all model regions)
 
-        Returns:
+        Returns: Numpy array of hospitalizations over time for the given regions.
 
         """
         tend = self.tend if tend is None else tend
         regions = self.regions if regions is None else regions
-
         region_levels = self.compartments_as_index.get_level_values(-1)
         Ih = np.concatenate([self.solution_y[tstart:(tend + 1), self.Ih_compartments & (region_levels == region)].sum(axis=1) for region in regions])
         return Ih
 
-    # Get the immunity against a given variant.
-    # I.e. if everyone were exposed today, what fraction of people who WOULD be normally infected if they had no immunity, are NOT infected because they are immune?
-    # or, if to_hosp=True, then what fraction of people who WOULD be normally hospitalized if they had no immunity, are NOT hospitalized because they are immune?
     def immunity(self, variant='omicron', vacc_only=False, to_hosp=False, age=None):
-        """
+        """Compute the immunity of the population against a given variant.
+
+        If everyone were exposed today, what fraction of people who WOULD be normally infected if they had no immunity,
+        are NOT infected because they are immune? or, if to_hosp=True, then what fraction of people who WOULD be
+        normally hospitalized if they had no immunity, are NOT hospitalized because they are immune?
+
 
         Args:
-            variant:
-            vacc_only:
-            to_hosp:
-            age:
+            variant: The variant against which to compute immunity
+            vacc_only: Ignore individuals who are not vaccinated. Caution: The people left may be immune from vaccination, but may also be immune because of prior infection
+            to_hosp: boolean. if true, compute immunity against hospitalization ('severe_disease'), if false, compute immunity against infection
+            age: which age group to compute immunity for (default is all age groups combined)
 
         Returns:
 
@@ -929,9 +1081,10 @@ class CovidModel:
         else:
             return (n * (1 - params['effective_inf_rate'])).groupby('date').sum() / n.groupby('date').sum()
 
-    # risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
     def risk(self, variant=None, to_hosp=False, age=None):
-        """
+        """risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
+
+        TODO: This hasn't been implemented yet, and may or may not be valuable to have.
 
         Args:
             variant:
@@ -941,9 +1094,15 @@ class CovidModel:
         pass
 
     def modeled_vs_observed_hosps(self):
-        """
+        """Create dataframe comparing hospitalization data to modeled hospitalizations
 
-        Returns:
+        This dataframe actually has four columns:
+            - observed: the data we get from the database
+            - estimated_actual: adjusted number based on dividing the observed number by the hospital reporting fraction
+            - modeled_actual: raw model output number of hospitalizations
+            - modeled_observed: adjusted number based on multiplying the modeled_actual number by the hospital reporting fraction
+
+        Returns: Pandas DataFrame with row index date / region, and four columns.
 
         """
         df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled_actual').to_frame()
@@ -954,18 +1113,22 @@ class CovidModel:
         df = df.reorder_levels([1, 0]).sort_index()  # put region first
         return df
 
-    # get a parameter for a given set of attributes and trange. Either specify attrs for compartment parameters, or from_attrs and to_attrs for compartment-pair attributes
     def get_param_for_attrs_by_t(self, param, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
-        """
+        """Get a model parameter for a given set of attributes and trange.
+
+        for compartment parameters, specify attrs and leave from_attrs and to_attrs as None
+        for compartment-pair parameters, specify from_attrs and to_attrs and leave attrs as None
+
+        See README.md for more info on how parameters are specified.
 
         Args:
-            param:
-            attrs:
-            from_attrs:
-            to_attrs:
-            convert_to_dates:
+            param: name of the parameter desired
+            attrs: for compartment parameters, dictionary of attributes defining the compartment or compartments that this parameter is desired for
+            from_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "from" compartment in the compartment pair
+            to_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "to" compartment in the compartment pair
+            convert_to_dates: boolean, whether to index the rows using dates (as opposed to t)
 
-        Returns:
+        Returns: Pandas DataFrame where rows are date or t, and column is the parameter desired.
 
         """
         # get the keys for the parameters we want
@@ -997,40 +1160,45 @@ class CovidModel:
         return df
 
     def get_params_for_attrs_by_t(self, params: list, attrs=None, from_attrs=None, to_attrs=None, convert_to_dates=False):
-        """
+        """Get one ore more model parameter for a given set of attributes and trange.
+
+        for compartment parameters, specify attrs and leave from_attrs and to_attrs as None
+        for compartment-pair parameters, specify from_attrs and to_attrs and leave attrs as None
+
+        See README.md for more info on how parameters are specified.
 
         Args:
-            params:
-            attrs:
-            from_attrs:
-            to_attrs:
-            convert_to_dates:
+            params: list of parameter names desired.
+            attrs: for compartment parameters, dictionary of attributes defining the compartment or compartments that this parameter is desired for
+            from_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "from" compartment in the compartment pair
+            to_attrs: for compartment-pair parameters, dictionary of attributes defining the compartment or compartments making up the "to" compartment in the compartment pair
+            convert_to_dates: boolean, whether to index the rows using dates (as opposed to t)
 
-        Returns:
+        Returns: Pandas DataFrame where rows are date or t, and column is the parameter desired.
 
         """
         return pd.concat([self.get_param_for_attrs_by_t(param, attrs, from_attrs, to_attrs, convert_to_dates) for param in params], axis=1)
 
-    # get all terms that refer to flow from one specific compartment to another
     def get_terms_by_cmpt(self, from_cmpt, to_cmpt):
-        """
+        """get all ODE terms that refer to flow from one specific compartment to another
 
         Args:
-            from_cmpt:
-            to_cmpt:
+            from_cmpt: tuple of attributes describing the "from" compartment
+            to_cmpt: tuple of attributes describing the "to" compartment
 
-        Returns:
+        Returns: list of ODE flow terms which apply to the compartments in question.
 
         """
         return [term for term in self.terms if term.from_cmpt_idx == self.cmpt_idx_lookup[from_cmpt] and term.to_cmpt_idx == self.cmpt_idx_lookup[to_cmpt]]
 
-    # get the terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
     def get_terms_by_attr(self, from_attrs, to_attrs):
-        """
+        """get the terms that refer to flow from compartments with a set of attributes to compartments with another set of attributes
+
+        See README.md for more information on how attribute dictionaries are used to select compartments
 
         Args:
-            from_attrs:
-            to_attrs:
+            from_attrs: dictionary of attributes describing the "from" compartments of interest
+            to_attrs: dictionary of attributes describing the "to" compartments of interest
 
         Returns:
 
@@ -1040,12 +1208,12 @@ class CovidModel:
 
     # create a json string capturing all the ode terms: nonlinear, linear, and constant
     def ode_terms_as_json(self, compact=False):
-        """
+        """Convert all of the model's ODE terms into a JSON string, either compact or slightly more verbose
 
         Args:
-            compact:
+            compact: boolean, whether to use the compact representation or the slightly more verbose representation
 
-        Returns:
+        Returns: String in JSON format of all the ODE terms, including the flow values, between all compartments.
 
         """
         if compact:
@@ -1057,14 +1225,6 @@ class CovidModel:
             return json.dumps({"compartments": cm, "constant_vector": cv, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
         else:
             def fcm(i):
-                """
-
-                Args:
-                    i:
-
-                Returns:
-
-                """
                 return f'{",".join(self.compartments[i])}'
 
             cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
@@ -1076,16 +1236,15 @@ class CovidModel:
     ####################################################################################################################
     ### ODE related functions
 
-    # check if a cmpt matches a dictionary of attributes
     def does_cmpt_have_attrs(self, cmpt, attrs, is_param_cmpts=False):
-        """
+        """check if a given cmpt matches a dictionary of attributes
 
         Args:
-            cmpt:
-            attrs:
-            is_param_cmpts:
+            cmpt: A tuple of attributes specifying a compartment
+            attrs: A dictionary of attributes, where the key is an attribute name and the value is a list of attribute levels
+            is_param_cmpts: Whether the compartment is just using parameter-attributes (true) or all attributes (false)
 
-        Returns:
+        Returns: Boolean, true if the compartment matches the attributes dictionary
 
         """
         return all(
@@ -1093,13 +1252,12 @@ class CovidModel:
             in ([attr_val] if isinstance(attr_val, str) else attr_val)
             for attr_name, attr_val in attrs.items())
 
-    # return compartments that match a dictionary of attributes
     def get_cmpts_matching_attrs(self, attrs, is_param_cmpts=False):
-        """
+        """return all compartments that match a dictionary of attributes
 
         Args:
-            attrs:
-            is_param_cmpts:
+            attrs: dictionary of attributes to match
+            is_param_cmpts: whether using just parameter-attributes (true), or all attributes (false)
 
         Returns:
 
@@ -1115,17 +1273,17 @@ class CovidModel:
         return list(itertools.product(*list(new_attrs.values())))
         # return [cmpt for cmpt in (self.param_compartments if is_param_cmpts else self.compartments) if self.does_cmpt_have_attrs(cmpt, attrs, is_param_cmpts)]
 
-    # given a compartment tuple, update the corresponding elements with items from attrs dict.
-    # if one or more values in attrs dict is a list, then create all combinations of matching compartments
     def update_cmpt_tuple_with_attrs(self, cmpt, attrs: dict, is_param_cmpt=False):
-        """
+        """given a compartment tuple, update the corresponding elements with items from attrs dict.
+
+        if one or more values in attrs dict is a list, then create all combinations of matching compartments
 
         Args:
-            cmpt:
-            attrs:
-            is_param_cmpt:
+            cmpt: the compartment to update
+            attrs: dictionary of attributes to use to update the compartment
+            is_param_cmpt: whether using just parameter-attributes (true), or all attributes (false)
 
-        Returns:
+        Returns: list of compartments that are updated based on the attrs dictionary
 
         """
         cmpt = list(cmpt)
@@ -1140,7 +1298,7 @@ class CovidModel:
     def get_vacc_per_available(self):
         """Compute fraction of people in a region / age group that are eligible for a shot who receive the shot on a particular day
 
-        Returns:
+        Returns: Pandas DataFrame with row index date / region, and columns are the different shots.
 
         """
         # Construct a cleaned version of how many of each shot are given on each day to each age group in each region
