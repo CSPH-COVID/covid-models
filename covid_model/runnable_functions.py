@@ -276,7 +276,7 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
     args_list = list(map(lambda x: {**x, **fit_args}, model_args_list))
     # run each scenario
     if multiprocess:
-        install_mp_handler()
+        #install_mp_handler()  # current bug in multiprocessing-logging prevents this from working right now
         p = Pool(multiprocess)
         models = p.map(do_single_fit_wrapper_parallel, args_list)
     else:
@@ -453,7 +453,7 @@ def do_create_multiple_reports(models, multiprocess=None, **report_args):
     args_list = list(map(lambda x: {'model': x, **report_args}, models))
     # run each scenario
     if multiprocess:
-        install_mp_handler()
+        #install_mp_handler()  # current bug in multiprocessing-logging prevents this from working right now
         p = Pool(multiprocess)
         p.map(do_create_report_wrapper_parallel, args_list)
     else:
