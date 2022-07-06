@@ -43,7 +43,7 @@ class CovidModel:
 
     ####################################################################################################################
     ### Initialization and Updating
-    def __init__(self, engine=None, base_model=None, update_derived_properties=True, base_spec_id=None, **margs):
+    def __init__(self, engine=None, base_model=None, update_data=True, base_spec_id=None, **margs):
         # margs can be any model property
         self.recently_updated_properties = []
 
@@ -133,7 +133,7 @@ class CovidModel:
             setattr(self, key, copy.deepcopy(val))
             self.recently_updated_properties.append(key)
 
-        if update_derived_properties:
+        if update_data:
             self.update_data(engine)
 
     def update_data(self, engine=None):
