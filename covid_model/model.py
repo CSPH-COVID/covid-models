@@ -1003,7 +1003,7 @@ class CovidModel:
         """
         df = self.solution_ydf
         if group_by_attr_levels is not None:
-            df = df.groupby(group_by_attr_levels, axis=1).sum()
+            df = df.groupby(group_by_attr_levels, axis=1).sum(min_count=1)
         df['date'] = self.daterange
         df = df.set_index('date')
         return df
@@ -1105,7 +1105,7 @@ class CovidModel:
         Returns: Pandas DataFrame with row index date / region, and four columns.
 
         """
-        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region').rename('modeled_actual').to_frame()
+        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region', dropna=False).rename('modeled_actual').to_frame()
         df = df.join(self.hosps)
         df['hosp_reporting_frac'].ffill(inplace=True)
         df['modeled_observed'] = df['modeled_actual'] * df['hosp_reporting_frac']
@@ -1886,7 +1886,7 @@ class CovidModel:
         self.build_region_picker_matrix()
         self.compile()
         # initialize solution dataframe with all NA values
-        self.solution_y = np.ndarray(shape=(len(self.trange), len(self.compartments_as_index)))
+        self.solution_y = np.zeros(shape=(len(self.trange), len(self.compartments_as_index))) * np.nan
         if pickle_matrices:
             self.pickle_ode_matrices(outdir)
 
