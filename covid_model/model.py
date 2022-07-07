@@ -50,7 +50,7 @@ class CovidModel:
         # basic model data
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                                     'age': ['0-19', '20-39', '40-64', '65+'],
-                                    'vacc': ['none', 'shot1', 'shot2', 'shot3'],
+                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
                                     'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45'],
                                     'immun': ['none', 'weak', 'strong'],
                                     'region': ['co']})
@@ -1323,7 +1323,7 @@ class CovidModel:
         # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
         cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2'])
         # compute what fraction of the eligible population got each shot on a given day.
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
         vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'date', 'region', 'age']).sort_index()
@@ -1704,14 +1704,14 @@ class CovidModel:
         for seir in ['S', 'E', 'A']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
-            for i in [2, 3]:
+            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2')]:
                 for immun in self.attrs['immun']:
-                    # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
                     if immun == 'none':
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i - 1}_fail_rate)')
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, from_coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i - 1}_fail_rate)')
+                        # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available * (1 - {to_shot}_fail_rate / {to_shot}_fail_rate)')
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'none'}, from_coef=f'{to_shot}_per_available * ({to_shot}_fail_rate / {to_shot}_fail_rate)')
                     else:
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available')
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available')
 
         # seed variants (only seed the ones in our attrs)
         logger.debug(f"{str(self.tags)} Building seed flows")
