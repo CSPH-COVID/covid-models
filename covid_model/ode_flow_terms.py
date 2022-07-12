@@ -12,7 +12,7 @@ class ODEFlowTerm:
     The different subclasses of ODEFlowTerm correspond with different types of ODE term:
     - Constant: the flow value is not proportional to the value in any compartment, but may vary over time.
     - Linear: the flow value is equal to a linear combination of values in a subset of model compartments
-    - Nonlinear: the flow value is equal to a linear combination of values in a subset of model comaprtments, scaled by the sum of values in some other subset of compartments
+    - Nonlinear: the flow value is equal to a linear combination of values in a subset of model compartments, scaled by the sum of values in some other subset of compartments
     - Scaled nonlinear: like nonlinear, but we take a WEIGHTED sum of the scaling compartments
 
     """
@@ -73,7 +73,7 @@ class ODEFlowTerm:
         """Create the appropriate subclass, based on whether the appropriate coefficients and scaling compartments are specified
 
         Args:
-            from_cmpt_idx: list of indices for the comparments this flow is coming FROM
+            from_cmpt_idx: list of indices for the compartments this flow is coming FROM
             to_cmpt_idx: list of indices for the compartments this flow is going TO
             coef_by_t: a dictionary whose keys are time and whose values are a flow multiplier to be applied at that time
             scale_by_cmpts_idxs: list of indices for the scaling compartments which sum will multiply the flow
