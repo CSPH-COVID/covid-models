@@ -109,7 +109,7 @@ class CovidModel:
         self.nonlinear_matrices = None
         self.constant_vector = None
         self.region_picker_matrix = None
-        self.max_step_size = np.inf
+        self.max_step_size = 1.0
 
         if base_model is not None and base_spec_id is not None:
             self.log_and_raise("Cannot pass both a base_model and base_spec_id", ValueError)
