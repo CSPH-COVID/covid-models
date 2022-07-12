@@ -109,7 +109,7 @@ class CovidModel:
         self.nonlinear_matrices = None
         self.constant_vector = None
         self.region_picker_matrix = None
-        self.max_step_size = np.inf
+        self.max_step_size = 1.0
 
         if base_model is not None and base_spec_id is not None:
             self.log_and_raise("Cannot pass both a base_model and base_spec_id", ValueError)
@@ -183,7 +183,7 @@ class CovidModel:
         self.recently_updated_properties = []
 
     ####################################################################################################################
-    ### Functions to Update Derived Properites and Retrieve Data
+    ### Functions to Retrieve Data
 
     def set_actual_vacc(self, engine=None):
         """Retrieve vaccination data from the database and format it slightly, before storing it in self.actual_vacc_df
@@ -1783,6 +1783,8 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} Building immunity decay flows")
         for seir in [seir for seir in self.attrs['seir'] if seir != 'D']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'immun': 'strong'}, {'immun': 'weak'}, to_coef='1 / imm_decay_days')
+
+
 
     # a matrix which picks out the r
     # possibly could be used in the future to modify TC for subgroups as well e.g. for scenario exploration.
