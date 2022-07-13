@@ -99,6 +99,7 @@ def do_single_fit(tc_0=0.75,
                   fit_start_date=None,
                   fit_end_date=None,
                   prep_model=True,
+                  pre_solve_model=False,
                   outdir=None,
                   write_results=True,
                   write_batch_results=False,
@@ -117,6 +118,7 @@ def do_single_fit(tc_0=0.75,
         fit_start_date: refit all tc's on or after this date (if None, use model start date)
         fit_end_date: refit all tc's up to this date (if None, uses either model end date or last date with hospitalization data, whichever is earlier)
         prep_model: Should we run model.prep before fitting (useful if the model_args specify a base_model which has already been prepped)
+        pre_solve_model: Should we run model.solve_seir() before fitting (useful if the fit_start_date is after model.start_date and so we need an initial solution to get the initial conditions
         outdir: the output directory for saving results
         write_results: should final results be written to the database
         write_batch_results: Should we write output to the database after each fit
@@ -177,6 +179,13 @@ def do_single_fit(tc_0=0.75,
         model.prep(outdir=outdir)
         logger.debug(f'{str(model.tags)} Model flows {model.flows_string}')
         logger.info(f'{str(model.tags)} Model prepped for fitting in {perf_counter() - t0} seconds.')
+
+    # prep model (we only do this once to save time)
+    if pre_solve_model:
+        logger.info(f'{str(model.tags)} Solving Model ODE')
+        t0 = perf_counter()
+        model.solve_seir()
+        logger.info(f'{str(model.tags)} Model solved in {perf_counter() - t0} seconds.')
 
     # replace the TC and tslices within the fit window
     fit_tstart = model.date_to_t(fit_start_date)
