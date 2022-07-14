@@ -282,7 +282,7 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
     """
     # generate list of arguments
     fit_args2 = {key: val for key, val in fit_args.items() if key not in ['write_results', 'write_batch_output']}
-    args_list = list(map(lambda x: {**x, **fit_args}, model_args_list))
+    args_list = list(map(lambda x: {**x, **fit_args2}, model_args_list))
     # run each scenario
     if multiprocess:
         #install_mp_handler()  # current bug in multiprocessing-logging prevents this from working right now
@@ -298,9 +298,9 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
         pass
     else:
         [m.write_specs_to_db(engine=engine) for m in models]
-        [m.write_results_to_db(engine=engine) for m in models]
+        #[m.write_results_to_db(engine=engine) for m in models]
         logger.info(f'spec_ids: {",".join([str(m.spec_id) for m in models])}')
-        logger.info(f'result_ids: {",".join([str(m.result_id) for m in models])}')
+        #logger.info(f'result_ids: {",".join([str(m.result_id) for m in models])}')   # takes way too long, let's not write the results to the database right now.
 
     return models
 
