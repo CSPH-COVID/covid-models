@@ -109,7 +109,7 @@ class CovidModel:
         self.nonlinear_matrices = None
         self.constant_vector = None
         self.region_picker_matrix = None
-        self.max_step_size = np.inf
+        self.max_step_size = 1.0
 
         if base_model is not None and base_spec_id is not None:
             self.log_and_raise("Cannot pass both a base_model and base_spec_id", ValueError)
@@ -183,7 +183,7 @@ class CovidModel:
         self.recently_updated_properties = []
 
     ####################################################################################################################
-    ### Functions to Update Derived Properites and Retrieve Data
+    ### Functions to Retrieve Data
 
     def set_actual_vacc(self, engine=None):
         """Retrieve vaccination data from the database and format it slightly, before storing it in self.actual_vacc_df
@@ -1332,15 +1332,21 @@ class CovidModel:
         return vacc_per_available
 
     def set_param_by_t(self, param, vals: dict, mults: dict, cmpt=None, from_cmpt=None, to_cmpt=None):
-        """
+        """Set the value of a parameter, or apply multipliers to a parameter, at different points in time, for a single compartment or compartment pair
+
+        parameters are defined as step functions which change only at user specified times. The user can also apply
+        multipliers which modify the value of a parameter at different points in time. This function will set or update
+        parameters for the given compartments
+
+        Both vals and mults can be specified, but typically only one is done at a time.
 
         Args:
-            param:
-            vals:
-            mults:
-            cmpt:
-            from_cmpt:
-            to_cmpt:
+            param: The parameter being set
+            vals: A dictionary where keys are string representations of dates and values are the values of this parameter at those dates
+            mults: A dictionary where keys are string representations of dates and values are the values of this parameter at those dates
+            cmpt: If setting a parameter that is attached to a compartment, the compartment to set this parameter for. Expressed as a tuple of attribute levels
+            from_cmpt: If setting a parameter that is associated with a pair of compartments, the "from" compartment. Expressed as a tuple of attribute levels
+            to_cmpt: If setting a parameter that is associated with a pair of compartments, the "to" compartment. Expressed as a tuple of attribute levels
         """
         param_key = cmpt if cmpt is not None else (from_cmpt, to_cmpt)
         # cmpts are added to params greedily to reduce space allocation
@@ -1374,16 +1380,19 @@ class CovidModel:
                 if idx_left >= 0:  # there is a multiplier that applies to this time.
                     self.params_by_t[param_key][param][t] *= mults2[list(mults2.keys())[idx_left]]
 
-    # set values for a single parameter based on param_tslices
     def set_compartment_param(self, param, attrs: dict = None, vals: dict = None, mults: dict = None, desc=None):
-        """
+        """Set the value of a parameter, or apply multipliers to a parameter, at different points in time, for a group of compartments
+
+        This function is only used when setting parameters which are attached to a compartment.
+
+        Both vals and mults can be specified, but typically only one is done at a time.
 
         Args:
-            param:
-            attrs:
-            vals:
-            mults:
-            desc:
+            param: The parameter being set
+            attrs: dictionary with keys being attribute names and values being attribute levels or a list of attribute levels, which describe the compartments to set the parameters for
+            vals: A dictionary where keys are string representations of dates and values are the values of this parameter at those dates
+            mults: A dictionary where keys are string representations of dates and values are the values of this parameter at those dates
+            desc: A description of why this parameter is being set this way. This is not actually used in the code, but gives a space in the json file to justify each parameter specification
         """
         # get only the compartments we want
         cmpts = ['all'] if attrs is None else self.get_cmpts_matching_attrs(attrs, is_param_cmpts=True)
@@ -1393,15 +1402,20 @@ class CovidModel:
 
     # set values for a single parameter based on param_tslices
     def set_from_to_compartment_param(self, param, from_attrs: dict = None, to_attrs: dict = None, vals: dict = None, mults: dict = None, desc=None):
-        """
+        """Set the value of a parameter, or apply multipliers to a parameter, at different points in time, for a group of from/to compartment pairs
+
+        This function is only used when setting parameters which are associated with a pair of compartments.
+        The to_attrs argument specifies the changes which should be applied to each from-compartment to produce each to-compartment.
+
+        Both vals and mults can be specified, but typically only one is done at a time.
 
         Args:
-            param:
-            from_attrs:
-            to_attrs:
-            vals:
-            mults:
-            desc:
+            param: The parameter being set
+            from_attrs: dictionary with keys being attribute names and values being attribute levels or a list of attribute levels, which describe the from-compartments to set the parameters for
+            to_attrs: dictionary with keys being attribute names and values being attribute levels or a list of attribute levels, which describe the to-compartments to set the parameters for
+            vals: A dictionary where keys are string representations of dates and values are the values of this parameter at those dates
+            mults: A dictionary where keys are string representations of dates and values are the values of this parameter at those dates
+            desc: A description of why this parameter is being set this way. This is not actually used in the code, but gives a space in the json file to justify each parameter specification
         """
         # get only the compartments we want
         from_cmpts = ['all'] if from_attrs is None else self.get_cmpts_matching_attrs(from_attrs, is_param_cmpts=True)
@@ -1414,13 +1428,12 @@ class CovidModel:
             for to_cmpt in to_cmpts:
                 self.set_param_by_t(param, from_cmpt=from_cmpt, to_cmpt=to_cmpt, vals=vals, mults=mults)
 
-    # combine param_defs, vaccine_defs, etc. into a time indexed parameters dictionary
     def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
-        """
+        """ combine param_defs list and vaccination_data into a time indexed parameters dictionary
 
         Args:
-            apply_vaccines:
-            vacc_delay:
+            apply_vaccines: Whether vaccines should be applied in the model
+            vacc_delay: How long to wait before vaccines become effective (how long after a vaccine is administered before we move someone to a vaccinated status
         """
         logger.debug(f"{str(self.tags)} Building param lookups")
         # clear model params if they exist
@@ -1468,14 +1481,20 @@ class CovidModel:
         self.params_trange = sorted(list(set.union(*[set(param.keys()) for param_key in self.params_by_t.values() for param in param_key.values()])))
         self.t_prev_lookup = {t_int: max(t for t in self.params_trange if t <= t_int) for t_int in self.trange}
 
-    # set TC by slice, and update non-linear multiplier; defaults to reseting the last TC values
     def update_tc(self, tc, replace=True, update_lookup=True):
-        """
+        """set TC at different points in time, and update the lookup dictionary that quickly determines which TC is relevant for a given time
+
+        TC is used in the model as a multiplier on the nonlinear terms, because those terms only deal with disease
+        transmission. This function updates part or all of the tc dictionary, and also updates a lookup dictionary with
+        keys being all t between tstart and tend, and values being the index of the tc value which applies to that t
+
+        This function runs every time the curve_fit function tries out a new TC value when optimizing, so there are a
+        few options to help things run as fast as possible.
 
         Args:
-            tc:
-            replace:
-            update_lookup:
+            tc: dictionary with keys being time t relative to the start date, and values being the tc value starting at that date.
+            replace: Whether to just update the model's existing tc dictionary (False), or replace the entire thing (True)
+            update_lookup: Whether to update the lookup dictionary. Only necessary if a t value is added or changed. If only the tc values are being updated, this slightly costly operation can be skipped.
         """
         if replace:
             self.__tc = tc
@@ -1485,11 +1504,18 @@ class CovidModel:
             self.tc_t_prev_lookup = [max(t for t in self.__tc.keys() if t <= t_int) for t_int in self.trange]  # lookup for latest defined TC value
 
     def _default_nonlinear_matrix(self):
+        """A function that constructs an empty nonlinear matrix with the correct dimensions.
+
+        Several nonlinear matrices are constructed, since different "scale_by" compartments need to be applied to
+        different ODE terms. This function allows easy creation of a new nonlinear matrix.
+
+        Returns: SciPy sparse matrix in list-in-list format, making it easy to update elements later.
+
+        """
         return spsp.lil_matrix((self.n_compartments, self.n_compartments))
 
-    # assign default values to matrices
     def reset_ode(self):
-        """
+        """Assign default values to matrices and vectors used in the system of ODE's
 
         """
         self.terms = []
@@ -1497,16 +1523,17 @@ class CovidModel:
         self.nonlinear_matrices = {t: defaultdict(self._default_nonlinear_matrix) for t in self.params_trange}
         self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
 
-    # given a parameter, find its definition in params_by_t for the desired compartment(s). Useful because of the "all" default, so we may have to hunt a bit for the param
     def get_param_key_for_param_and_cmpts(self, param, cmpt=None, from_cmpt=None, to_cmpt=None, nomatch_okay=False, is_param_cmpt=False):
-        """
+        """given a parameter, find its definition in params_by_t for the desired compartment(s).
+
+        Useful because of the "all" default, so we may have to hunt a bit for the param
 
         Args:
-            param:
-            cmpt:
-            from_cmpt:
-            to_cmpt:
-            nomatch_okay:
+            param: The value of the parameter to retrieve the value for
+            cmpt: For parameters attached to a compartment, the compartment to retrieve the parameter for.
+            from_cmpt: For parameters attached to pairs of compartments, the "from-compartment" to retrieve the parameter for.
+            to_cmpt: For parameters attached to pairs of compartments, the "to-compartment" to retrieve the parameter for.
+            nomatch_okay: Whether or not to raise an error when
             is_param_cmpt:
 
         Returns:
@@ -1532,19 +1559,20 @@ class CovidModel:
                 self.log_and_raise(f"parameter {param} not defined for from-compartment {from_cmpt} and to-compartment {to_cmpt}", ValueError)
         return param_key
 
-    # takes a symbolic expression (coef), and looks up variable names in params to provide a computed output for each t in params_trange
-    # cmpt_key may be a single compartment tuple or a tuple of two compartment tuples (for a pair-specific parameter)
     def calc_coef_by_t(self, coef, cmpt=None, from_cmpt=None, to_cmpt=None, lambdified_coef=None):
-        """
+        """takes a symbolic expression (coef), and looks up variable names in params dictionary to compute a number for
+         each t in params_trange
+
+         cmpt_key may be a single compartment tuple or a tuple of two compartment tuples (for a pair-specific parameter)
 
         Args:
-            coef:
-            cmpt:
-            from_cmpt:
-            to_cmpt:
-            lambdified_coef:
+            coef: a dictionary, function, string, or symbolic expression representing the coefficient to be computed (most likely a string or symbolic expression
+            cmpt: for a compartment attached parameter, a tuple of attribute values defining a compartment
+            from_cmpt: for parameters associated with a pair of compartments, a tuple of attribute values defining the from-compartment
+            to_cmpt: for parameters associated with a pair of compartments, a tuple of attribute values defining the to-compartment
+            lambdified_coef: Optional: a lambified expression (a function) which computes the coefficient given the values of the relevant parameters (if not provided, a labmdified expression of coef will be created.
 
-        Returns:
+        Returns: dictionary with keys being t values in self.params_trange and values being the value of coef at each t
 
         """
         if isinstance(coef, dict):
@@ -1580,19 +1608,21 @@ class CovidModel:
         else:
             return {t: coef for t in self.params_trange}
 
-    # add a flow term, and add new flow to ODE matrices
     def add_flow_from_cmpt_to_cmpt(self, from_cmpt, to_cmpt, from_coef=None, to_coef=None, from_to_coef=None, scale_by_cmpts=None, scale_by_cmpts_coef=None, constant=None):
-        """
+        """add a flow term, and add new flow to ODE matrices
+
+        Depending on the passed arguments, a term will be added to either the constant vector, linear matrix, or one or
+        more nonlinear matrices which define the system of ODE's
 
         Args:
-            from_cmpt:
-            to_cmpt:
-            from_coef:
-            to_coef:
-            from_to_coef:
-            scale_by_cmpts:
-            scale_by_cmpts_coef:
-            constant:
+            from_cmpt: a tuple of attribute levels defining the from compartment for this flow
+            to_cmpt: a tuple of attribute levels defining the to comaprtment for this flow
+            from_coef: a string representation of an algebraic expression involving parameters to get from the from-compartment
+            to_coef: a string representation of an algebraic expression involving parameters to get from the to-compartment
+            from_to_coef: a string representation of an algebraic expression involving parameters to get that are associated with the pair of from/to compartments
+            scale_by_cmpts: A list of tuples of attribute levels representing the compartments to sum together and multiply into this flow term.
+            scale_by_cmpts_coef: A list of string expressions representing multipliers which allow a weighted sum of the scale_by_cmpts (may not work currently)
+            constant: A string representation of an algebraic expression involving parameters to use in the constant vector
         """
         if len(from_cmpt) < len(self.attr_names):
             self.log_and_raise(f'Source compartment `{to_cmpt}` does not have the right number of attributes.', ValueError)
@@ -1648,20 +1678,26 @@ class CovidModel:
                 term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
                 term.add_to_constant_vector(self.constant_vector[t], t)
 
-    # add multipler flows, from all compartments with from_attrs, to compartments that match the from compartments, but replacing attributes as designated in to_attrs
-    # e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
+
     def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, from_to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
-        """
+        """add  flows from one set of compartments to another set of compartments
+
+        The "from" compartments are all compartments matching the attributes specified in from_attrs
+        The "to" compartments are all compartments matching the attributes specified in from_attrs, but with any updates
+        as specified in the to_attrs
+
+        e.g. from {'seir': 'S', 'age': '0-19'} to {'seir': 'E'} will be a flow from susceptible 0-19-year-olds to exposed 0-19-year-olds
 
         Args:
-            from_attrs:
-            to_attrs:
-            from_coef:
-            to_coef:
-            from_to_coef:
-            scale_by_attrs:
-            scale_by_coef:
-            constant:
+            from_attrs: dictionary with keys being attribute names and values being attribute levels or lists of attribute levels specifying the from compartments
+            to_attrs: dictionary with keys being attribute names and values being attribute levels or lists of attribute levels specifying the to compartments
+            from_coef: a string representation of an algebraic expression involving parameters to get from the from-compartment
+            to_coef: a string representation of an algebraic expression involving parameters to get from the to-compartment
+            from_to_coef: a string representation of an algebraic expression involving parameters to get that are associated with the pair of from/to compartments
+            scale_by_cmpts: A list of tuples of attribute levels representing the compartments to sum together and multiply into this flow term.
+            scale_by_cmpts_coef: A list of string expressions representing multipliers which allow a weighted sum of the scale_by_cmpts (may not work currently)
+            constant: A string representation of an algebraic expression involving parameters to use in the constant vector
+
         """
         # Create string summarizing the flow
         from_attrs_str = '(' + ','.join(from_attrs[p] if p in from_attrs.keys() else "*" for p in self.attrs) + ')'
@@ -1690,9 +1726,8 @@ class CovidModel:
                 self.add_flow_from_cmpt_to_cmpt(from_cmpt, to_cmpt, from_coef=from_coef, to_coef=to_coef, from_to_coef=from_to_coef, scale_by_cmpts=scale_by_cmpts,
                                                 scale_by_cmpts_coef=scale_by_coef, constant=constant)
 
-    # build ODE
     def build_ode_flows(self):
-        """
+        """Create all the flows that should be in the model, to represent the different dynamics we are modeling
 
         """
         logger.debug(f"{str(self.tags)} Building ode flows")
@@ -1784,10 +1819,13 @@ class CovidModel:
         for seir in [seir for seir in self.attrs['seir'] if seir != 'D']:
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'immun': 'strong'}, {'immun': 'weak'}, to_coef='1 / imm_decay_days')
 
-    # a matrix which picks out the r
-    # possibly could be used in the future to modify TC for subgroups as well e.g. for scenario exploration.
     def build_region_picker_matrix(self):
-        """
+        """A matrix which indicates the region associated with each compartment.
+
+        This matrix can be multiplied by a state vector to sum a set of compartments over each region. Useful for
+        quickly computing hospitalizations per region (when also picking out only hospitalized compartments)
+
+        this matrix has dimension (# of compartments, # of regions) with elements 1 indicating a compartment belongs to a region, and 0 otherwise.
 
         """
         logger.debug(f"{str(self.tags)} creating region picker matrix")
@@ -1797,9 +1835,8 @@ class CovidModel:
             picker[region_idx, i] = 1
         self.region_picker_matrix = picker
 
-    # convert ODE matrices to CSR format, to (massively) improve performance
     def compile(self):
-        """
+        """convert ODE matrices to CSR format, to (massively) improve performance
 
         """
         logger.debug(f"{str(self.tags)} compiling ODE")
@@ -1809,15 +1846,14 @@ class CovidModel:
                 self.nonlinear_matrices[t][k] = v.tocsr()
         self.region_picker_matrix = self.region_picker_matrix.tocsr()
 
-    # ODE step forward
     def ode(self, t: float, y: list):
-        """
+        """Compute the derivative WRT time of the model at a time t and state vector y. Used to solve the system of ODE's
 
         Args:
-            t:
-            y:
+            t: integer representing the time at which to compute the derivative
+            y: current state vector
 
-        Returns:
+        Returns: Derivative of y with respect to t at time t.
 
         """
         dy = [0] * self.n_compartments
@@ -1838,14 +1874,16 @@ class CovidModel:
 
         return dy
 
-    # solve ODE using scipy.solve_ivp, and put solution in solution_y
     def solve_seir(self, y0=None, tstart=None, tend=None):
-        """
+        """solve ODE using scipy.solve_ivp, and put solution in solution_y
+
+        Can specify a start_time, but if so need to provide an initial condition in y0 or else the model's y0_dict will
+        be used as the starting condition
 
         Args:
-            y0:
-            tstart:
-            tend:
+            y0: Initial conditions
+            tstart: t at which to start solving the ODE
+            tend: t at which to stop solving the ODE
         """
         if len(self.tc) == 0:
             self.log_and_raise("Trying to solve SEIR, but no TC is set", RuntimeError)
@@ -1869,15 +1907,18 @@ class CovidModel:
         # replace the part of the solution we simulated
         self.solution_y[tstart:(tend + 1), ] = np.transpose(solution.y)
 
-    # a model must be prepped before it can be run; if any params EXCEPT the TC change, it must be re-prepped
     def prep(self, rebuild_param_lookups=True, pickle_matrices=True, outdir=None, **build_param_lookup_args):
-        """
+        """Convert params definitions and model settings into ODE matrices that can be used to solve the system of ODE's
+
+        a model must be prepped before the ODE's can be solved; if any params EXCEPT the TC change, it must be re-prepped
+
+        This function also creates some other necessary things for fitting
 
         Args:
-            rebuild_param_lookups:
-            pickle_matrices:
-            outdir:
-            **build_param_lookup_args:
+            rebuild_param_lookups: Whether to rebuild parameter lookups
+            pickle_matrices: whether to save a pickled version of the ODE matrices/vector to the output directory
+            outdir: string representation of the path to save the pickled ODE matrices to
+            **build_param_lookup_args: Additional arguments to be passed to self.build_param_lookups function
         """
         logger.info(f"{str(self.tags)} Prepping Model")
         if rebuild_param_lookups:
@@ -1894,12 +1935,13 @@ class CovidModel:
     ### Reading and Writing Data
     @staticmethod
     def serialize_vacc(df):
-        """
+        """Convert a pandas dataframe of vaccinations to a dictionary so it can be serialized in json format for writing
+        to the database
 
         Args:
-            df:
+            df: vaccination dataframe
 
-        Returns:
+        Returns: dictionary representation of vaccination dataframe
 
         """
         df = df.reset_index()
@@ -1908,12 +1950,13 @@ class CovidModel:
 
     @classmethod
     def unserialize_vacc(cls, vdict):
-        """
+        """convert a dictionary of vaccinations that probably came from the database, into a pandas dataframe of
+        vaccinations
 
         Args:
-            vdict:
+            vdict: The dictionary representation of vaccinations
 
-        Returns:
+        Returns: A Pandas DataFrame of the vaccinations
 
         """
         df = pd.DataFrame.from_dict(vdict)
@@ -1922,12 +1965,13 @@ class CovidModel:
 
     @staticmethod
     def serialize_hosp(df):
-        """
+        """Convert a pandas dataframe of hospitalizations to a dictionary so it can be serialized in json format for writing
+        to the database
 
         Args:
-            df:
+            df: Pandas DataFrame of hospitalizations
 
-        Returns:
+        Returns: dictionary representation of hospitalizations
 
         """
         df = df.reset_index()
@@ -1936,12 +1980,14 @@ class CovidModel:
 
     @classmethod
     def unserialize_hosp(cls, hdict):
-        """
+        """convert a dictionary of hospitalizations that probably came from the database, into a pandas dataframe of
+        hospitalizations
+
 
         Args:
-            hdict:
+            hdict: dictionary representation of hospitalizations
 
-        Returns:
+        Returns: Pandas DataFrame of hospitalizations
 
         """
         df = pd.DataFrame.from_dict(hdict)
@@ -1950,12 +1996,13 @@ class CovidModel:
 
     @staticmethod
     def serialize_mob(df):
-        """
+        """Convert a pandas dataframe of mobility to a dictionary so it can be serialized in json format for writing
+        to the database
 
         Args:
-            df:
+            df: Pandas DataFrame of mobility
 
-        Returns:
+        Returns: dictionary representation of hospitalizations
 
         """
         df = df.reset_index()
@@ -1964,12 +2011,13 @@ class CovidModel:
 
     @classmethod
     def unserialize_mob(cls, mdict):
-        """
+        """convert a dictionary of mobility that probably came from the database, into a pandas dataframe of
+        mobility
 
         Args:
-            mdict:
+            mdict: dictionary representation of mobility
 
-        Returns:
+        Returns: Pandas DataFrame of mobility
 
         """
         df = pd.DataFrame.from_dict(mdict)
@@ -1978,12 +2026,15 @@ class CovidModel:
 
     @classmethod
     def unserialize_tc(cls, tc_dict):
-        """
+        """Convert a modified TC dictionary that came from the database, into a dictionary suitable for the model
+
+        the TC dictionary uses integer values as dictionary keys. JSON only allows strings as keys, so these keys are
+        strings when retrieved from the database. This function simply converts them back to integers.
 
         Args:
-            tc_dict:
+            tc_dict: database version of tc_dictionary
 
-        Returns:
+        Returns: model suitable version of tc_dictionary
 
         """
         # JSON can't handle numbers as dict keys
@@ -1991,34 +2042,41 @@ class CovidModel:
 
     @staticmethod
     def serialize_y0_dict(y0_dict):
-        """
+        """Convert a dictionary representing the initial conditions in the model, to a list suitable for json conversion
+        in order to write to the database.
+
+        JSON doesn't support tuples as dictionary keys, so we just have to convert the dictionary to a list of lists
 
         Args:
-            y0_dict:
+            y0_dict: python dictionary of initial conditions, keys being tuples representing compartments, and values being an integer
 
-        Returns:
+        Returns: list of lists suitable for JSON conversion
 
         """
         return [list(key) + [val] for key, val in y0_dict.items()]
 
     @classmethod
     def unserialize_y0_dict(cls, y0_list):
-        """
+        """Convert a list of lists formatted initial conditions that probably came from the database, to a dictionary
+        suitable for the model.
 
         Args:
-            y0_list:
+            y0_list: list of lists, each inner list containing the key/value pair of the initial condition.
 
-        Returns:
+        Returns: proper dictionary representation of the model's initial condition
 
         """
         return {tuple(li[:-1]): float(li[-1]) for li in y0_list} if y0_list is not None else None
 
-    # serializes SOME of this model's properties to a json format which can be written to database
-    # model needs prepping still
     def to_json_string(self):
-        """
+        """serializes SOME of this model's properties to a json format which can be written to database.
 
-        Returns:
+        In general, anything created by the self.prep() and self.solve_seir() functions is not saved to the database,
+        so when the model is reloaded from the database, it will have to be re-prepped and re-solved.
+
+        However, TC IS saved to the database.
+
+        Returns: A string representation of a JSON object suitable for writing to the database
 
         """
         logger.debug(f"{str(self.tags)} Serializing model to json")
@@ -2052,10 +2110,10 @@ class CovidModel:
         return json.dumps(serial_dict)
 
     def from_json_string(self, s):
-        """
+        """Re-institute SOME model properties using a JSON string presumably retrieved from the database.
 
         Args:
-            s:
+            s: JSON string containing different model properties.
         """
         logger.debug(f"{str(self.tags)} repopulating model from serialized json")
         raw = json.loads(s)
@@ -2081,7 +2139,7 @@ class CovidModel:
         self.end_date = self.end_date
 
     def write_specs_to_db(self, engine=None):
-        """
+        """Function which assigns this model a spec_id and writes a serialized version of this model to the database
 
         Args:
             engine:
@@ -2114,10 +2172,10 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} spec_id: {self.spec_id}")
 
     def read_from_base_spec_id(self, engine):
-        """
+        """Retrieve specifications for this model from the database.
 
         Args:
-            engine:
+            engine: a connection to the database
         """
         if engine is None:
             engine = db_engine()
@@ -2133,19 +2191,30 @@ class CovidModel:
 
     @staticmethod
     def _col_to_json(d):
+        """Convert a single pandas column (Series) to a json string suitable for writing to the database.
+
+        Args:
+            d: Pandas Series
+
+        Returns: string representation of JSON object.
+
+        """
         return json.dumps(d, ensure_ascii=False)
 
     def write_results_to_db(self, engine, new_spec=False, vals_json_attr='seir',
                             cmpts_json_attrs=('region', 'age', 'vacc')):
-        """
+        """Write the model's solution to the database, i.e. the solution_sum, grouped by user defined attributes.
+
+        The solution will be grouped by both vals_json_attr and cmpts_json_attrs, but the cmpts_json_attrs will be
+        pivoted from column index to row index, and the vals_json_attr will be columns.
 
         Args:
-            engine:
-            new_spec:
-            vals_json_attr:
-            cmpts_json_attrs:
+            engine: a connection to the database
+            new_spec: whether to write this model to the specifications table (and get a spec_id) before writing the results
+            vals_json_attr: tuple of attributes that define which attributes define the columns of the solution_sum
+            cmpts_json_attrs: tuple of attributes that define which attributes define the rows of the solution_sum
 
-        Returns:
+        Returns: The Pandas DataFrame that was written to the database.
 
         """
         if engine is None:
@@ -2183,10 +2252,10 @@ class CovidModel:
         return df
 
     def pickle_ode_matrices(self, outdir=None):
-        """
+        """Dump all the model's ODE matrices and vectors to a pickle object
 
         Args:
-            outdir:
+            outdir: the output directory to pickle the ODE matrices to
         """
         logger.debug("Pickling ODE matrices")
         with open(get_filepath_prefix(outdir, self.tags) + "ode_matrices.pkl", 'wb') as f:
@@ -2197,10 +2266,10 @@ class CovidModel:
             pickle.dump(self.t_prev_lookup, f)
 
     def unpickle_ode_matrices(self, filepath):
-        """
+        """Read pickled versions of ODE matrices from a file
 
         Args:
-            filepath:
+            filepath: The filepath of the pickled object.
         """
         logger.debug("Unpickling ODE matrices")
         with open(filepath, "rb") as f:
