@@ -1,11 +1,10 @@
-from unittest import TestCase
-from covid_model.db import db_engine, get_sqa_table
-from covid_model.model_specs import CovidModelSpecifications
-from covid_model.model import CovidModel
-from sqlalchemy import *
-from sqlalchemy.engine import create_engine
-from sqlalchemy.schema import *
+""" Python Standard Library """
 import datetime as dt
+from unittest import TestCase
+""" Third Party Imports """
+""" Local Imports """
+from covid_model.utils import get_sqa_table, db_engine
+from covid_model.model import CovidModel
 
 
 class Test(TestCase):

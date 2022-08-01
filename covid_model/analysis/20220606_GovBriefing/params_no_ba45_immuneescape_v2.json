@@ -369,11 +369,8 @@
   {"param": "immune_escape", "from_attrs": null, "to_attrs": null,  "vals": {"2020-01-01": 0},  "desc":  ""},
   {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["omicron", "ba2", "ba2121"]},  "vals": {"2020-01-01": 0.1},  "desc":  ""},
   {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["omicron", "ba2"]}, "to_attrs": {"variant": ["ba2121"]},  "vals": {"2020-01-01": 0.1},  "desc": ""},
-  {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121"]}, "to_attrs": {"variant": ["ba45"]},  "vals": {"2020-01-01": 0.1},  "desc": "strong"},
-  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
-  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["omicron", "ba2"]}, "to_attrs": {"variant": ["ba2121", "ba45"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
-  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["ba2121"]}, "to_attrs": {"variant": ["ba45"]},  "vals": {"2020-01-01": 0.75},  "desc": "weak"},
-
+  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["omicron", "ba2", "ba2121"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["omicron", "ba2"]}, "to_attrs": {"variant": ["ba2121"]},  "vals": {"2020-01-01": 0.75},  "desc": ""},
 
   {"param": "imm_decay_days",	"attrs": null,	"vals": {"2020-01-01": 360},	"desc": ""},
   {"param": "imm_decay_days",	"attrs": {"vacc": "shot3"},	"mults": {"2020-01-01": 1.25},	"desc": "Booster immunity decays more slowly than 2-dose immunity."},
@@ -414,7 +411,7 @@
 
   {"param": "hosp",	"attrs": {"variant": "alpha"},	"mults": {"2020-01-01": 1.4},	"desc": "Alpha is more severe than wildtype."},
   {"param": "hosp",	"attrs": {"variant": "delta"},	"mults": {"2020-01-01": 2.38},	"desc": "Delta is more severe than wildtype."},
-  {"param": "hosp",	"attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},	"mults": {"2020-01-01": 0.833},	"desc": "Omicron is less severe than wildtype."},
+  {"param": "hosp",	"attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},	"mults": {"2020-01-01": 0.952},	"desc": "Omicron is less severe than wildtype."},
 
   {"param": "hlos",	"attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},	"mults": {"2020-01-01": 0.6},	"desc": "Omicron has shorter length of stay than wildtype."},
 
