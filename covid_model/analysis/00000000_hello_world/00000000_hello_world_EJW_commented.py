@@ -101,7 +101,7 @@ def main():
         # params_defs is just a giant file that has all the parameters (i.e. a number used in an ODE somewhere)
         # could be anything from population to how many people are receiving monoclonal antibodies
         # can be constant or vary over time depending on the parameter
-        'params_defs': json.load(open('covid_model/analysis/00000000_hello_world/base_params_for_scenarios.json')),
+        'params_defs': json.load(open('covid_model/analysis/00000000_hello_world/permanent_params.json')),
 
         # region_defs defines the regions that we're using for the model
         'region_defs': 'covid_model/input/region_definitions.json',
