@@ -37,7 +37,7 @@ def main():
     base_model_args = {
         'params_defs': json.load(open('covid_model/analysis/20220606_GovBriefing/params_no_ba45_immuneescape.json')),
         'region_defs': 'covid_model/input/region_definitions.json',
-        'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
+        'vacc_proj_params': 'covid_model/input/20220718_vacc_proj_params.json',
         'regions': ['co'],
         'tc': [0.75, 0.75],
         'tc_tslices': [14],

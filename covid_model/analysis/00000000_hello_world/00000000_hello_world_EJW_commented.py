@@ -110,7 +110,7 @@ def main():
         # if we're projecting for the future, we need to make some sort of assumption
         # as to how vaccinations will look in the future
         # we mostly haven't touched it but we still need to tell the model how to do it
-        'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
+        'vacc_proj_params': 'covid_model/input/20220718_vacc_proj_params.json',
 
         # define the regions we're working with in this model
         'regions': ['co'], # if we wanted to make this a list of regions, you could say 'regions': ['co', 'ar', 'bo']

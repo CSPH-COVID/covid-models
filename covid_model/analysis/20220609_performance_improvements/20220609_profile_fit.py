@@ -38,7 +38,7 @@ def main():
     model_args = {
         'params_defs': json.load(open('covid_model/analysis/20220609_performance_improvements/profile_params.json')),
         'region_defs': 'covid_model/input/region_definitions.json',
-        'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
+        'vacc_proj_params': 'covid_model/input/20220718_vacc_proj_params.json',
         'regions': ['co'],
         'mobility_mode': None,
         'start_date': dt.datetime.strptime('2020-01-24', "%Y-%m-%d").date(),
