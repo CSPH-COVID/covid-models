@@ -27,7 +27,7 @@ logger = IndentLogger(logging.getLogger(''), {})
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
-class CovidModel:
+class CovidModelSimplified:
     ####################################################################################################################
     """ Setup """
 
@@ -1070,11 +1070,12 @@ class CovidModel:
         if vacc_only:
             params.loc[params.index.get_level_values('vacc') == 'none', 'immunity'] = 0
             params.loc[params.index.get_level_values('vacc') == 'none', 'severe_immunity'] = 0
-
+        # define the effective infection rate, which is the uncontrolled infection rate minus the complement of immunity and immune escape parameters
         params['effective_inf_rate'] = 1 - params['immunity'] * (1 - params['immune_escape'])
         if to_hosp:
-            # weights = people who would be hospitalized if noone had any immunity
+            # weights = people who would be hospitalized if no one had any immunity
             weights = n * params['hosp'] * (1 - params['mab_prev'] - params['pax_prev'] + params['mab_prev'] * params['mab_hosp_adj'] + params['pax_prev'] * params['pax_hosp_adj'])
+            # define the effective hospitalization rate, which is the effective infection rate minus the complement of immunity against hospitalization
             params['effective_hosp_rate'] = params['effective_inf_rate'] * (1 - params['severe_immunity'])
             return (weights * (1 - params['effective_hosp_rate'])).groupby('date').sum() / weights.groupby('date').sum()
             # return (n * (1 - params['effective_hosp_rate'])).groupby('date').sum() / n.groupby('date').sum()
@@ -1737,16 +1738,8 @@ class CovidModel:
         # vaccination
         logger.debug(f"{str(self.tags)} Building vaccination flows")
         for seir in ['S', 'E', 'A']:
-            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
-            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2')]:
-                for immun in self.attrs['immun']:
-                    if immun == 'none':
-                        # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available * (1 - {to_shot}_fail_rate / {to_shot}_fail_rate)')
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'none'}, from_coef=f'{to_shot}_per_available * ({to_shot}_fail_rate / {to_shot}_fail_rate)')
-                    else:
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available')
+            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available')
+            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available')
 
         # seed variants (only seed the ones in our attrs)
         logger.debug(f"{str(self.tags)} Building seed flows")
@@ -1801,15 +1794,15 @@ class CovidModel:
         for variant in self.attrs['variant']:
             if variant == 'none':
                 continue
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - hosp - dnh) * (1 - priorinf_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S'}, to_coef='gamm * (1 - hosp - dnh) * priorinf_fail_rate')
-            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - priorinf_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S'}, to_coef='gamm * priorinf_fail_rate')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm * (1 - hosp - dnh)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'S'}, to_coef='gamm * (1 - hosp - dnh)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='gamm')
+            self.add_flows_from_attrs_to_attrs({'seir': 'A', 'variant': variant}, {'seir': 'S'}, to_coef='gamm')
 
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='1 / hlos * (1 - dh) * (1 - priorinf_fail_rate) * (1-mab_prev)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S'}, to_coef='1 / hlos * (1 - dh) * priorinf_fail_rate * (1-mab_prev)')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * (1 - priorinf_fail_rate) * mab_prev')
-            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S'}, to_coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * priorinf_fail_rate * mab_prev')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='1 / hlos * (1 - dh) * (1-mab_prev)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S'}, to_coef='1 / hlos * (1 - dh) * (1-mab_prev)')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S', 'immun': 'strong'}, to_coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * mab_prev')
+            self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'S'}, to_coef='1 / (hlos * mab_hlos_adj) * (1 - dh) * mab_prev')
 
             self.add_flows_from_attrs_to_attrs({'seir': 'I', 'variant': variant}, {'seir': 'D'}, to_coef='gamm * dnh * (1 - severe_immunity)')
             self.add_flows_from_attrs_to_attrs({'seir': 'Ih', 'variant': variant}, {'seir': 'D'}, to_coef='1 / hlos * dh')
@@ -2081,12 +2074,12 @@ class CovidModel:
         """
         logger.debug(f"{str(self.tags)} Serializing model to json")
         keys = ['base_spec_id', 'spec_id', 'tags',
-                '_CovidModel__start_date', '_CovidModel__end_date', '_CovidModel__attrs', '_CovidModel__tc',
-                'tc_t_prev_lookup', '_CovidModel__params_defs',
-                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params',
-                '_CovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility',
-                '_CovidModel__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps', '_CovidModel__hosp_reporting_frac',
-                '_CovidModel__y0_dict', 'max_step_size', 'ode_method']
+                '_CovidModelSimplified__start_date', '_CovidModelSimplified__end_date', '_CovidModelSimplified__attrs', '_CovidModelSimplified__tc',
+                'tc_t_prev_lookup', '_CovidModelSimplified__params_defs',
+                '_CovidModelSimplified__region_defs', '_CovidModelSimplified__regions', '_CovidModelSimplified__vacc_proj_params',
+                '_CovidModelSimplified__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility',
+                '_CovidModelSimplified__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps', '_CovidModelSimplified__hosp_reporting_frac',
+                '_CovidModelSimplified__y0_dict', 'max_step_size', 'ode_method']
         # add in proj_mobility
         serial_dict = OrderedDict()
         for key in keys:
@@ -2101,7 +2094,7 @@ class CovidModel:
                 serial_dict[key] = self.serialize_mob(val)
             elif key == 'hosps' and val is not None:
                 serial_dict[key] = self.serialize_hosp(val)
-            elif key == '_CovidModel__y0_dict' and self.__y0_dict is not None:
+            elif key == '_CovidModelSimplified__y0_dict' and self.__y0_dict is not None:
                 serial_dict[key] = self.serialize_y0_dict(val)
             elif key == 'max_step_size':
                 serial_dict[key] = val if not np.isinf(val) else 'inf'
@@ -2118,17 +2111,17 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} repopulating model from serialized json")
         raw = json.loads(s)
         for key, val in raw.items():
-            if key in ['_CovidModel__start_date', '_CovidModel__end_date']:
+            if key in ['_CovidModelSimplified__start_date', '_CovidModelSimplified__end_date']:
                 self.__dict__[key] = dt.datetime.strptime(val, "%Y-%m-%d").date()
-            elif key == '_CovidModel__tc':
-                self.__dict__[key] = CovidModel.unserialize_tc(val)
+            elif key == '_CovidModelSimplified__tc':
+                self.__dict__[key] = CovidModelSimplified.unserialize_tc(val)
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_vacc(val)
+                self.__dict__[key] = CovidModelSimplified.unserialize_vacc(val)
             elif key in ['actual_mobility', 'proj_mobility'] and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_mob(val)
+                self.__dict__[key] = CovidModelSimplified.unserialize_mob(val)
             elif key == 'hosp' and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_hosp(val)
-            elif key == '_CovidModel__y0_dict':
+                self.__dict__[key] = CovidModelSimplified.unserialize_hosp(val)
+            elif key == '_CovidModelSimplified__y0_dict':
                 self.__dict__[key] = self.unserialize_y0_dict(val)
             elif key == 'max_step_size':
                 self.__dict__[key] = np.inf if val == 'inf' else float(val)
