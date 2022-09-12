@@ -488,7 +488,7 @@ def do_build_legacy_output_df(model: CovidModelSimplified):
     age_totals = model.solution_sum_df(['seir', 'age'])
     age_totals = age_totals.drop(columns=['A', 'E', 'S', 'I'])
 
-    age_df = pd.DataFrame()
+    age_df = pd.DataFrame(
 
     age_df['D_age1'] = age_totals['D']['0-19']
     age_df['D_age2'] = age_totals['D']['20-39']
