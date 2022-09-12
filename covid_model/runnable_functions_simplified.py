@@ -485,7 +485,22 @@ def do_build_legacy_output_df(model: CovidModelSimplified):
     totals = totals.rename(columns={'Ih': 'Iht', 'D': 'Dt', 'E': 'Etotal'})
     totals['Itotal'] = totals['I'] + totals['A']
 
-    df = totals.join(model.new_infections).join(model.re_estimates)
+    age_totals = model.solution_sum_df(['seir', 'age'])
+    age_totals = age_totals.drop(columns=['A', 'E', 'S', 'I'])
+
+    age_df = pd.DataFrame()
+
+    age_df['D_age1'] = age_totals['D']['0-19']
+    age_df['D_age2'] = age_totals['D']['20-39']
+    age_df['D_age3'] = age_totals['D']['40-64']
+    age_df['D_age4'] = age_totals['D']['65+']
+
+    age_df['Ih_age1'] = age_totals['Ih']['0-19']
+    age_df['Ih_age2'] = age_totals['Ih']['20-39']
+    age_df['Ih_age3'] = age_totals['Ih']['40-64']
+    age_df['Ih_age4'] = age_totals['Ih']['65+']
+
+    df = totals.join(model.new_infections).join(model.re_estimates).join(age_df)
 
     df['prev'] = 100000.0 * df['Itotal'] / df['region_pop']
     df['oneinX'] = df['region_pop'] / df['Itotal']
