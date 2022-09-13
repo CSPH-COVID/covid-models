@@ -505,8 +505,6 @@ def do_build_legacy_output_df(model: CovidModelSimplified):
     df['prev'] = 100000.0 * df['Itotal'] / df['region_pop']
     df['oneinX'] = df['region_pop'] / df['Itotal']
 
-    # Brittney: can you find a way for us to output the hospitalizations and deaths by age group by default in out2.csv?
-
     return df
 
 
