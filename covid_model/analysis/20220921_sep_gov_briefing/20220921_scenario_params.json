@@ -54,7 +54,7 @@
   {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["ba45"]}, "vals": {"2020-01-01": 0.80}, "desc": "given prior infection with a pre-Omicron variant, 80% of weakly immune individuals can get reinfected with BA.4/5"},
   {"param": "immune_escape", "from_attrs": {"immun": "strong", "variant": ["omicron", "ba2", "ba2121"]}, "to_attrs": {"variant": ["ba45"]}, "vals": {"2020-01-01": 0.04}, "desc": "given prior infection with an Omicron variant, 4% of strongly immune individuals can get reinfected with BA.4/5"},
   {"param": "immune_escape", "from_attrs": {"immun": "weak", "variant": ["omicron", "ba2", "ba2121"]}, "to_attrs": {"variant": ["ba45"]}, "vals": {"2020-01-01": 0.40}, "desc": "given prior infection with an Omicron variant, 40% of weakly immune individuals can get reinfected with BA.4/5"},
-  {"param": "immune_escape", "from_attrs": {"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["vx"]}, "vals": {"2020-01-01":  0.80}, "desc": "given prior infection with any variant (or no variant), 80% of individuals can get reinfected with Variant X"},
+  {"param": "immune_escape", "from_attrs": {"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["vx"]}, "vals": {"2020-01-01": 0.80}, "desc": "given prior infection with any variant (or no variant), 80% of individuals can get reinfected with Variant X"},
   {"param": "imm_decay_days", "attrs": null, "vals": {"2020-01-01": 360}, "desc": "it takes 360 days for strong immunity to decay to weak immunity (weak immunity is assumed not to decay to no immunity)"},
   {"param": "imm_decay_days", "attrs": {"vacc": ["booster1", "booster2"]}, "mults": {"2020-01-01": 1.25}, "desc": "immunity takes 1.25x longer to decay for those who have been boosted"},
   {"param": "wildtype_seed", "attrs": {"region": "co"},	"vals": {"2020-01-01": 0, "2020-01-24": 2.2, "2020-01-30": 0}, "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"},
@@ -79,7 +79,7 @@
   {"param": "hosp",	"attrs": {"variant": "alpha"}, "mults": {"2020-01-01": 1.4}, "desc": "Alpha sends 1.4x more people to the hospital compared to wildtype"},
   {"param": "hosp",	"attrs": {"variant": "delta"}, "mults": {"2020-01-01": 2.38}, "desc": "Delta sends 2.38x more people to the hospital compared to wildtype"},
   {"param": "hosp",	"attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},	"mults": {"2020-01-01": 0.833},	"desc": "Omicrons send 16.7% fewer people to the hospital compared to wildtype"},
-  {"param": "hosp", "attrs": {"variant": "vx"}, "mults": {"2020-01-01": 1}, "desc": "baseline value for Variant X virulence"},
+  {"param": "hosp", "attrs": {"variant": "vx"}, "mults": {"2020-01-01": 1}, "desc": "baseline hospitalization value for scenarios"},
   {"param": "hlos",	"attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]},	"mults": {"2020-01-01": 0.6}, "desc": "Omicrons have a 40% shorter hospital length of stay than wildtype"},
   {"param": "dh", "attrs": {"variant": "alpha"}, "mults": {"2020-01-01": 1.15},	"desc": "Alpha has a 15% higher death rate than wildtype for those who are hospitalized"},
   {"param": "dh", "attrs": {"variant": "delta"}, "mults": {"2020-01-01": 1.3225}, "desc": "Delta has a 32% higher death rate than wildtype for those who are hospitalized"},
@@ -92,5 +92,5 @@
   {"param": "mab_prev",	"attrs": null, "vals": {"2020-01-24": 0.0, "2021-10-02": 0.0106, "2021-10-09": 0.029150000000000002, "2021-10-16": 0.0477, "2021-10-23": 0.0689, "2021-11-01": 0.09275, "2021-11-10": 0.106, "2021-12-17": 0.0651111111111111, "2021-12-26": 0.01},	"desc": "proportion of COVID-19 cases that receive monoclonal antibodies, which changes over time"},
   {"param": "mab_hosp_adj",	"attrs": null, "vals": {"2020-01-01": 0.21}, "desc": "monoclonal antibodies reduce the probability of hospitalization by 79%"},
   {"param": "mab_hlos_adj",	"attrs": null, "vals": {"2020-01-01": 0.72}, "desc": "monoclonal antibodies reduce hospital length of stay by 28%"},
-  {"param": "hrf", "attrs": null, "vals":  {"2020-01-01": 1, "2022-03-15": 0.8}, "desc": "hospital reporting fraction was 100% up until March 15, 2022, at which point it dropped to 80%"}
+  {"param": "hosp_reporting_frac", "attrs": null, "vals": {"2020-01-01": 1, "2022-03-01": 0.932, "2022-03-15": 0.868, "2022-03-30": 0.8}, "desc": "hospital reporting fraction"}
 ]
