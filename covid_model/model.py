@@ -1470,7 +1470,7 @@ class CovidModel:
                 for age in self.attrs['age']:
                     for region in self.attrs['region']:
                         vpa_sub = vacc_per_available[['date', shot]].loc[region, age]
-                        # TODO: hack for when there's only one date. Is there a better way?
+                        # TO DO: hack for when there's only one date. Is there a better way?
                         if isinstance(vpa_sub, pd.Series):
                             vpa_sub = {vpa_sub[0]: vpa_sub[1]}
                         else:
