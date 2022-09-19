@@ -5,4 +5,5 @@ select
 	, dose2_mrna as shot2
 	, booster1 as booster1
 	, booster2 as booster2
-from vaccination.combined_doses_by_age_group v;
+	, booster3 as booster3
+from vaccination.combined_doses_by_age_group_withbooster3 v;
