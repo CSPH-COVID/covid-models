@@ -6,4 +6,4 @@ select
 	, booster1 as booster1
 	, booster2 as booster2
 	, booster3 as booster3
-from vaccination.combined_doses_by_age_group_withbooster3 v;
+from vaccination.combined_doses_by_age_group_with_booster3 v;
