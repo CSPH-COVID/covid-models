@@ -125,9 +125,10 @@ class ExternalVacc(ExternalData):
             sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
-            return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
-
+            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+            return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
+            #sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
+            #return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 def get_region_mobility_from_db(engine, county_ids=None, fpath=None) -> pd.DataFrame:
     """Standalone function to retrieve mobility data from database and possibly write to a file
