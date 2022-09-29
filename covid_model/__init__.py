@@ -4,5 +4,5 @@
 # bad idea to import here
 """ Local Imports """
 # classes
-from covid_model.model_simplified import CovidModelSimplified
+from covid_model.model import CovidModel
 # functions
