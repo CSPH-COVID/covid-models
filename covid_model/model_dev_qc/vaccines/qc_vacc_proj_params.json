@@ -1,5 +1,5 @@
 {
-    "lookback": 14,
+    "lookback": 7,
     "max_cumu": null,
     "max_rate_per_remaining": null,
     "realloc_priority": null,
