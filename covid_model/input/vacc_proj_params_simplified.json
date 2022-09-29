@@ -1,8 +1,0 @@
-{
-    "lookback": 14,
-    "max_cumu": null,
-    "max_rate_per_remaining": null,
-    "realloc_priority": null,
-    "fixed_rates": null,
-    "rate_falloff_halflife": 16
-}
