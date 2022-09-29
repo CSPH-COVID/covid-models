@@ -80,7 +80,7 @@
   {"param": "ba2_seed",	"attrs": null, "vals": {"2020-01-01": 0, "2021-12-23": 5, "2022-02-02": 0},	"desc": "5 BA.2 seeds are planted each day starting December 23rd, 2021 and ending February 2nd, 2022"},
   {"param": "ba2121_seed", "attrs": null, "vals": {"2020-01-01": 0, "2022-02-27": 5, "2022-04-08": 0}, "desc": "5 BA.2.12.1 seeds are planted each day starting February 27th, 2022 and ending April 8th, 2022"},
   {"param": "ba45_seed", "attrs": null,	"vals": {"2020-01-01": 0, "2022-04-05": 5, "2022-05-15": 0}, "desc": "5 BA.4/5 seeds are planted each day started April 5th, 2022 and ending May 15, 2022"},
-  {"param": "vx_seed", "attrs":  null, "vals":  {"2020-01-01": 0, "2022-09-20": 2, "2022-10-20": 0}, "desc": "baseline Variant X seeding value for scenarios"},
+  {"param": "vx_seed", "attrs":  null, "vals":  {"2020-01-01": 0, "2022-09-20": 1, "2022-10-20": 0}, "desc": "baseline Variant X seeding value for scenarios"},
   {"param": "betta", "attrs": {"variant": "alpha"}, "mults": {"2020-01-01": 1.5}, "desc": "Alpha is 1.5x more infectious than wildtype"},
   {"param": "betta", "attrs": {"variant": "delta"}, "mults": {"2020-01-01": 2.25}, "desc": "Delta is 2.25x more infectious than wildtype"},
   {"param": "betta", "attrs": {"variant": "omicron"}, "mults": {"2020-01-01":  5.063}, "desc": "BA.1 is 2.25x more infectious than Delta (and 5.063x more infectious than wildtype)"},
