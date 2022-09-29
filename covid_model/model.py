@@ -51,6 +51,7 @@ class CovidModel:
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                                     'age': ['0-19', '20-39', '40-64', '65+'],
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'],
+                                    #'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
                                     'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'vx'],
                                     'immun': ['none', 'weak', 'strong'],
                                     'region': ['co']})
@@ -1737,22 +1738,30 @@ class CovidModel:
         # vaccination
         logger.debug(f"{str(self.tags)} Building vaccination flows")
         for seir in ['S', 'E', 'A']:
-            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available')
-            for(from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2'), ('shot2', 'booster3'), ('booster1', 'booster3'), ('booster2', 'booster3')]:
+            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'},
+                                               from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
+            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'},
+                                               from_coef=f'shot1_per_available * shot1_fail_rate')
+            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2'), ('shot2', 'booster3'), ('booster1', 'booster3'), ('booster2', 'booster3')]:
                 for immun in self.attrs['immun']:
-                    self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available')
-                #else:
+                    if immun == 'none':
+                        # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun},
+                                                           {'vacc': f'{to_shot}', 'immun': f'strong'},
+                                                           from_coef=f'{to_shot}_per_available * (1 - {to_shot}_fail_rate / {to_shot}_fail_rate)')
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun},
+                                                           {'vacc': f'{to_shot}', 'immun': f'none'},
+                                                           from_coef=f'{to_shot}_per_available * ({to_shot}_fail_rate / {to_shot}_fail_rate)')
+                    else:
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun},
+                                                           {'vacc': f'{to_shot}', 'immun': f'strong'},
+                                                           from_coef=f'{to_shot}_per_available')
+        #logger.debug(f"{str(self.tags)} Building vaccination flows")
+        #for seir in ['S', 'E', 'A']:
+            #self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available')
+            #for(from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2'), ('shot2', 'booster3'), ('booster1', 'booster3'), ('booster2', 'booster3')]:
+                #for immun in self.attrs['immun']:
                     #self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available')
-        #    self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
-        #    self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
-        #    for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2'), ('shot2', 'booster3'), ('booster1', 'booster3'), ('booster2', 'booster3')]:
-        #        for immun in self.attrs['immun']:
-        #            if immun == 'none':
-        #                # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
-        #                self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available * (1 - {to_shot}_fail_rate / {to_shot}_fail_rate)')
-        #                self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'none'}, from_coef=f'{to_shot}_per_available * ({to_shot}_fail_rate / {to_shot}_fail_rate)')
-        #            else:
-        #                self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun}, {'vacc': f'{to_shot}', 'immun': f'strong'}, from_coef=f'{to_shot}_per_available')
 
         # seed variants (only seed the ones in our attrs)
         logger.debug(f"{str(self.tags)} Building seed flows")
