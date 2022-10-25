@@ -305,7 +305,9 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
     return models
 
 
-def do_regions_fit(model_args, fit_args, multiprocess=None):
+def do_regions_fit(
+                    multiprocess=None,
+                   **model_args):
     """Fits a single, disconnected model for each region specified in model_args
 
     Args:
