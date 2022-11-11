@@ -51,7 +51,7 @@ class CovidModel:
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                                     'age': ['0-19', '20-39', '40-64', '65+'],
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
-                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45'],
+                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'vx'],
                                     'immun': ['none', 'weak', 'strong'],
                                     'region': ['coe', 'con', 'cow']})
         # labels used when logging and writing to db.
@@ -192,15 +192,24 @@ class CovidModel:
             engine: a database connection. if None, we will make a new connection in this method
         """
         logger.info(f"{str(self.tags)} Retrieving vaccinations data")
+        pop_by_region = {dc["attrs"]["region"]: dc["vals"]["2020-01-01"] for dc in self.params_defs if dc["param"] == "region_pop"}
+        colo_pop = sum([pop_by_region[c] for c in pop_by_region.keys() if c in {"cow","con","coe"}])
         if engine is None:
             engine = db_engine()
         logger.debug(f"{str(self.tags)} getting vaccines from db")
         actual_vacc_df_list = []
         for region in self.regions:
             county_ids = self.region_defs[region]['counties_fips']
-            actual_vacc_df_list.append(ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age']))
+            tmp_vacc = ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
+            if region in {"cow","con","coe"}:
+                logger.warning("WARNING!!! SCALING VACCINATION DATA BY REGIONAL POPULATION!")
+                logger.warning("REMOVE THIS WHEN THE REGIONAL DATA IS FIXED!!!!")
+                # Scale tmp_vacc by regional population proportion (pop_region/pop_total)
+                tmp_vacc = tmp_vacc * (pop_by_region[region]/colo_pop)
+            actual_vacc_df_list.append(tmp_vacc)
         self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
+
         logger.debug(f"{str(self.tags)} Vaccinations span from {self.actual_vacc_df.index.get_level_values(0).min()} to {self.actual_vacc_df.index.get_level_values(0).max()}")
 
     def set_proj_vacc(self):
