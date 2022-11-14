@@ -53,7 +53,7 @@ class CovidModel:
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
                                     'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'vx'],
                                     'immun': ['none', 'weak', 'strong'],
-                                    'region': ['co']})
+                                    'region': ['coe', 'con', 'cow']})
         # labels used when logging and writing to db.
         self.tags = {}
 
@@ -78,8 +78,8 @@ class CovidModel:
         self.solution_y = None
 
         # data related params
-        self.__params_defs = json.load(open('covid_model/input/params.json'))  # default params
-        self.__region_defs = json.load(open('covid_model/input/region_definitions.json'))  # default value
+        self.__params_defs = json.load(open('covid_model/input/rmw_params.json'))  # default params
+        self.__region_defs = json.load(open('covid_model/input/rmw_region_definitions.json'))  # default value
         self.__hosp_reporting_frac = None
         self.__vacc_proj_params = None
         self.__mobility_mode = None
@@ -192,15 +192,24 @@ class CovidModel:
             engine: a database connection. if None, we will make a new connection in this method
         """
         logger.info(f"{str(self.tags)} Retrieving vaccinations data")
+        pop_by_region = {dc["attrs"]["region"]: dc["vals"]["2020-01-01"] for dc in self.params_defs if dc["param"] == "region_pop"}
+        colo_pop = sum([pop_by_region[c] for c in pop_by_region.keys() if c in {"cow","con","coe"}])
         if engine is None:
             engine = db_engine()
         logger.debug(f"{str(self.tags)} getting vaccines from db")
         actual_vacc_df_list = []
         for region in self.regions:
             county_ids = self.region_defs[region]['counties_fips']
-            actual_vacc_df_list.append(ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age']))
+            tmp_vacc = ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
+            if region in {"cow","con","coe"}:
+                logger.warning("WARNING!!! SCALING VACCINATION DATA BY REGIONAL POPULATION!")
+                logger.warning("REMOVE THIS WHEN THE REGIONAL DATA IS FIXED!!!!")
+                # Scale tmp_vacc by regional population proportion (pop_region/pop_total)
+                tmp_vacc = tmp_vacc * (pop_by_region[region]/colo_pop)
+            actual_vacc_df_list.append(tmp_vacc)
         self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
+
         logger.debug(f"{str(self.tags)} Vaccinations span from {self.actual_vacc_df.index.get_level_values(0).min()} to {self.actual_vacc_df.index.get_level_values(0).max()}")
 
     def set_proj_vacc(self):
@@ -299,7 +308,7 @@ class CovidModel:
         for projection using mobility_proj_params
 
         """
-        # TODO: implement mobility projections
+        # TO DO: implement mobility projections
         logger.info(f"{str(self.tags)} Constructing Mobility projections")
         # self.proj_mobility = pd.DataFrame(columns = self.actual_mobility.columns)
         self.proj_mobility = None
@@ -392,16 +401,36 @@ class CovidModel:
             engine = db_engine()
         logger.info(f"{str(self.tags)} Retrieving hospitalizations data")
         # makes sure we pull from EMResource if region is CO
+        region_names = pd.DataFrame.from_dict({'region': [self.region_defs[region]['name'] for region in self.regions]})
+
         regions_lookup = pd.DataFrame.from_dict({'county_id': [fips for region in self.regions for fips in self.region_defs[region]['counties_fips']],
                                                  'region': [region for region in self.regions for fips in self.region_defs[region]['counties_fips']]})
+        #if self.regions != ['co']:
+            #hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list()) \
+                #.join(regions_lookup.set_index('county_id'), on='county_id') \
+                #.groupby(['measure_date', 'region']) \
+                #.aggregate(observed=('observed_hosp', 'sum')) \
+                #.reset_index('measure_date') \
+                #.rename(columns={'measure_date': 'date'}) \
+                #.set_index('date', append=True).sort_index()
+
         if self.regions != ['co']:
-            hosps = ExternalHospsCOPHS(engine).fetch(county_ids=regions_lookup['county_id'].to_list()) \
-                .join(regions_lookup.set_index('county_id'), on='county_id') \
-                .groupby(['measure_date', 'region']) \
-                .aggregate(observed=('observed_hosp', 'sum')) \
-                .reset_index('measure_date') \
-                .rename(columns={'measure_date': 'date'}) \
-                .set_index('date', append=True).sort_index()
+            region_name_to_shorthand = {v["name"]:k for k,v in self.region_defs.items()}
+            hosps = ExternalHospsCOPHS(engine).fetch(region_ids=region_names['region'].to_list()) \
+                                            .drop(["NA"]) \
+                                            .replace({"Region": region_name_to_shorthand})
+            hosps.index = pd.to_datetime(hosps.index)
+            hosps.index.name = "date"
+            hosps.set_index("Region",inplace=True,append=True)
+            hosps.index = hosps.index.reorder_levels([1,0])
+            hosps.index.names = ["region","date"]
+            hosps.sort_index(inplace=True)
+            date_level = hosps.index.get_level_values("date")
+            hosps = hosps.reindex(
+                pd.MultiIndex.from_product([self.regions, pd.date_range(min(date_level), max(date_level), freq="D")],
+                                           names=["region", "date"]), fill_value=0).groupby("region").rolling(7,
+                                                                                                              min_periods=0).mean()\
+                .droplevel(0)
         else:
             hosps = ExternalHospsEMR(engine).fetch() \
                 .rename(columns={'currently_hospitalized': 'observed'}) \
@@ -410,7 +439,7 @@ class CovidModel:
                 .rename(columns={'measure_date': 'date'}) \
                 .set_index(['region', 'date']).sort_index()
         # fill in the beginning with zeros if necessary, or truncate if necessary
-        hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values(1))).date], names=['region', 'date']), fill_value=0)
+        hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values("date"))).date], names=['region', 'date']), fill_value=0)
 
         hosps = hosps.join(self.hosp_reporting_frac_by_t())
         hosps['estimated_actual'] = hosps['observed'] / hosps['hosp_reporting_frac']
@@ -1084,7 +1113,7 @@ class CovidModel:
     def risk(self, variant=None, to_hosp=False, age=None):
         """risk is similar to immunity, but it incorporates prevalence as well. i.e. higher prevalence will lead to higher risk
 
-        TODO: This hasn't been implemented yet, and may or may not be valuable to have.
+        TO DO: This hasn't been implemented yet, and may or may not be valuable to have.
 
         Args:
             variant:
@@ -1636,7 +1665,7 @@ class CovidModel:
             # retreive the weights for each compartment we are scaling by
             coef_by_t_dl = None
             if scale_by_cmpts_coef:
-                # TODO: revisit based on new signature of calc_coef_by_t?
+                # TO DO: revisit based on new signature of calc_coef_by_t?
                 coef_by_t_lookup = {c: self.calc_coef_by_t(c, to_cmpt) for c in set(scale_by_cmpts_coef)}
                 coef_by_t_ld = [coef_by_t_lookup[c] for c in scale_by_cmpts_coef]
                 coef_by_t_dl = {t: [dic[t] for dic in coef_by_t_ld] for t in self.params_trange}

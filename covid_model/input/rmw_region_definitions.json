@@ -1,0 +1,646 @@
+{
+  "coe": {
+    "name": "Colorado East",
+    "counties": [
+      "Baca",
+      "Bent",
+      "Cheyenne",
+      "Crowley",
+      "Custer",
+      "El Paso",
+      "Fremont",
+      "Huerfano",
+      "Kiowa",
+      "Kit Carson",
+      "Las Animas",
+      "Lincoln",
+      "Logan",
+      "Morgan",
+      "Otero",
+      "Phillips",
+      "Prowers",
+      "Pueblo",
+      "Sedgwick",
+      "Teller",
+      "Washington",
+      "Yuma"
+    ],
+    "counties_fips": [
+      "08009",
+      "08011",
+      "08017",
+      "08025",
+      "08027",
+      "08041",
+      "08043",
+      "08055",
+      "08061",
+      "08063",
+      "08071",
+      "08073",
+      "08075",
+      "08087",
+      "08089",
+      "08095",
+      "08099",
+      "08101",
+      "08115",
+      "08119",
+      "08121",
+      "08125"
+    ]
+  },
+  "con": {
+    "name": "Colorado North",
+    "counties": [
+      "Adams",
+      "Arapahoe",
+      "Boulder",
+      "Broomfield",
+      "Clear Creek",
+      "Denver",
+      "Douglas",
+      "Elbert",
+      "Gilpin",
+      "Grand",
+      "Jackson",
+      "Jefferson",
+      "Larimer",
+      "Park",
+      "Summit",
+      "Weld"
+    ],
+    "counties_fips": [
+      "08001",
+      "08005",
+      "08013",
+      "08014",
+      "08019",
+      "08031",
+      "08035",
+      "08039",
+      "08047",
+      "08049",
+      "08057",
+      "08059",
+      "08069",
+      "08093",
+      "08117",
+      "08123"
+    ]
+  },
+  "cow": {
+    "name": "Colorado West",
+    "counties": [
+      "Chaffee",
+      "Conejos",
+      "Costilla",
+      "Delta",
+      "Dolores",
+      "Eagle",
+      "Garfield",
+      "Hinsdale",
+      "La Plata",
+      "Mesa",
+      "Mineral",
+      "Moffat",
+      "Montezuma",
+      "Montrose",
+      "Ouray",
+      "Pitkin",
+      "Rio Blanco",
+      "Rio Grande",
+      "Routt",
+      "Saguache",
+      "San Juan",
+      "San Miguel",
+      "Alamosa",
+      "Archuleta"
+    ],
+    "counties_fips": [
+      "08015",
+      "08021",
+      "08023",
+      "08029",
+      "08033",
+      "08037",
+      "08045",
+      "08051",
+      "08053",
+      "08067",
+      "08065",
+      "08077",
+      "08079",
+      "08081",
+      "08083",
+      "08085",
+      "08091",
+      "08097",
+      "08103",
+      "08105",
+      "08107",
+      "08109",
+      "08111",
+      "08113",
+      "08003",
+      "08007"
+    ]
+  },
+  "ide": {
+    "name": "Idaho East",
+    "counties": [
+      "Bannock",
+      "Bear Lake",
+      "Benewah",
+      "Bingham",
+      "Bonneville",
+      "Butte",
+      "Caribou",
+      "Clark",
+      "Custer",
+      "Franklin",
+      "Fremont",
+      "Jefferson",
+      "Lemhi County",
+      "Madison",
+      "Oneida",
+      "Power",
+      "Teton"
+    ],
+    "counties_fips": [
+      "16005",
+      "16007",
+      "16009",
+      "16011",
+      "16019",
+      "16023",
+      "16029",
+      "16033",
+      "16037",
+      "16041",
+      "16043",
+      "16051",
+      "16059",
+      "16065",
+      "16071",
+      "16077",
+      "16081"
+    ]
+  },
+  "idn": {
+    "name": "Idaho North",
+    "counties": [
+      "Bonner",
+      "Boundary",
+      "Clearwater",
+      "Idaho",
+      "Kootenai",
+      "Latah",
+      "Lewis",
+      "Nez Perce",
+      "Shoshone"
+    ],
+    "counties_fips": [
+      "16017",
+      "16021",
+      "16035",
+      "16049",
+      "16055",
+      "16057",
+      "16061",
+      "16069",
+      "16079"
+    ]
+  },
+  "ids": {
+    "name": "Idaho South",
+    "counties": [
+      "Blaine",
+      "Camas",
+      "Cassia",
+      "Gooding",
+      "Jerome",
+      "Lincoln",
+      "Minidoka",
+      "Twin Falls"
+    ],
+    "counties_fips": [
+      "16013",
+      "16025",
+      "16031",
+      "16047",
+      "16053",
+      "16063",
+      "16067",
+      "16083"
+    ]
+  },
+  "idw": {
+    "name": "Idaho West",
+    "counties": [
+      "Ada",
+      "Adams",
+      "Boise",
+      "Canyon",
+      "Elmore",
+      "Gem",
+      "Owyhee",
+      "Payette",
+      "Valley",
+      "Washington"
+    ],
+    "counties_fips": [
+      "16001",
+      "16003",
+      "16015",
+      "16027",
+      "16039",
+      "16045",
+      "16073",
+      "16075",
+      "16085",
+      "16087"
+    ]
+  },
+  "mte": {
+    "name": "Montana East",
+    "counties": [
+      "Big Horn",
+      "Carbon",
+      "Carter",
+      "Custer",
+      "Daniels",
+      "Dawson",
+      "Fallon",
+      "Fergus",
+      "Garfield",
+      "Golden Valley",
+      "Judith Basin",
+      "McCone",
+      "Musselshell",
+      "Petroleum",
+      "Phillips",
+      "Powder River",
+      "Prairie",
+      "Richland",
+      "Roosevelt",
+      "Rosebud",
+      "Sheridan",
+      "Stillwater",
+      "Sweet Grass",
+      "Treasure",
+      "Valley",
+      "Wheatland",
+      "Wibaux",
+      "Yellowstone"
+    ],
+    "counties_fips": [
+      "30003",
+      "30009",
+      "30011",
+      "30017",
+      "30019",
+      "30021",
+      "30025",
+      "30027",
+      "30033",
+      "30037",
+      "30045",
+      "30055",
+      "30065",
+      "30069",
+      "30071",
+      "30075",
+      "30079",
+      "30083",
+      "30085",
+      "30087",
+      "30091",
+      "30095",
+      "30097",
+      "30103",
+      "30105",
+      "30107",
+      "30109",
+      "30111"
+    ]
+  },
+  "mtn": {
+    "name": "Montana North",
+    "counties": [
+      "Blaine",
+      "Cascade",
+      "Chouteau",
+      "Glacier",
+      "Hill",
+      "Liberty",
+      "Pondera",
+      "Teton",
+      "Toole"
+    ],
+    "counties_fips": [
+      "30005",
+      "30013",
+      "30015",
+      "30035",
+      "30041",
+      "30051",
+      "30073",
+      "30099",
+      "30101"
+    ]
+  },
+  "mtw": {
+    "name": "Montana West",
+    "counties": [
+      "Beaverhead",
+      "Broadwater",
+      "Deer Lodge",
+      "Flathead",
+      "Gallatin",
+      "Granite",
+      "Jefferson",
+      "Lake",
+      "Lewis and Clark",
+      "Lincoln",
+      "Madison",
+      "Meagher",
+      "Mineral",
+      "Missoula",
+      "Park",
+      "Powell",
+      "Ravalli",
+      "Sanders",
+      "Silver Bow"
+    ],
+    "counties_fips": [
+      "30001",
+      "30007",
+      "30023",
+      "30029",
+      "30031",
+      "30039",
+      "30043",
+      "30047",
+      "30049",
+      "30053",
+      "30057",
+      "30059",
+      "30061",
+      "30063",
+      "30067",
+      "30077",
+      "30081",
+      "30089",
+      "30093"
+    ]
+  },
+  "nme": {
+    "name": "New Mexico East",
+    "counties": [
+      "Colfax",
+      "Curry",
+      "De Baca",
+      "Guadalupe",
+      "Harding",
+      "Mora",
+      "Quay",
+      "Roosevelt",
+      "San Miguel",
+      "Union"
+    ],
+    "counties_fips": [
+      "35007",
+      "",
+      "35009",
+      "35011",
+      "35019",
+      "35021",
+      "35033",
+      "35037",
+      "35041",
+      "35047",
+      "35059"
+    ]
+  },
+  "nmn": {
+    "name": "New Mexico North",
+    "counties": [
+      "Los Alamos",
+      "Rio Arriba",
+      "Santa Fe",
+      "Taos"
+    ],
+    "counties_fips": [
+      "35028",
+      "35039",
+      "35049",
+      "35055"
+    ]
+  },
+  "nms": {
+    "name": "New Mexico South",
+    "counties": [
+      "Catron",
+      "Chaves",
+      "Dona Ana",
+      "Eddy",
+      "Grant",
+      "Hidalgo",
+      "Lea",
+      "Lincoln",
+      "Luna",
+      "Otero",
+      "Sierra"
+    ],
+    "counties_fips": [
+      "35003",
+      "35005",
+      "35013",
+      "35015",
+      "35017",
+      "35023",
+      "35025",
+      "35027",
+      "35029",
+      "35035",
+      "35051"
+    ]
+  },
+  "nmw": {
+    "name": "New Mexico West",
+    "counties": [
+      "Bernalillo",
+      "Cibola",
+      "McKinley",
+      "San Juan",
+      "Sandoval",
+      "Socorro",
+      "Torrance",
+      "Valencia"
+    ],
+    "counties_fips": [
+      "35001",
+      "35006",
+      "35031",
+      "35045",
+      "35043",
+      "35053",
+      "35057",
+      "35061"
+    ]
+  },
+  "ute": {
+    "name": "Utah East",
+    "counties": [
+      "Carbon",
+      "Daggett",
+      "Duchesne",
+      "Emery",
+      "Grand",
+      "San Juan",
+      "Uintah"
+    ],
+    "counties_fips": [
+      "49007",
+      "49009",
+      "49013",
+      "49015",
+      "49019",
+      "49037",
+      "49047"
+    ]
+  },
+  "utn": {
+    "name": "Utah North",
+    "counties": [
+      "Box Elder",
+      "Cache",
+      "Davis",
+      "Morgan",
+      "Rich",
+      "Weber"
+    ],
+    "counties_fips": [
+      "49003",
+      "49005",
+      "49011",
+      "49029",
+      "49033",
+      "49057"
+    ]
+  },
+  "uts": {
+    "name": "Utah South",
+    "counties": [
+      "Beaver",
+      "Garfield",
+      "Iron",
+      "Kane",
+      "Washington"
+    ],
+    "counties_fips": [
+      "49001",
+      "49017",
+      "49021",
+      "49025",
+      "49053"
+    ]
+  },
+  "utw": {
+    "name": "Utah West",
+    "counties": [
+      "Juab",
+      "Millard",
+      "Piute",
+      "Salt Lake",
+      "Sanpete",
+      "Sevier",
+      "Summit",
+      "Tooele",
+      "Utah",
+      "Wasatch",
+      "Wayne"
+    ],
+    "counties_fips": [
+      "49023",
+      "49027",
+      "49031",
+      "49035",
+      "49039",
+      "49041",
+      "49043",
+      "49045",
+      "49049",
+      "49051",
+      "49055"
+    ]
+  },
+  "wye": {
+    "name": "Wyoming East",
+    "counties": [
+      "Albany",
+      "Carbon",
+      "Converse",
+      "Fremont",
+      "Goshen",
+      "Laramie",
+      "Natrona",
+      "Niobrara",
+      "Platte"
+    ],
+    "counties_fips": [
+      "56001",
+      "56007",
+      "56009",
+      "56013",
+      "56015",
+      "56021",
+      "56025",
+      "56027",
+      "56031"
+    ]
+  },
+  "wyn": {
+    "name": "Wyoming North",
+    "counties": [
+      "Campbell",
+      "Crook",
+      "Johnson",
+      "Sheridan",
+      "Weston"
+    ],
+    "counties_fips": [
+      "56005",
+      "56011",
+      "56019",
+      "56033",
+      "56045"
+    ]
+  },
+  "wyw": {
+    "name": "Wyoming West",
+    "counties": [
+      "Big Horn",
+      "Hot Springs",
+      "Lincoln",
+      "Park",
+      "Sublette",
+      "Sweetwater",
+      "Teton",
+      "Uinta",
+      "Washakie"
+    ],
+    "counties_fips": [
+      "56003",
+      "56017",
+      "56023",
+      "56029",
+      "56035",
+      "56037",
+      "56039",
+      "56041",
+      "56043"
+    ]
+  }
+}

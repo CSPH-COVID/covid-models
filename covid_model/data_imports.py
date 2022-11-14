@@ -93,7 +93,7 @@ class ExternalHospsCOPHS(ExternalData):
     """Class for Retrieving COPHS hospitalization data from database
 
     """
-    def fetch_from_db(self, county_ids: list):
+    def fetch_from_db(self, region_ids: list):
         """Retrieve hospitalization data from database using query in hospitalized_county_subset.sql
 
         COPHS contains county level hospitalizations, so optionally you can specify a subset of counties to query for.
@@ -104,8 +104,8 @@ class ExternalHospsCOPHS(ExternalData):
         Returns: Pandas dataframe of hospitalization data
 
         """
-        sql = open('covid_model/sql/hospitalized_county_subset.sql', 'r').read()
-        return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'county_ids': county_ids})
+        sql = open('covid_model/sql/hospitalized_region_subset.sql', 'r').read()
+        return pd.read_sql(sql, self.engine, index_col=['measure_date'], params={'region_ids': region_ids})
 
 
 class ExternalVacc(ExternalData):
@@ -125,9 +125,14 @@ class ExternalVacc(ExternalData):
             sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
-            return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
-
+            sql = open("covid_model/sql/vaccination_by_age_with_boosters.sql","r").read()
+            return pd.read_sql(sql, self.engine, index_col=["measure_date","age"], params={"county_ids": county_ids})
+            # Old
+            #sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
+            #return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
+            # Older
+            #sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide_county_subset.sql', 'r').read()
+            #return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'], params={'county_ids': county_ids})
 
 def get_region_mobility_from_db(engine, county_ids=None, fpath=None) -> pd.DataFrame:
     """Standalone function to retrieve mobility data from database and possibly write to a file

@@ -406,10 +406,10 @@
 
   {"param": "betta", "attrs": {"variant": "alpha"}, "mults": {"2020-01-01": 1.5}, "desc": "Alpha is 1.5x more infectious than wildtype"},
   {"param": "betta", "attrs": {"variant": "delta"}, "mults": {"2020-01-01": 2.25}, "desc": "Delta is 2.25x more infectious than wildtype"},
-  {"param": "betta", "attrs": {"variant": "omicron"}, "mults": {"2020-01-01":  5.063}, "desc": "BA.1 is 2.25x more infectious than Delta (and 5.063x more infectious than wildtype)"},
-  {"param": "betta", "attrs": {"variant": "ba2"}, "mults": {"2020-01-01": 7.594}, "desc": "BA.2 is 1.5x more infectious than Omicron (and 7.594x more infectious than wildtype)"},
-  {"param": "betta", "attrs": {"variant": "ba2121"}, "mults":  {"2020-01-01": 8.581}, "desc": "BA.2.12.1 is 1.13x more infectious than BA.2 (and 8.581x more infectious than wildtype)"},
-  {"param": "betta", "attrs": {"variant": "ba45"}, "mults":  {"2020-01-01": 8.581}, "desc": "BA.4/5 is 1.13x more infectious than BA.2 (and 8.581x more infectious than wildtype)"},
+  {"param": "betta", "attrs": {"variant": "omicron"}, "mults": {"2020-01-01":  5.063}, "desc": "BA.1 is 2.25x more infectious than Delta"},
+  {"param": "betta", "attrs": {"variant": "ba2"}, "mults": {"2020-01-01": 7.594}, "desc": "BA.2 is 1.5x more infectious than Omicron"},
+  {"param": "betta", "attrs": {"variant": "ba2121"}, "mults":  {"2020-01-01": 8.581}, "desc": "BA.2.12.1 is 1.13x more infectious than BA.2"},
+  {"param": "betta", "attrs": {"variant": "ba45"}, "mults":  {"2020-01-01": 8.581}, "desc": "BA.4/5 is 1.13x more infectious than BA.2"},
 
   {"param": "alpha", "attrs": null,	"vals": {"2020-01-01": 2.5}, "desc": "wildtype has an incubation period of 2.5 days"},
   {"param": "alpha", "attrs": {"variant": ["omicron", "ba2", "ba2121", "ba45"]}, "mults": {"2020-01-01": 0.6}, "desc": "Omicrons have 40% shorter incubation periods than wildtype"},

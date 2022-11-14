@@ -35,7 +35,7 @@ def main():
     model_args = {
         'params_defs': 'covid_model/analysis/20220616_mobility_update/params.json',
         'region_defs': 'covid_model/input/region_definitions.json',
-        'vacc_proj_params': 'covid_model/input/vacc_proj_params.json',
+        'vacc_proj_params': 'covid_model/input/20220718_vacc_proj_params.json',
         #'attrs': OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
         #                      'age': ['0-19', '20-39', '40-64', '65+'],
         #                      'vacc': ['none', 'shot1', 'shot2', 'shot3'],
