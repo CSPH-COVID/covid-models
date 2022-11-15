@@ -125,8 +125,12 @@ class ExternalVacc(ExternalData):
             sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
         else:
-            sql = open("covid_model/sql/vaccination_by_age_with_boosters.sql","r").read()
-            return pd.read_sql(sql, self.engine, index_col=["measure_date","age"], params={"county_ids": county_ids})
+            sql = open("covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql","r").read()
+            return pd.read_sql(sql,self.engine, index_col=["measure_date","age"])
+            # This query passes in region/county IDs which can be used to subset the data (Should only be used if the
+            # population scaling is turned OFF).
+            #sql = open("covid_model/sql/vaccination_by_age_with_boosters.sql","r").read()
+            #return pd.read_sql(sql, self.engine, index_col=["measure_date","age"], params={"county_ids": county_ids})
             # Old
             #sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             #return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])
