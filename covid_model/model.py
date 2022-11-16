@@ -58,7 +58,8 @@ class CovidModel:
         self.tags = {}
 
         # start and end date/time
-        self.__start_date = dt.datetime.strptime('2020-01-01', "%Y-%m-%d").date()
+        #self.__start_date = dt.datetime.strptime('2020-01-01', "%Y-%m-%d").date()
+        self.__start_date = dt.datetime.strptime('2020-01-24', "%Y-%m-%d").date()
         self.__end_date = dt.datetime.strptime('2024-01-01', "%Y-%m-%d").date()
         self.__daterange = pd.date_range(self.start_date, end=self.end_date).date
         self.__tend = (self.end_date - self.start_date).days
