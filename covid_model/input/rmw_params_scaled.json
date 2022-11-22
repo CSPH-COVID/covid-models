@@ -5,7 +5,7 @@
       "region": "coe"
     },
     "vals": {
-      "2020-01-01": 1131447
+      "2020-01-01": 377608
     },
     "desc": "Colorado East total population"
   },
@@ -15,7 +15,7 @@
       "region": "con"
     },
     "vals": {
-      "2020-01-01": 4060627
+      "2020-01-01": 4841725
     },
     "desc": "Colorado North total population"
   },
@@ -25,7 +25,7 @@
       "region": "cow"
     },
     "vals": {
-      "2020-01-01": 615645
+      "2020-01-01": 588386
     },
     "desc": "Colorado West total population"
   },
@@ -2000,1779 +2000,1766 @@
   },
   {
     "param": "wildtype_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2020-01-24": 0.4285991453787623,
-      "2020-01-30": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2020-03-01": 1.5381907079182033,
-      "2020-04-01": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2020-02-22": 0.23321014670303436,
-      "2020-03-22": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-03-01": 2.2,
-      "2020-04-01": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-03-07": 2.2,
-      "2020-04-07": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-03-22": 2.2,
-      "2020-04-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "wildtype_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-02-22": 2.2,
-      "2020-03-22": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2020-11-09": 0.19481779335398286,
-      "2020-12-04": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2020-11-09": 0.6991775945082742,
-      "2020-12-04": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2020-11-09": 0.10600461213774288,
-      "2020-12-04": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "alpha_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2020-11-09": 1,
-      "2020-12-04": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-03-07": 0.19481779335398286,
-      "2021-04-11": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-03-07": 0.6991775945082742,
-      "2021-04-11": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-03-07": 0.10600461213774288,
-      "2021-04-11": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "delta_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-03-07": 1,
-      "2021-04-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-11-09": 0.19481779335398286,
-      "2021-12-11": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-11-09": 0.6991775945082742,
-      "2021-12-11": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-11-09": 0.10600461213774288,
-      "2021-12-11": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "omicron_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-11-09": 1,
-      "2021-12-11": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-12-23": 0.9740889667699143,
-      "2022-02-02": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-12-23": 3.495887972541371,
-      "2022-02-02": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2021-12-23": 0.5300230606887144,
-      "2022-02-02": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2021-12-23": 5,
-      "2022-02-02": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2022-02-27": 0.9740889667699143,
-      "2022-04-08": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2022-02-27": 3.495887972541371,
-      "2022-04-08": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2022-02-27": 0.5300230606887144,
-      "2022-04-08": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba2121_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-02-27": 5,
-      "2022-04-08": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "coe"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2022-04-05": 0.9740889667699143,
-      "2022-05-15": 0.0
-    },
-    "desc": "2.2 wildtype seeds are planted each day in CO starting January 24th, 2020"
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "con"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2022-04-05": 3.495887972541371,
-      "2022-05-15": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "cow"
-    },
-    "vals": {
-      "2020-01-01": 0.0,
-      "2022-04-05": 0.5300230606887144,
-      "2022-05-15": 0.0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "ide"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "idn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "ids"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "idw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "mte"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "mtn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "mtw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "nme"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "nmn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "nms"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "nmw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "ute"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "utn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "uts"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "utw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "wye"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "wyn"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "ba45_seed",
-    "attrs": {
-      "region": "wyw"
-    },
-    "vals": {
-      "2020-01-01": 0,
-      "2022-04-05": 5,
-      "2022-05-15": 0
-    },
-    "desc": ""
-  },
-  {
-    "param": "vx_seed",
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-09-20": 5,
-      "2022-10-30": 0
+      "2020-01-24": 1.834,
+      "2020-01-30": 0
     },
-    "desc": "baseline Variant X seeding value for scenarios"
+    "desc": "scaled wildtype seed for reference region (CO North)"
   },
   {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "wildtype_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2020-11-09": 0.834,
+      "2020-12-04": 0
+    },
+    "desc": "scaled alpha seed for reference region (CO North)"
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "alpha_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2021-03-07": 0.834,
+      "2020-04-11": 0
+    },
+    "desc": "scaled delta seed for reference region (CO North)"
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "delta_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+{
+    "param": "omicron_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2021-10-28": 3.33,
+      "2020-04-11": 0
+    },
+    "desc": "scaled BA.1 seed for reference region (CO North)"
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "omicron_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+{
+    "param": "ba2_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2021-12-30": 8.34,
+      "2022-01-08": 4.17,
+      "2022-01-10": 0
+    },
+    "desc": "scaled BA.2 seed for reference region (CO North)"
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+{
+    "param": "ba2121_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2022-01-25": 5.00,
+      "2022-01-26": 0
+    },
+    "desc": "scaled BA.2.12.1 seed for reference region (CO North)"
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba2121_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+{
+    "param": "ba45_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2022-03-15": 4.17,
+      "2022-03-25": 0
+    },
+    "desc": "scaled BA.4/5 seed for reference region (CO North)"
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "ba45_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+{
+    "param": "emv_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2022-09-15": 4.17,
+      "2022-10-15": 0
+    },
+    "desc": "scaled emerging variant seed for reference region (CO North)"
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05085373
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09655500
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06306919
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514852
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03401448
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10371040
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03225870
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146056
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07472913
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02862040
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03213275
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07712176
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13330562
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02188312
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11360469
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462696
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26191993
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04263705
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135198
+    },
+    "desc": ""
+  },
+  {
+    "param": "emv_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03352174
+    },
+    "desc": ""
+  },
+{
     "param": "betta",
     "attrs": {
       "variant": "alpha"
