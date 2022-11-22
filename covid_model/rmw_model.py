@@ -201,11 +201,11 @@ class CovidModel:
         for region in self.regions:
             county_ids = self.region_defs[region]['counties_fips']
             tmp_vacc = ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
-            if region in {"cow","con","coe"}:
-                logger.warning("WARNING!!! SCALING VACCINATION DATA BY REGIONAL POPULATION!")
-                logger.warning("REMOVE THIS WHEN THE REGIONAL DATA IS FIXED!!!!")
-                # Scale tmp_vacc by regional population proportion (pop_region/pop_total)
-                tmp_vacc = tmp_vacc * (pop_by_region[region]/colo_pop)
+            # if region in {"cow","con","coe"}:
+            #     logger.warning("WARNING!!! SCALING VACCINATION DATA BY REGIONAL POPULATION!")
+            #     logger.warning("REMOVE THIS WHEN THE REGIONAL DATA IS FIXED!!!!")
+            #     # Scale tmp_vacc by regional population proportion (pop_region/pop_total)
+            #     tmp_vacc = tmp_vacc * (pop_by_region[region]/colo_pop)
             actual_vacc_df_list.append(tmp_vacc)
         self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         self.actual_vacc_df.index.set_names('date', level=0, inplace=True)

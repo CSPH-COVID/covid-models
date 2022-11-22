@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import scipy.integrate
 
 if __name__ == "__main__":
     """ Python Standard Library """
@@ -10,33 +9,17 @@ if __name__ == "__main__":
     import pickle
 
     """ Third Party Imports """
-    import numpy as np
-    import pandas as pd
     from matplotlib import pyplot as plt
-    import seaborn as sns
 
     """ Local Imports """
-    if 'requirements.txt' not in os.listdir(os.getcwd()):
-        os.chdir(os.path.join('../../../../..', '..', '..'))
-    print(os.getcwd())
     # Import the RMW model instead of the original model
     from covid_model.rmw_model import CovidModel as RMWCovidModel
-    from covid_model.runnable_functions import do_regions_fit, do_single_fit, do_fit_scenarios, \
-        do_create_multiple_reports
+    from covid_model.runnable_functions import do_fit_scenarios, do_create_multiple_reports
     from covid_model.utils import setup, get_filepath_prefix
     from covid_model.analysis.charts import plot_transmission_control
 
-    # os.environ['gcp_project'] = 'co-covid-models'
-    # os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "co-covid-models-credentials.json"
-
-    # In[5]:
-
     # set up the output directory for this Jupyter notebook
     outdir = setup("rmw_scenario_projections.ipynb")
-
-    # ### Fit an initial scenario through February 2022
-
-    # In[6]:
 
     # designate the arguments for how the model will behave
     model_args = {
@@ -45,7 +28,7 @@ if __name__ == "__main__":
         'vacc_proj_params': 'covid_model/analysis/20221004_oct_gov_briefing/20221004_vacc_proj_params.json',
         'start_date': '2020-01-24',
         'end_date': '2024-01-01',
-        'regions': ['coe', 'con', 'cow']
+        #'regions': ['coe', 'con', 'cow']
     }
 
     # this is how the fit will behave
