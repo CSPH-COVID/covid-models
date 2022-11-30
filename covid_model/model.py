@@ -81,7 +81,7 @@ class CovidModel:
         # data related params
         self.__params_defs = json.load(open('covid_model/input/params.json'))  # default params
         self.__region_defs = json.load(open('covid_model/input/region_definitions.json'))  # default value
-        # self.__hosp_reporting_frac = None
+        # #self.__hosp_reporting_frac = None
         self.__vacc_proj_params = None
         self.__mobility_mode = None
         self.__mobility_proj_params = None

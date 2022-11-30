@@ -299,7 +299,7 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
         [m.write_specs_to_db(engine=engine) for m in models]
         #[m.write_results_to_db(engine=engine) for m in models]
         logger.info(f'spec_ids: {",".join([str(m.spec_id) for m in models])}')
-        #logger.info(f'result_ids: {",".join([str(m.result_id) for m in models])}')   # takes way too long, let's not write the results to the database right now.
+        ##logger.info(f'result_ids: {",".join([str(m.result_id) for m in models])}')   # takes way too long, let's not write the results to the database right now.
 
     return models
 
