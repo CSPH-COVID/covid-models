@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 ### Local Imports ###
-from covid_model.utils import get_params
+from covid_model.utils1 import get_params
 
 
 def normalize_date(date):
