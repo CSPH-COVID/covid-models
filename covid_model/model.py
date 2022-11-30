@@ -1147,7 +1147,7 @@ class CovidModel:
         Returns:
 
         """
-        idx = [i for i, term in enumerate(self.terms) if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx],to_attrs)]
+        idx = [i for i, term in enumerate(self.terms) if self.does_cmpt_have_attrs(self.compartments[term.from_cmpt_idx], from_attrs) and self.does_cmpt_have_attrs(self.compartments[term.to_cmpt_idx], to_attrs)]
         return [self.terms[i] for i in idx]
 
     # create a json string capturing all the ode terms: nonlinear, linear, and constant
