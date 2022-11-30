@@ -14,10 +14,10 @@ from scipy import optimize as spo
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mtick
 ### Local Imports ###
-from covid_model import CovidModel, db_engine
+from covid_model import CovidModel#, db_engine
 from covid_model.analysis.charts import plot_transmission_control
 from covid_model.utils import IndentLogger, setup, get_filepath_prefix
-from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
+from covid_model.analysis.charts import plot_modeled, format_date_axis #plot_actual_hosps, format_date_axis
 logger = IndentLogger(logging.getLogger(''), {})
 
 
@@ -203,69 +203,155 @@ def do_regions_fit(model_args, fit_args, multiprocess=None):
     do_multiple_fits(model_args_list, fit_args, multiprocess=multiprocess)
 
 
-def do_create_report(model, outdir, from_date=None, to_date=None, prep_model=False, solve_model=False):
+def do_create_report(model, outdir, immun_variants=('ba2121',), from_date=None, to_date=None, prep_model=False, solve_model=False):
+    """Create some typically required figures and data for Gov briefings.
+
+    Args:
+        model: Model for which to create output
+        outdir: path of directory where the output should be saved
+        immun_variants: which variants to plot immunity against. Relevant because immune escape factors into immunity and is variant specific
+        from_date: start date used in plotting
+        to_date: end date used in plotting
+        prep_model: whether to run model.prep() before solving the ODEs. useful if model has already been prepped
+        solve_model: whether to run model.solve_seir(). useful if model has already been solved.
+
+    Returns: None
+
+    """
     from_date = model.start_date if from_date is None else from_date
+    from_date = dt.datetime.strptime(from_date, '%Y-%m-%d').date() if isinstance(from_date, str) else from_date
     to_date = model.end_date if to_date is None else to_date
+    to_date = dt.datetime.strptime(to_date, '%Y-%m-%d').date() if isinstance(to_date, str) else to_date
 
     if prep_model:
         logger.info('Prepping model')
         t0 = perf_counter()
-        model.prep()
+        model.prep(outdir=outdir)
         t1 = perf_counter()
         logger.info(f'Model prepped in {t1 - t0} seconds.')
 
     if solve_model:
         logger.info('Solving model')
         model.solve_seir()
-    # build_legacy_output_df(model).to_csv('output/out2.csv')
 
-    size_per_chart = 8
-    fig, axs = plt.subplots(2,2, figsize=(size_per_chart * 2 + 1, size_per_chart * 2))
+    subplots_args = {'figsize': (10, 8), 'dpi': 300}
 
     # prevalence
-    ax = axs.flatten()[0]
-    ax.set_ylabel('SARS-CoV-2 Prevalenca')
+    fig, ax = plt.subplots(**subplots_args)
+    ax.set_ylabel('SARS-CoV-2 Prevalence')
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     ax.legend(loc='best')
     plot_modeled(model, ['I', 'A'], share_of_total=True, ax=ax, label='modeled')
+    format_date_axis(ax)
+    ax.set_xlim(from_date, to_date)
+    ax.axvline(x=dt.date.today(), color='darkgray')
+    ax.grid(color='lightgray')
+    ax.legend(loc='best')
+    fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'prevalence.png')
+    plt.close()
 
     # hospitalizations
-    ax = axs.flatten()[1]
+    #TO DO: update to be the back_adjusted hosps
+    fig, ax = plt.subplots(**subplots_args)
     ax.set_ylabel('Hospitalized with COVID-19')
-    plot_actual_hosps(db_engine(), ax=ax, color='black')
+    plot_observed_hosps(db_engine(), ax=ax, color='black')
     plot_modeled(model, 'Ih', ax=ax, label='modeled')
-
-    #hosps_df = pd.DataFrame(index=model.trange)
-    #hosps_df['modeled'] = model.solution_sum('seir')['Ih']
-    #hosps_df.index = model.daterange
-    #hosps_df.loc[:'2022-02-28'].round(1).to_csv(get_filepath_prefix(outdir) + 'omicron_report_hospitalizations.csv')
+    format_date_axis(ax)
+    ax.set_xlim(from_date, to_date)
+    ax.axvline(x=dt.date.today(), color='darkgray')
+    ax.grid(color='lightgray')
+    ax.legend(loc='best')
+    fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'hospitalized.png')
+    plt.close()
 
     # variants
-    ax = axs.flatten()[2]
+    fig, ax = plt.subplots(**subplots_args)
     plot_modeled(model, ['I', 'A'], groupby='variant', share_of_total=True, ax=ax)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     ax.set_ylabel('Variant Share of Infections')
+    format_date_axis(ax)
+    ax.set_xlim(from_date, to_date)
+    ax.axvline(x=dt.date.today(), color='darkgray')
+    ax.grid(color='lightgray')
+    ax.legend(loc='best')
+    fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'variant_share.png')
+    plt.close()
 
     # immunity
-    ax = axs.flatten()[3]
-    ax.plot(model.daterange, model.immunity('omicron'), label='Immunity vs Omicron', color='cyan')
-    ax.plot(model.daterange, model.immunity('omicron', age='65+'), label='Immunity vs Omicron (65+ only)', color='darkcyan')
-    ax.plot(model.daterange, model.immunity('omicron', to_hosp=True), label='Immunity vs Severe Omicron', color='gold')
-    ax.plot(model.daterange, model.immunity('omicron', to_hosp=True, age='65+'), label='Immunity vs Severe Omicron (65+ only)', color='darkorange')
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-    ax.set_ylim(0, 1)
-    ax.set_ylabel('Percent Immune')
-
-    # formatting
-    for ax in axs.flatten():
+    for variant in immun_variants:
+        fig, ax = plt.subplots(**subplots_args)
+        immun = model.immunity(variant=variant)
+        immun_65p = model.immunity(variant=variant, age='65+')
+        immun_hosp = model.immunity(variant=variant, to_hosp=True)
+        immun_hosp_65p = model.immunity(variant=variant, age='65+', to_hosp=True)
+        for df, name in zip((immun, immun_65p, immun_hosp, immun_hosp_65p), ('immun', 'immun_65p', 'immun_hosp', 'immun_hosp_65p')):
+            df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + f'{name}_{variant}.csv')
+        ax.plot(model.daterange, immun, label=f'Immunity vs Infection', color='cyan')
+        ax.plot(model.daterange, immun_65p, label=f'Immunity vs Infection (65+ only)', color='darkcyan')
+        ax.plot(model.daterange, immun_hosp, label=f'Immunity vs Severe Infection', color='gold')
+        ax.plot(model.daterange, immun_hosp_65p, label=f'Immunity vs Severe Infection (65+ only)', color='darkorange')
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+        ax.set_ylim(0, 1)
+        ax.set_ylabel('Percent Immune')
         format_date_axis(ax)
         ax.set_xlim(from_date, to_date)
         ax.axvline(x=dt.date.today(), color='darkgray')
         ax.grid(color='lightgray')
         ax.legend(loc='best')
+        fig.savefig(get_filepath_prefix(outdir, tags=model.tags) + f'immunity_{variant}.png')
+        plt.close()
 
-    fig.tight_layout()
-    fig.savefig(get_filepath_prefix(outdir) + 'report.png')
+    do_build_legacy_output_df(model).to_csv(get_filepath_prefix(outdir, tags=model.tags) + 'out2.csv')
+
+    return None
+
+
+def do_create_report_wrapper_parallel(args):
+    """wrapper function for the do_create_report function that can easily be mapped. suitable for creating reports in parallel
+
+    A new logger needs to be created since this wrapper will run in a new process.
+
+    Args:
+        args: dictionary of named arguments to be used in do_create_report
+
+    Returns: whatever do_create_report returns
+
+    """
+    setup(os.path.basename(__file__), 'info')
+    logger = IndentLogger(logging.getLogger(''), {})
+    return do_create_report(**args)
+
+
+def do_create_report_wrapper_nonparallel(args):
+    """wrapper function for the do_create_report function that can easily be mapped. suitable for creating reports serially
+
+    Args:
+        args: dictionary of named arguments to be used in do_create_report
+
+    Returns: whatever do_create_report returns
+
+    """
+    return do_create_report(**args)
+
+
+def do_create_multiple_reports(models, multiprocess=None, **report_args):
+    """Method to easily create multiple reports for various different models. Can be done in parallel or serially
+
+    Args:
+        models: list of models that reporst should be created for.
+        multiprocess: positive integer indicating how many parallel processes to use, or None if fitting should be done serially
+        **report_args: arguments to be passed to do_create_report
+    """
+    # generate list of arguments
+    args_list = list(map(lambda x: {'model': x, **report_args}, models))
+    # run each scenario
+    if multiprocess:
+        #install_mp_handler()  # current bug in multiprocessing-logging prevents this from working right now
+        p = Pool(multiprocess)
+        p.map(do_create_report_wrapper_parallel, args_list)
+    else:
+        list(map(do_create_report_wrapper_nonparallel, args_list))
+
 
 
 def do_build_legacy_output_df(model: CovidModel):
