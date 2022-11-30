@@ -21,7 +21,8 @@ from sortedcontainers import SortedDict
 """ Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports1 import ExternalVacc, ExternalHosps, get_region_mobility_from_db
-from covid_model.utils import IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
+from covid_model.utils1 import IndentLogger
+from covid_model.db1 import get_sqa_table, db_engine #get_filepath_prefix,
 
 logger = IndentLogger(logging.getLogger(''), {})
 
