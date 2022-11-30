@@ -44,7 +44,7 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
     yd_start = model.y0_dict if yd_start is None else yd_start
     y0 = model.y0_from_dict(yd_start)
     trange = range(tstart, tend+1)
-    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['estimated_actual'].to_numpy().flatten('F')
+    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['observed'].to_numpy().flatten('F')
 
     def tc_list_to_dict(tc_list):
         """convert tc output of curve_fit to a dict like in our model.
@@ -87,7 +87,6 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
         bounds=([tc_min] * len(tc_ts) * len(regions), [tc_max] * len(tc_ts) * len(regions)))
     fitted_tc = tc_list_to_dict(fitted_tc)
     return fitted_tc, fitted_tc_cov
-
 
 def do_single_fit(tc_0=0.75,
                   tc_min=0,

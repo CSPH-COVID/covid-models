@@ -81,7 +81,7 @@ class CovidModel:
         # data related params
         self.__params_defs = json.load(open('covid_model/input/params.json'))  # default params
         self.__region_defs = json.load(open('covid_model/input/region_definitions.json'))  # default value
-        self.__hosp_reporting_frac = None
+        # self.__hosp_reporting_frac = None
         self.__vacc_proj_params = None
         self.__mobility_mode = None
         self.__mobility_proj_params = None
@@ -177,7 +177,7 @@ class CovidModel:
                 self.params_defs.extend(self.get_mobility_as_params())
 
         if any([p in self.recently_updated_properties for p in
-                ['start_date', 'end_date', 'regions', 'region_defs', 'hosp_reporting_frac']]):
+                ['start_date', 'end_date', 'regions', 'region_defs']]):
             logger.debug(f"{str(self.tags)} Setting Hospitalizations")
             self.set_hosp(engine)
 
@@ -355,30 +355,6 @@ class CovidModel:
 
         return params
 
-    def hosp_reporting_frac_by_t(self):
-        """Construct a pandas DataFrame of the hospital reporting fraction over time
-
-        Returns: a Pandas DataFrame with rows spanning the model's daterange and a column for hosp reporting fraction
-
-        """
-        # currently assigns the same hrf to all regions.
-        hrf = pd.DataFrame(index=self.daterange)
-        hrf['hosp_reporting_frac'] = np.nan
-        early_dates = []
-        for date, val in self.hosp_reporting_frac.items():
-            date = date if isinstance(date, dt.date) else dt.datetime.strptime(date, "%Y-%m-%d").date()
-            if date in hrf.index:
-                hrf.loc[date]['hosp_reporting_frac'] = val
-            elif date <= hrf.index[0]:
-                early_dates.append(date)
-        if len(early_dates) > 0:
-            # among all the dates before the start date, take the latest one
-            hrf.iloc[0] = self.hosp_reporting_frac[dt.datetime.strftime(max(early_dates), "%Y-%m-%d")]
-        hrf = hrf.ffill()
-        hrf.index.name = 'date'
-        hrf = pd.concat([hrf.assign(region=r) for r in self.attrs['region']]).set_index('region', append=True).reorder_levels([1, 0])
-        return hrf
-
 
     def set_hosp(self, engine=None):
         """Retrieve hospitalizations from the database for each region of interest, and store in the model
@@ -413,8 +389,8 @@ class CovidModel:
         # fill in the beginning with zeros if necessary, or truncate if necessary
         hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(self.start_date, max(hosps.index.get_level_values(1))).date], names=['region', 'date']), fill_value=0)
 
-        hosps = hosps.join(self.hosp_reporting_frac_by_t())
-        hosps['estimated_actual'] = hosps['observed'] / hosps['hosp_reporting_frac']
+        #hosps = hosps.join(self.hosp_reporting_frac_by_t())
+        #hosps['estimated_actual'] = hosps['observed'] / hosps['hosp_reporting_frac']
         self.hosps = hosps
 
     ####################################################################################################################
@@ -759,39 +735,6 @@ class CovidModel:
         self.__mobility_mode = value if value != 'none' else None
         self.recently_updated_properties.append('mobility_mode')
 
-    @property
-    def hosp_reporting_frac(self):
-        """Dictionary defining the hospitalization reporting fraction at different points in time.
-
-        This factor gets applied to reported hospitalizations to account for incomplete hospitalization reporting. The
-        number reflects what proportion of COVID hospitalizations are actually present in the data.
-
-        Currently assumed the same for all regions, but can modify in the future to work like TC, with time indexed
-        first, and region specified in a nested dictionary. Then you could update self.hosp_reporting_frac_by_t() to
-        construct the dataframe with both date and region as indices, and the adjustments should be applied on a region
-        specific basis.
-
-        This is specified by date, similar to how parameter values are specified.
-        e.g. {'2020-01-01': 1, '2020-02-01': 0.5} means hosp reporting fraction dropped to 50% on Feb 2nd 2020 and
-        stayed that way
-
-        Returns: the hospitalization reporting fraction. Defaults to 1.
-
-        """
-        return self.__hosp_reporting_frac if self.__hosp_reporting_frac is not None else {dt.datetime.strftime(self.start_date, "%Y-%m-%d"): 1}
-
-    @hosp_reporting_frac.setter
-    def hosp_reporting_frac(self, value: dict):
-        """Sets the hospitalization reporting fraction.
-
-        Args:
-            value: a dictionary where keys are strings representing dates, and values are the fraction. e.g. {'2020-01-01': 1, '2020-02-01': 0.5}
-
-        """
-        self.__hosp_reporting_frac = value
-        self.recently_updated_properties.append('hosp_reporting_frac')
-
-    ### Properties that take a little computation to get
 
     @property
     def y0_dict(self):
@@ -1106,11 +1049,11 @@ class CovidModel:
         Returns: Pandas DataFrame with row index date / region, and four columns.
 
         """
-        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region', dropna=False).rename('modeled_actual').to_frame()
+        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region', dropna=False).rename('modeled_observed').to_frame()
         df = df.join(self.hosps)
-        df['hosp_reporting_frac'].ffill(inplace=True)
-        df['modeled_observed'] = df['modeled_actual'] * df['hosp_reporting_frac']
-        df = df.reindex(columns=['observed', 'estimated_actual', 'modeled_actual', 'modeled_observed'])
+        #df['hosp_reporting_frac'].ffill(inplace=True)
+        #df['modeled_observed'] = df['modeled_actual']
+        df = df.reindex(columns=['observed', 'modeled_observed'])
         df = df.reorder_levels([1, 0]).sort_index()  # put region first
         return df
 
@@ -2096,7 +2039,7 @@ class CovidModel:
                 'tc_t_prev_lookup', '_CovidModel__params_defs',
                 '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params',
                 '_CovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility',
-                '_CovidModel__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps', '_CovidModel__hosp_reporting_frac',
+                '_CovidModel__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps',
                 '_CovidModel__y0_dict', 'max_step_size', 'ode_method']
         # add in proj_mobility
         serial_dict = OrderedDict()
