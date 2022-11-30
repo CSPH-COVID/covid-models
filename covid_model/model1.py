@@ -1,12 +1,14 @@
-### Python Standard Library ###
+""" Python Standard Library """
 import json
 import math
 import datetime as dt
 import copy
 from operator import itemgetter
+import itertools
 from collections import OrderedDict, defaultdict
 import logging
-### Third Party Imports ###
+import pickle
+""" Third Party Imports """
 import numpy as np
 import pandas as pd
 import sympy as sym
@@ -16,11 +18,11 @@ import scipy.sparse as spsp
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sortedcontainers import SortedDict
-### Local Imports ###
-from covid_model.db import get_sqa_table, db_engine
+""" Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
-from covid_model.data_imports import ExternalVacc, ExternalHosps, get_region_mobility_from_db
-from covid_model.utils import get_params, IndentLogger
+from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
+from covid_model.utils import IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
+
 logger = IndentLogger(logging.getLogger(''), {})
 
 
@@ -46,15 +48,15 @@ class CovidModel:
         # basic model data
         self.attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                              'age': ['0-19', '20-39', '40-64', '65+'],
-                             'vacc': ['none', 'shot1', 'shot2', 'shot3'],
-                             'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45'],
+                             'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'],
+                             'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'bq'],
                              'immun': ['none', 'weak', 'strong'],
                              'region': ['co']})
 
         self.tags = {}
 
-        self.__start_date = dt.datetime.strptime("2020-01-01", "%Y-%m-%d").date()
-        self.__end_date = dt.datetime.strptime("2023-01-01", "%Y-%m-%d").date()
+        self.__start_date = dt.datetime.strptime("2020-01-24", "%Y-%m-%d").date()
+        self.__end_date = dt.datetime.strptime("2024-01-01", "%Y-%m-%d").date()
 
         self.tc_tslices = list()
         self.tc = list()
@@ -757,7 +759,7 @@ class CovidModel:
         # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
         cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'shot3'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'])
 
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
         vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'date', 'region', 'age']).sort_index()
@@ -1053,17 +1055,26 @@ class CovidModel:
         self.apply_tc(force_nlm_update=True)  # update the nonlinear multiplier
 
         # vaccination
+        logger.debug(f"{str(self.tags)} Building vaccination flows")
         for seir in ['S', 'E', 'A']:
-            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'}, from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
-            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'}, from_coef=f'shot1_per_available * shot1_fail_rate')
-            for i in [2, 3]:
+            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'weak'},
+                                               from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
+            self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'},
+                                               from_coef=f'shot1_per_available * shot1_fail_rate')
+            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2'), ('booster2', 'booster3')]:
                 for immun in self.attrs['immun']:
-                    # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
                     if immun == 'none':
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available * (1 - shot{i}_fail_rate / shot{i - 1}_fail_rate)')
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'none'}, from_coef=f'shot{i}_per_available * (shot{i}_fail_rate / shot{i - 1}_fail_rate)')
+                        # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun},
+                                                           {'vacc': f'{to_shot}', 'immun': f'strong'},
+                                                           from_coef=f'{to_shot}_per_available * (1 - {to_shot}_fail_rate / {to_shot}_fail_rate)')
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun},
+                                                           {'vacc': f'{to_shot}', 'immun': f'none'},
+                                                           from_coef=f'{to_shot}_per_available * ({to_shot}_fail_rate / {to_shot}_fail_rate)')
                     else:
-                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'shot{i - 1}', "immun": immun}, {'vacc': f'shot{i}', 'immun': f'strong'}, from_coef=f'shot{i}_per_available')
+                        self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'{from_shot}', "immun": immun},
+                                                           {'vacc': f'{to_shot}', 'immun': f'strong'},
+                                                           from_coef=f'{to_shot}_per_available')
 
         # seed variants (only seed the ones in our attrs)
         for variant in self.attrs['variant']:
@@ -1110,9 +1121,9 @@ class CovidModel:
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'I'}, to_coef='1 / alpha * pS')
         self.add_flows_from_attrs_to_attrs({'seir': 'E'}, {'seir': 'A'}, to_coef='1 / alpha * (1 - pS)')
         # assume no one is receiving both pax and mab
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * (1 - mab_prev - pax_prev)')
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * mab_prev * mab_hosp_adj')
-        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * (1 - severe_immunity) * pax_prev * pax_hosp_adj')
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * hrf * (1 - severe_immunity) * (1 - mab_prev - pax_prev)')
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * hrf * (1 - severe_immunity) * mab_prev * mab_hosp_adj')
+        self.add_flows_from_attrs_to_attrs({'seir': 'I'}, {'seir': 'Ih'}, to_coef='gamm * hosp * hrf *  (1 - severe_immunity) * pax_prev * pax_hosp_adj')
 
         # disease termination
         for variant in self.attrs['variant']:
