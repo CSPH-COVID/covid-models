@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from sortedcontainers import SortedDict
 """ Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
-from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
+from covid_model.data_imports1 import ExternalVacc, ExternalHosps, get_region_mobility_from_db
 from covid_model.utils import IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
 
 logger = IndentLogger(logging.getLogger(''), {})
