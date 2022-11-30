@@ -16,9 +16,9 @@ import matplotlib.ticker as mtick
 ### Local Imports ###
 from covid_model import CovidModel#, db_engine
 from covid_model.db1 import db_engine
-from covid_model.analysis.charts import plot_transmission_control
+from covid_model.analysis.charts1 import plot_transmission_control
 from covid_model.utils1 import IndentLogger, setup, get_filepath_prefix
-from covid_model.analysis.charts import plot_modeled, plot_actual_hosps, format_date_axis
+from covid_model.analysis.charts1 import plot_modeled, plot_actual_hosps, format_date_axis
 logger = IndentLogger(logging.getLogger(''), {})
 
 
