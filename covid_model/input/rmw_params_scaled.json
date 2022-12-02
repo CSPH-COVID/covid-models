@@ -2003,7 +2003,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2020-01-24": 1.834,
+      "2020-01-24": 1.9,
       "2020-01-30": 0
     },
     "desc": "scaled wildtype seed for reference region (CO North)"
@@ -2223,7 +2223,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2020-11-09": 0.834,
+      "2020-11-09": 0.87,
       "2020-12-04": 0
     },
     "desc": "scaled alpha seed for reference region (CO North)"
@@ -2443,7 +2443,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2021-03-07": 0.834,
+      "2021-03-07": 0.87,
       "2020-04-11": 0
     },
     "desc": "scaled delta seed for reference region (CO North)"
@@ -2663,7 +2663,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2021-10-28": 3.33,
+      "2021-10-28": 3.5,
       "2020-04-11": 0
     },
     "desc": "scaled BA.1 seed for reference region (CO North)"
@@ -2883,8 +2883,8 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2021-12-30": 8.34,
-      "2022-01-08": 4.17,
+      "2021-12-30": 8.7,
+      "2022-01-08": 4.4,
       "2022-01-10": 0
     },
     "desc": "scaled BA.2 seed for reference region (CO North)"
@@ -3104,7 +3104,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-01-25": 5.00,
+      "2022-01-25": 5.2,
       "2022-01-26": 0
     },
     "desc": "scaled BA.2.12.1 seed for reference region (CO North)"
@@ -3324,7 +3324,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-03-15": 4.17,
+      "2022-03-15": 4.4,
       "2022-03-25": 0
     },
     "desc": "scaled BA.4/5 seed for reference region (CO North)"
@@ -3544,7 +3544,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-09-15": 4.17,
+      "2022-09-15": 4.4,
       "2022-10-15": 0
     },
     "desc": "scaled emerging variant seed for reference region (CO North)"
