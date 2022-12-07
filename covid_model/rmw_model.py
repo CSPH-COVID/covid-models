@@ -27,7 +27,7 @@ logger = IndentLogger(logging.getLogger(''), {})
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
-class CovidModel:
+class RMWCovidModel:
     ####################################################################################################################
     """ Setup """
 
@@ -50,8 +50,8 @@ class CovidModel:
         # basic model data
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                                     'age': ['0-19', '20-39', '40-64', '65+'],
-                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
-                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'vx'],
+                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'],
+                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'emv'],
                                     'immun': ['none', 'weak', 'strong'],
                                     'region': ['coe', 'con', 'cow']})
         # labels used when logging and writing to db.
@@ -1352,7 +1352,7 @@ class CovidModel:
         # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
         cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'])
         # compute what fraction of the eligible population got each shot on a given day.
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
         vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'date', 'region', 'age']).sort_index()
@@ -1770,7 +1770,7 @@ class CovidModel:
                                                from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'},
                                                from_coef=f'shot1_per_available * shot1_fail_rate')
-            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2')]:
+            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2'),("booster2", "booster3")]:
                 for immun in self.attrs['immun']:
                     if immun == 'none':
                         # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
@@ -2158,13 +2158,13 @@ class CovidModel:
             if key in ['_CovidModel__start_date', '_CovidModel__end_date']:
                 self.__dict__[key] = dt.datetime.strptime(val, "%Y-%m-%d").date()
             elif key == '_CovidModel__tc':
-                self.__dict__[key] = CovidModel.unserialize_tc(val)
+                self.__dict__[key] = RMWCovidModel.unserialize_tc(val)
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_vacc(val)
+                self.__dict__[key] = RMWCovidModel.unserialize_vacc(val)
             elif key in ['actual_mobility', 'proj_mobility'] and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_mob(val)
+                self.__dict__[key] = RMWCovidModel.unserialize_mob(val)
             elif key == 'hosp' and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_hosp(val)
+                self.__dict__[key] = RMWCovidModel.unserialize_hosp(val)
             elif key == '_CovidModel__y0_dict':
                 self.__dict__[key] = self.unserialize_y0_dict(val)
             elif key == 'max_step_size':
