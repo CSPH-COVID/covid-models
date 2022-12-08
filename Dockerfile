@@ -11,8 +11,8 @@ WORKDIR /covid_rmw_model
 # Copy the files over to the image.
 # Note: We use a .dockerignore file to only copy relevant files from the covid_model directory.
 COPY covid_model ./covid_model/
-# Copy the requirements file to the image.
-COPY requirements.txt .
+# Copy the wrapper and requirements file to the image.
+COPY docker_wrapper.py requirements.txt ./
 # Install required packages
 RUN pip install -r requirements.txt
 # Set the entrypoint for the image.

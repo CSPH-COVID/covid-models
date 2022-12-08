@@ -7,9 +7,26 @@
 
 # Contains Jupyter notebooks for interactive model running
 covid_model/analysis
+!covid_model/analysis/__init__.py
+!covid_model/analysis/charts.py
 
 # Contains QC code
-covid_models/model_dev_qc
+covid_model/model_dev_qc
 
 # Contains output from previous model runs (When running from Docker, we will map a GCS bucket at this path anyways).
-covid_models/output
+covid_model/output
+
+# Contains Python virtual environment
+venv/
+
+# Contains old pre-Docker files
+old/
+
+# Contains test code
+test/
+
+# Contains Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Git
+.git/
