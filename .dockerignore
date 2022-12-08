@@ -1,0 +1,15 @@
+# CSTE Rocky Mountain West Regional COVID Model .dockerignore
+# Written by: Andrew Hill
+# Last Modified: 2022-12-07
+# Description: This file contains directories and files which we would like to ignore when building the Docker image,
+#              like files which are only used for interactive analysis, or QC and test files which are unnecessary
+#              when running to generate results.
+
+# Contains Jupyter notebooks for interactive model running
+covid_model/analysis
+
+# Contains QC code
+covid_models/model_dev_qc
+
+# Contains output from previous model runs (When running from Docker, we will map a GCS bucket at this path anyways).
+covid_models/output
