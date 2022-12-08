@@ -28,11 +28,9 @@ if __name__ == "__main__":
     # ENVIRONMENT VARIABLE SETUP
     # The BATCH_TASK_INDEX variable is passed in by Batch, and is the unique index of the Task within the group.
     # We can use this to index into the list of regions, to determine which region we should fit.
-    BATCH_TASK_INDEX = os.environ["BATCH_TASK_INDEX"]
-    # As part of the Batch run, all instances will have a GCS bucket mounted at GCS_BUCKET_MOUNT_PATH, which by default
-    # will be 'covid_model/output/'. We will use the setup() function to create a logger and setup the output to a
-    # subdirectory that contains the region name.
-    GCS_BUCKET_MOUNT_PATH = os.environ["GCS_BUCKET_MOUNT_PATH"]
+    BATCH_TASK_INDEX = int(os.environ["BATCH_TASK_INDEX"])
+    # The model references the 'gcp_project' environment variable later, so we hard-code it here.
+    os.environ["gcp_project"] = "co-covid-models"
 
     # INPUT PARAMETERS
     # The input parameters to the container are passed in as a base64 encoded JSON string. To retrieve them in a usable
