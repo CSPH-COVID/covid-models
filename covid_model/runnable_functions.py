@@ -44,7 +44,9 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
     yd_start = model.y0_dict if yd_start is None else yd_start
     y0 = model.y0_from_dict(yd_start)
     trange = range(tstart, tend+1)
-    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['estimated_actual'].to_numpy().flatten('F')
+    # hrf_finder
+    # To take out hrf: change 'estimated_actual' to 'observed'
+    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['observed'].to_numpy().flatten('F')
 
     def tc_list_to_dict(tc_list):
         """convert tc output of curve_fit to a dict like in our model.
@@ -304,7 +306,7 @@ def do_multiple_fits(model_args_list, fit_args, multiprocess = None):
 
     return models
 
-
+# region_finder
 def do_regions_fit(
                     multiprocess=None,
                    **model_args):
@@ -320,7 +322,7 @@ def do_regions_fit(
     model_args_list = list(map(lambda x: {'regions': [x], **non_region_model_args, 'tags':{'region': x}}, regions))
     do_multiple_fits(model_args_list, fit_args, multiprocess=multiprocess)
 
-
+# update_variant
 def do_create_report(model, outdir, immun_variants=('ba2121',), from_date=None, to_date=None, prep_model=False, solve_model=False):
     """Create some typically required figures and data for Gov briefings.
 
@@ -491,7 +493,7 @@ def do_build_legacy_output_df(model: CovidModel):
     age_totals = age_totals.drop(columns=['A', 'E', 'S', 'I'])
 
     age_df = pd.DataFrame()
-
+    # agecat_finder
     age_df['D_age1'] = age_totals['D']['0-19']
     age_df['D_age2'] = age_totals['D']['20-39']
     age_df['D_age3'] = age_totals['D']['40-64']
