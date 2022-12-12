@@ -44,7 +44,9 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
     yd_start = model.y0_dict if yd_start is None else yd_start
     y0 = model.y0_from_dict(yd_start)
     trange = range(tstart, tend+1)
-    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['observed'].to_numpy().flatten('F')
+    #hrf_finder
+    #change 'estimated_actual' to observed
+    ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['estimated_actual'].to_numpy().flatten('F')
 
     def tc_list_to_dict(tc_list):
         """convert tc output of curve_fit to a dict like in our model.
@@ -488,7 +490,7 @@ def do_build_legacy_output_df(model: CovidModel):
     age_totals = age_totals.drop(columns=['A', 'E', 'S', 'I'])
 
     age_df = pd.DataFrame()
-
+    # age_cat_finder
     age_df['D_age1'] = age_totals['D']['0-19']
     age_df['D_age2'] = age_totals['D']['20-39']
     age_df['D_age3'] = age_totals['D']['40-64']
