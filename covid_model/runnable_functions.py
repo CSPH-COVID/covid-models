@@ -494,15 +494,13 @@ def do_build_legacy_output_df(model: RMWCovidModel):
 
     age_df = pd.DataFrame()
     # agecat_finder
-    age_df['D_age1'] = age_totals['D']['0-19']
-    age_df['D_age2'] = age_totals['D']['20-39']
-    age_df['D_age3'] = age_totals['D']['40-64']
-    age_df['D_age4'] = age_totals['D']['65+']
+    age_df['D_age1'] = age_totals['D']['0-17']
+    age_df['D_age2'] = age_totals['D']['18-64']
+    age_df['D_age3'] = age_totals['D']['65+']
 
-    age_df['Ih_age1'] = age_totals['Ih']['0-19']
-    age_df['Ih_age2'] = age_totals['Ih']['20-39']
-    age_df['Ih_age3'] = age_totals['Ih']['40-64']
-    age_df['Ih_age4'] = age_totals['Ih']['65+']
+    age_df['Ih_age1'] = age_totals['Ih']['0-17']
+    age_df['Ih_age2'] = age_totals['Ih']['18-64']
+    age_df['Ih_age3'] = age_totals['Ih']['65+']
 
     df = totals.join(model.new_infections).join(model.re_estimates).join(age_df)
 
