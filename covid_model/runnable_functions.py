@@ -45,7 +45,7 @@ def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=
     y0 = model.y0_from_dict(yd_start)
     trange = range(tstart, tend+1)
     # hrf_finder
-    # To take out hrf: change 'estimated_actual' to 'observed'
+    # To take out hrf: change 'estimated_actual' to 'observed':
     ydata = model.hosps.loc[pd.MultiIndex.from_product([regions, [model.t_to_date(t) for t in trange]])]['observed'].to_numpy().flatten('F')
 
     def tc_list_to_dict(tc_list):

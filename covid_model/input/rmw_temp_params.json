@@ -3688,6 +3688,7 @@
     },
     "desc": "monoclonal antibodies reduce hospital length of stay by 28%"
   },
+    # EMV related Params:
     {"param": "vx_seed", "attrs":  null, "vals":  {"2020-01-01": 0, "2022-09-20": 5, "2022-10-30": 0}, "desc": "baseline Variant X seeding value for scenarios"},
     {"param": "betta", "attrs": {"variant": "vx"}, "mults": {"2020-01-01": 8.581}, "desc": "Variant X is equally as infectious as BA.5"},
     {"param": "hosp", "attrs": {"variant": "vx"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for Variant X hospitalization rate"},
