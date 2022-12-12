@@ -130,7 +130,7 @@ class ExternalVacc(ExternalData):
             # This query passes in region/county IDs which can be used to subset the data (Should only be used if the
             # population scaling is turned OFF).
             sql = open("covid_model/sql/vaccination_by_age_with_boosters.sql","r").read()
-            return pd.read_sql(sql, self.engine, index_col=["measure_date","age"], params={"county_ids": [int(x) for x in county_ids]})
+            return pd.read_sql(sql, self.engine, index_col=["measure_date","age"], params={"county_ids": county_ids})
             # Old
             #sql = open('covid_model/sql/vaccination_by_age_group_with_boosters_wide.sql', 'r').read()
             #return pd.read_sql(sql, self.engine, index_col=['measure_date', 'age'])

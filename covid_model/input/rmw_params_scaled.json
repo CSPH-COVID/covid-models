@@ -1617,6 +1617,46 @@
     },
     "desc": "4% of second boosters among 65+ whose first, second, and first booster shots failed fail to confer immunity"
   },
+   {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "0-19"
+    },
+    "vals": {
+      "2020-01-01": 0.01
+    },
+    "desc": "1% of second boosters among 0-19 whose first, second, and first booster shots failed fail to confer immunity"
+  },
+  {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "20-39"
+    },
+    "vals": {
+      "2020-01-01": 0.01
+    },
+    "desc": "1% of second boosters among 20-39 whose first, second, and first booster shots failed fail to confer immunity"
+  },
+  {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "40-64"
+    },
+    "vals": {
+      "2020-01-01": 0.01
+    },
+    "desc": "1% of second boosters among 40-64 whose first, second, and first booster shots failed fail to confer immunity"
+  },
+  {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "65+"
+    },
+    "vals": {
+      "2020-01-01": 0.04
+    },
+    "desc": "4% of second boosters among 65+ whose first, second, and first booster shots failed fail to confer immunity"
+  },
   {
     "param": "immunity",
     "attrs": null,
@@ -1711,7 +1751,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -1724,13 +1765,15 @@
     "attrs": {
       "vacc": [
         "booster1",
-        "booster2"
+        "booster2",
+        "booster3"
       ],
       "variant": [
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -1944,11 +1987,11 @@
     },
     "to_attrs": {
       "variant": [
-        "vx"
+        "emv"
       ]
     },
     "vals": {
-      "2020-01-01": 0.095
+      "2020-01-01": 0.15
     },
     "desc": "given prior infection with any variant (or no variant), 9.5% of strongly immune individuals can get reinfected with Variant X"
   },
@@ -1969,7 +2012,7 @@
     },
     "to_attrs": {
       "variant": [
-        "vx"
+        "emv"
       ]
     },
     "vals": {
@@ -1990,7 +2033,8 @@
     "attrs": {
       "vacc": [
         "booster1",
-        "booster2"
+        "booster2",
+        "booster3"
       ]
     },
     "mults": {
@@ -2003,7 +2047,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2020-01-24": 1.834,
+      "2020-01-24": 1.9,
       "2020-01-30": 0
     },
     "desc": "scaled wildtype seed for reference region (CO North)"
@@ -2223,7 +2267,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2020-11-09": 0.834,
+      "2020-11-09": 0.87,
       "2020-12-04": 0
     },
     "desc": "scaled alpha seed for reference region (CO North)"
@@ -2443,7 +2487,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2021-03-07": 0.834,
+      "2021-03-07": 0.87,
       "2020-04-11": 0
     },
     "desc": "scaled delta seed for reference region (CO North)"
@@ -2663,7 +2707,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2021-10-28": 3.33,
+      "2021-10-28": 3.5,
       "2020-04-11": 0
     },
     "desc": "scaled BA.1 seed for reference region (CO North)"
@@ -2883,8 +2927,8 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2021-12-30": 8.34,
-      "2022-01-08": 4.17,
+      "2021-12-30": 8.7,
+      "2022-01-08": 4.4,
       "2022-01-10": 0
     },
     "desc": "scaled BA.2 seed for reference region (CO North)"
@@ -3104,7 +3148,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-01-25": 5.00,
+      "2022-01-25": 5.2,
       "2022-01-26": 0
     },
     "desc": "scaled BA.2.12.1 seed for reference region (CO North)"
@@ -3324,7 +3368,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-03-15": 4.17,
+      "2022-03-15": 4.4,
       "2022-03-25": 0
     },
     "desc": "scaled BA.4/5 seed for reference region (CO North)"
@@ -3544,7 +3588,7 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-09-15": 4.17,
+      "2022-09-15": 4.4,
       "2022-10-15": 0
     },
     "desc": "scaled emerging variant seed for reference region (CO North)"
@@ -3822,12 +3866,12 @@
   {
     "param": "betta",
     "attrs": {
-      "variant": "vx"
+      "variant": "emv"
     },
     "mults": {
       "2020-01-01": 8.581
     },
-    "desc": "Variant X is equally as infectious as BA.5"
+    "desc": "emv is equally as infectious as BA.5"
   },
   {
     "param": "alpha",
@@ -3844,7 +3888,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -3859,7 +3904,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -3874,7 +3920,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ],
       "vacc": [
         "none",
@@ -3893,12 +3940,14 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ],
       "vacc": [
         "shot2",
         "booster1",
-        "booster2"
+        "booster2",
+        "booster3"
       ]
     },
     "mults": {
@@ -3933,7 +3982,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -3942,23 +3992,14 @@
     "desc": "Omicrons send 16.7% fewer people to the hospital compared to wildtype"
   },
   {
-    "param": "hosp",
-    "attrs": {
-      "variant": "vx"
-    },
-    "mults": {
-      "2020-01-01": 1
-    },
-    "desc": "baseline multiplier for Variant X hospitalization rate"
-  },
-  {
     "param": "hlos",
     "attrs": {
       "variant": [
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -3993,7 +4034,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {
@@ -4028,7 +4070,8 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "emv"
       ]
     },
     "mults": {

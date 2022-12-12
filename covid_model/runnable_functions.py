@@ -13,14 +13,14 @@ from scipy import optimize as spo
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mtick
 """ Local Imports """
-from covid_model import CovidModel
+from covid_model import RMWCovidModel
 from covid_model.analysis.charts import plot_transmission_control
 from covid_model.utils import IndentLogger, setup, get_filepath_prefix, db_engine
 from covid_model.analysis.charts import plot_modeled, plot_observed_hosps, format_date_axis
 logger = IndentLogger(logging.getLogger(''), {})
 
 
-def __single_batch_fit(model: CovidModel, tc_min, tc_max, yd_start=None, tstart=None, tend=None, regions=None):
+def __single_batch_fit(model: RMWCovidModel, tc_min, tc_max, yd_start=None, tstart=None, tend=None, regions=None):
     """function to fit TC for a single batch of time for a model
 
     Only TC values which lie in the specified regions between tstart and tend will be fit.
@@ -105,7 +105,7 @@ def do_single_fit(tc_0=0.75,
                   outdir=None,
                   write_results=True,
                   write_batch_results=False,
-                  model_class=CovidModel,
+                  model_class=RMWCovidModel,
                   **model_args):
     """ Fits TC for the model between two dates, and does the fit in batches to make the solving easier
 
@@ -473,7 +473,7 @@ def do_create_multiple_reports(models, multiprocess=None, **report_args):
         list(map(do_create_report_wrapper_nonparallel, args_list))
 
 
-def do_build_legacy_output_df(model: CovidModel):
+def do_build_legacy_output_df(model: RMWCovidModel):
     """Function to create "legacy output" file, which is a typical need for Gov briefings.
 
     creates a Pandas DataFrame containing things like prevalence, total infected, and 1-in-X numbers daily for each region

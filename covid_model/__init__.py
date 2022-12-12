@@ -4,5 +4,5 @@
 # bad idea to import here
 """ Local Imports """
 # classes
-from covid_model.model import CovidModel
+from covid_model.rmw_model import RMWCovidModel
 # functions
