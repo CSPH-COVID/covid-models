@@ -27,7 +27,7 @@ logger = IndentLogger(logging.getLogger(''), {})
 
 
 # class used to run the model given a set of parameters, including transmission control (ef)
-class CovidModel:
+class RMWCovidModel:
     ####################################################################################################################
     """ Setup """
 
@@ -2126,12 +2126,12 @@ class CovidModel:
         # hrf_finder (maybe)
         logger.debug(f"{str(self.tags)} Serializing model to json")
         keys = ['base_spec_id', 'spec_id', 'tags',
-                '_CovidModel__start_date', '_CovidModel__end_date', '_CovidModel__attrs', '_CovidModel__tc',
-                'tc_t_prev_lookup', '_CovidModel__params_defs',
-                '_CovidModel__region_defs', '_CovidModel__regions', '_CovidModel__vacc_proj_params',
-                '_CovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility',
-                '_CovidModel__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps', #'_CovidModel__hosp_reporting_frac',
-                '_CovidModel__y0_dict', 'max_step_size', 'ode_method']
+                '_RMWCovidModel__start_date', '_RMWCovidModel__end_date', '_RMWCovidModel__attrs', '_RMWCovidModel__tc',
+                'tc_t_prev_lookup', '_RMWCovidModel__params_defs',
+                '_RMWCovidModel__region_defs', '_RMWCovidModel__regions', '_RMWCovidModel__vacc_proj_params',
+                '_RMWCovidModel__mobility_mode', 'actual_mobility', 'proj_mobility', 'proj_mobility',
+                '_RMWCovidModel__mobility_proj_params', 'actual_vacc_df', 'proj_vacc_df', 'hosps', #'_RMWCovidModel__hosp_reporting_frac',
+                '_RMWCovidModel__y0_dict', 'max_step_size', 'ode_method']
         # add in proj_mobility
         serial_dict = OrderedDict()
         for key in keys:
@@ -2146,7 +2146,7 @@ class CovidModel:
                 serial_dict[key] = self.serialize_mob(val)
             elif key == 'hosps' and val is not None:
                 serial_dict[key] = self.serialize_hosp(val)
-            elif key == '_CovidModel__y0_dict' and self.__y0_dict is not None:
+            elif key == '_RMWCovidModel__y0_dict' and self.__y0_dict is not None:
                 serial_dict[key] = self.serialize_y0_dict(val)
             elif key == 'max_step_size':
                 serial_dict[key] = val if not np.isinf(val) else 'inf'
@@ -2163,17 +2163,17 @@ class CovidModel:
         logger.debug(f"{str(self.tags)} repopulating model from serialized json")
         raw = json.loads(s)
         for key, val in raw.items():
-            if key in ['_CovidModel__start_date', '_CovidModel__end_date']:
+            if key in ['_RMWCovidModel__start_date', '_RMWCovidModel__end_date']:
                 self.__dict__[key] = dt.datetime.strptime(val, "%Y-%m-%d").date()
-            elif key == '_CovidModel__tc':
-                self.__dict__[key] = CovidModel.unserialize_tc(val)
+            elif key == '_RMWCovidModel__tc':
+                self.__dict__[key] = RMWCovidModel.unserialize_tc(val)
             elif key in ['actual_vacc_df', 'proj_vacc_df'] and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_vacc(val)
+                self.__dict__[key] = RMWCovidModel.unserialize_vacc(val)
             elif key in ['actual_mobility', 'proj_mobility'] and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_mob(val)
+                self.__dict__[key] = RMWCovidModel.unserialize_mob(val)
             elif key == 'hosp' and val is not None:
-                self.__dict__[key] = CovidModel.unserialize_hosp(val)
-            elif key == '_CovidModel__y0_dict':
+                self.__dict__[key] = RMWCovidModel.unserialize_hosp(val)
+            elif key == '_RMWCovidModel__y0_dict':
                 self.__dict__[key] = self.unserialize_y0_dict(val)
             elif key == 'max_step_size':
                 self.__dict__[key] = np.inf if val == 'inf' else float(val)
