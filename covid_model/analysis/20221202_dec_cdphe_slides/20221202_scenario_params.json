@@ -112,5 +112,5 @@
   {"param": "mab_prev",	"attrs": null, "vals": {"2020-01-24": 0.0, "2021-10-02": 0.0106, "2021-10-09": 0.029150000000000002, "2021-10-16": 0.0477, "2021-10-23": 0.0689, "2021-11-01": 0.09275, "2021-11-10": 0.106, "2021-12-17": 0.0651111111111111, "2021-12-26": 0.01},	"desc": "proportion of COVID-19 cases that receive monoclonal antibodies, which changes over time"},
   {"param": "mab_hosp_adj",	"attrs": null, "vals": {"2020-01-01": 0.21}, "desc": "monoclonal antibodies reduce the probability of hospitalization by 79%"},
   {"param": "mab_hlos_adj",	"attrs": null, "vals": {"2020-01-01": 0.72}, "desc": "monoclonal antibodies reduce hospital length of stay by 28%"},
-  {"param": "hrf", "attrs": null, "vals": {"2020-01-01": 1, "2022-03-01": 0.932, "2022-03-15": 0.868, "2022-03-30": 0.8}, "desc": "hospital reporting fraction"}
+  {"param": "hosp_reporting_frac", "attrs": null, "vals": {"2020-01-01": 1, "2022-03-01": 0.932, "2022-03-15": 0.868, "2022-03-30": 0.8}, "desc": "hospital reporting fraction"}
 ]
