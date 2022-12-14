@@ -85,7 +85,8 @@ class ExternalHospsEMR(ExternalData):
         Returns: Pandas dataframe of hospitalization data
 
         """
-        sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
+        #sql = open('covid_model/sql/emresource_hospitalizations.sql', 'r').read()
+        sql = open('covid_model/sql/emresource_hospitalizations_original.sql', 'r').read()
         return pd.read_sql(sql, self.engine, index_col=['measure_date'])
 
 
