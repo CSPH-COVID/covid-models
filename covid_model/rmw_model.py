@@ -10,6 +10,7 @@ import logging
 import pickle
 """ Third Party Imports """
 import numpy as np
+#np.seterr(invalid="raise")
 import pandas as pd
 import sympy as sym
 from sympy.parsing.sympy_parser import parse_expr
@@ -18,6 +19,7 @@ import scipy.sparse as spsp
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sortedcontainers import SortedDict
+from matplotlib import pyplot as plt
 """ Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
 from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
@@ -52,7 +54,7 @@ class RMWCovidModel:
                                     # agecat_finder
                                     'age': ['0-17', '18-64', '65+'],
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
-                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'vx'],
+                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'emv'],
                                     'immun': ['none', 'weak', 'strong'],
                                     # region_finder
                                     'region': ['coe','con','cow','ide','idn','ids','idw','mte','mtn','mtw','nme','nmn','nms','nmw','ute','utn','uts','utw','wye','wyn','wyw']})
@@ -195,22 +197,41 @@ class RMWCovidModel:
         Args:
             engine: a database connection. if None, we will make a new connection in this method
         """
+
+        def decumulative(g):
+            # Run diff(), but keep the first row of data, which is set to NaN by the .diff() function.
+            tmp_g = g.diff()
+            tmp_g.iloc[0] = g.iloc[0]
+            return tmp_g
+
         logger.info(f"{str(self.tags)} Retrieving vaccinations data")
-        pop_by_region = {dc["attrs"]["region"]: dc["vals"]["2020-01-01"] for dc in self.params_defs if dc["param"] == "region_pop"}
         # region_finder
-        colo_pop = sum([pop_by_region[c] for c in pop_by_region.keys() if c in {"cow","con","coe"}])
         if engine is None:
             engine = db_engine()
         logger.debug(f"{str(self.tags)} getting vaccines from db")
         actual_vacc_df_list = []
         for region in self.regions:
+            #tmp_vacc = ExternalVacc(engine).fetch(region_id=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
             county_ids = self.region_defs[region]['counties_fips']
-            tmp_vacc = ExternalVacc(engine).fetch(county_ids=county_ids).assign(region=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
-            # if region in {"cow","con","coe"}:
-            #     logger.warning("WARNING!!! SCALING VACCINATION DATA BY REGIONAL POPULATION!")
-            #     logger.warning("REMOVE THIS WHEN THE REGIONAL DATA IS FIXED!!!!")
-            #     # Scale tmp_vacc by regional population proportion (pop_region/pop_total)
-            #     tmp_vacc = tmp_vacc * (pop_by_region[region]/colo_pop)
+            tmp_vacc = ExternalVacc(engine)\
+                .fetch(county_ids=county_ids)\
+                .assign(region=region)\
+                .set_index('region',append=True)\
+                .reorder_levels(['measure_date', 'region', 'age'])
+            # if tmp_vacc.groupby(["region","age"]).cumsum().idxmax(axis=1).unique() != ["shot1"]:
+            #     #TODO: If we ever change it so that shots can happen out of sequence, we will need to remove this.
+            #     logger.warning("Found at least one instance where a later sequence shot has a larger number of "
+            #                    "cumulative doses than an earlier shot (i.e. shot2 > shot1). This will break the "
+            #                    "compartmental flows! Adjusting vaccination data to compensate, but please fix the "
+            #                    "issue at the data source!")
+            #     # Transform the data to cumulative
+            #     tmp_vacc_cum = tmp_vacc.groupby(["region","age"]).cumsum()
+            #     # Take the element-wise minimum of the current cumulative data and the data shifted to the right
+            #     # by one column (i.e. the previous dose's cumulative #). Fill the first column with np.inf to ensure
+            #     # that the original first column is preserved.
+            #     tmp_vacc_cum = np.minimum(tmp_vacc_cum,tmp_vacc_cum.shift(axis=1).fillna(np.inf))
+            #     tmp_vacc = tmp_vacc_cum.groupby(["region","age"]).apply(decumulative)
+
             actual_vacc_df_list.append(tmp_vacc)
         self.actual_vacc_df = pd.concat(actual_vacc_df_list)
         self.actual_vacc_df.index.set_names('date', level=0, inplace=True)
@@ -422,7 +443,7 @@ class RMWCovidModel:
         if self.regions != ['co']:
             region_name_to_shorthand = {v["name"]:k for k,v in self.region_defs.items()}
             hosps = ExternalHospsCOPHS(engine).fetch(region_ids=region_names['region'].to_list()) \
-                                            .drop(["NA"]) \
+                                            .drop(["NA"],errors="ignore") \
                                             .replace({"Region": region_name_to_shorthand})
             hosps.index = pd.to_datetime(hosps.index)
             hosps.index.name = "date"
@@ -430,11 +451,14 @@ class RMWCovidModel:
             hosps.index = hosps.index.reorder_levels([1,0])
             hosps.index.names = ["region","date"]
             hosps.sort_index(inplace=True)
+            # Shift dates to represent the start of the week instead of the end
+            #date_level = hosps.index.get_level_values("date") - pd.Timedelta(days=6)
             date_level = hosps.index.get_level_values("date")
-            hosps = hosps.reindex(
-                pd.MultiIndex.from_product([self.regions, pd.date_range(min(date_level), max(date_level), freq="D")],
-                                           names=["region", "date"]), fill_value=0).groupby("region").rolling(7,
-                                                                                                              min_periods=0).mean()\
+            #hosps = hosps.reset_index(level="date",drop=True).set_index(date_level,append=True)
+            hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(min(date_level), max(date_level), freq="D")],names=["region", "date"]))\
+                .groupby("region")\
+                .rolling(7,min_periods=1)\
+                .mean()\
                 .droplevel(0)
         else:
             hosps = ExternalHospsEMR(engine).fetch() \
@@ -1139,10 +1163,11 @@ class RMWCovidModel:
         Returns: Pandas DataFrame with row index date / region, and four columns.
 
         """
-        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region', dropna=False).rename('observed').to_frame() #'modeled_actual
+        df = self.solution_sum_df(['seir', 'region'])['Ih'].stack('region', dropna=False).rename('modeled_actual').to_frame() #'modeled_actual
         df = df.join(self.hosps)
         #df['hosp_reporting_frac'].ffill(inplace=True)
-        df['modeled_observed'] = df['modeled_observed'] #df['modeled_actual'] * df['hosp_reporting_frac']
+        df['modeled_observed'] = df['modeled_actual']
+        #df["modeled_observed"] = df['modeled_actual'] * df['hosp_reporting_frac']
         df = df.reindex(columns=['observed', 'modeled_observed']) #'estimated_actual', 'modeled_actual',
         df = df.reorder_levels([1, 0]).sort_index()  # put region first
         return df

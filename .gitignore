@@ -132,3 +132,6 @@ dmypy.json
 covid_model/output/
 .idea/
 co-covid-models-*.json
+*.png
+*.pkl
+*.csv

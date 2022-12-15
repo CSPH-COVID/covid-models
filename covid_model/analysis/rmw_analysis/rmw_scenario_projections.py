@@ -7,13 +7,14 @@ if __name__ == "__main__":
     import json
     import logging
     import pickle
-
+    # import numpy as np
+    # np.seterr(all="raise")
     """ Third Party Imports """
     from matplotlib import pyplot as plt
 
     """ Local Imports """
     # Import the RMW model instead of the original model
-    from covid_model.rmw_model import CovidModel as RMWCovidModel
+    from covid_model.rmw_model import RMWCovidModel
     from covid_model.runnable_functions import do_fit_scenarios, do_create_multiple_reports
     from covid_model.utils import setup, get_filepath_prefix
     from covid_model.analysis.charts import plot_transmission_control
@@ -22,46 +23,48 @@ if __name__ == "__main__":
     outdir = setup("rmw_scenario_projections.ipynb")
 
     # designate the arguments for how the model will behave
-    model_args = {
-        'params_defs': 'covid_model/input/rmw_params_scaled.json',
-        'region_defs': 'covid_model/input/rmw_region_definitions.json',
-        'vacc_proj_params': 'covid_model/analysis/20221004_oct_gov_briefing/20221004_vacc_proj_params.json',
-        'start_date': '2020-01-24',
-        'end_date': '2024-01-01',
-        #'regions': ['coe', 'con', 'cow']
-    }
+    # model_args = {
+    #     'params_defs': 'covid_model/input/rmw_temp_params.json',
+    #     'region_defs': 'covid_model/input/rmw_region_definitions.json',
+    #     'vacc_proj_params': 'covid_model/input/rmw_vacc_proj_params.json',
+    #     'start_date': '2020-01-24',
+    #     'end_date': '2024-01-01',
+    #     #'regions': ['coe', 'con', 'cow']
+    # }
+    #
+    # # this is how the fit will behave
+    # # place the outdir argument here to tell the model fit where to go
+    # fit_args = {'outdir': outdir,
+    #             'fit_end_date': '2022-02-28',
+    #             'model_class': RMWCovidModel
+    #             }
+    #
+    # # because all the scenarios are the same
+    # # List of regions to use
+    # regions_to_use = ["nme","nmn","nms","nmw"]
+    # scen_args = [{"regions": [region]} for region in regions_to_use]
+    # #model = do_single_fit(**model_args,**fit_args)
+    # models = do_fit_scenarios(base_model_args=model_args,
+    #                           fit_args=fit_args,
+    #                           scenario_args_list=scen_args,
+    #                           multiprocess=2)
+    #
+    # for reg, reg_model in zip(regions_to_use, models):
+    #     with open(f"solution_df_{reg}_new.pkl", "wb") as f:
+    #         pickle.dump(reg_model.solution_ydf, f)
+    # #exit(0)
+    # multiprocess = 4
 
-    # this is how the fit will behave
-    # place the outdir argument here to tell the model fit where to go
-    fit_args = {'outdir': outdir,
-                'fit_end_date': '2022-02-28',
-                'model_class': RMWCovidModel
-                }
+    #for reg, reg_model in zip(regions_to_use, models):
+    for reg in [["nmn"],]:
+        # with open(f"solution_df_{reg}_new.pkl", "wb") as f:
+        #     pickle.dump(reg_model.solution_ydf, f)
 
-    # because all the scenarios are the same
-    # List of regions to use
-    regions_to_use = ["con"]
-    scen_args = [{"regions": [region]} for region in regions_to_use]
-    #model = do_single_fit(**model_args,**fit_args)
-    models = do_fit_scenarios(base_model_args=model_args,
-                              fit_args=fit_args,
-                              scenario_args_list=scen_args)
-
-    for reg, reg_model in zip(regions_to_use, models):
-        with open(f"solution_df_{reg}_new.pkl", "wb") as f:
-            pickle.dump(reg_model.solution_ydf, f)
-    exit(0)
-    multiprocess = 4
-
-    for reg, reg_model in zip(regions_to_use, models):
-        with open(f"solution_df_{reg}_new.pkl", "wb") as f:
-            pickle.dump(reg_model.solution_ydf, f)
-
-        scenario_params = json.load(open("covid_model/input/rmw_params_scaled.json"))
+        scenario_params = json.load(open("covid_model/input/rmw_temp_params.json"))
 
         model_args = {
-            'base_spec_id': reg_model.spec_id,  # model.spec_id, # use the spec id that was output from the model fit
-            'regions':reg_model.regions
+            'base_spec_id': 4567,  # model.spec_id, # use the spec id that was output from the model fit
+            'regions':reg
         }
         model_fit_args = {
             'outdir': outdir,
@@ -104,8 +107,8 @@ if __name__ == "__main__":
                                             'tags': {'vx_seed': vx_seed,
                                                      'vir_mult': vir_mult,
                                                      'booster_mult': 0,
-                                                     'region':"_".join(reg_model.regions)},
-                                            'regions':reg_model.regions})
+                                                     'region':"_".join(reg)},
+                                            'regions':reg})
 
         # %%
 
@@ -115,7 +118,9 @@ if __name__ == "__main__":
         # %%
 
         # run the scenarios
-        models = do_fit_scenarios(base_model_args=model_args, scenario_args_list=scenario_model_args, fit_args=model_fit_args)
+        models = do_fit_scenarios(base_model_args=model_args,
+                                  scenario_args_list=scenario_model_args,
+                                  fit_args=model_fit_args)
 
         # %% md
 
@@ -124,8 +129,13 @@ if __name__ == "__main__":
         # %%
 
         # here you can also specify which variants you want to calculate immunity for
-        do_create_multiple_reports(models, multiprocess=multiprocess, outdir=outdir, prep_model=False, solve_model=True,
-                                   immun_variants=['ba45', 'vx'], from_date='2022-01-01')
+        do_create_multiple_reports(models,
+                                   #multiprocess=multiprocess,
+                                   outdir=outdir,
+                                   prep_model=False,
+                                   solve_model=True,
+                                   immun_variants=['ba45', 'vx'],
+                                   from_date='2022-01-01')
 
         # %%
 
