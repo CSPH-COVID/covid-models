@@ -211,26 +211,26 @@ class RMWCovidModel:
         logger.debug(f"{str(self.tags)} getting vaccines from db")
         actual_vacc_df_list = []
         for region in self.regions:
-            #tmp_vacc = ExternalVacc(engine).fetch(region_id=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
-            county_ids = self.region_defs[region]['counties_fips']
-            tmp_vacc = ExternalVacc(engine)\
-                .fetch(county_ids=county_ids)\
-                .assign(region=region)\
-                .set_index('region',append=True)\
-                .reorder_levels(['measure_date', 'region', 'age'])
-            # if tmp_vacc.groupby(["region","age"]).cumsum().idxmax(axis=1).unique() != ["shot1"]:
-            #     #TODO: If we ever change it so that shots can happen out of sequence, we will need to remove this.
-            #     logger.warning("Found at least one instance where a later sequence shot has a larger number of "
-            #                    "cumulative doses than an earlier shot (i.e. shot2 > shot1). This will break the "
-            #                    "compartmental flows! Adjusting vaccination data to compensate, but please fix the "
-            #                    "issue at the data source!")
-            #     # Transform the data to cumulative
-            #     tmp_vacc_cum = tmp_vacc.groupby(["region","age"]).cumsum()
-            #     # Take the element-wise minimum of the current cumulative data and the data shifted to the right
-            #     # by one column (i.e. the previous dose's cumulative #). Fill the first column with np.inf to ensure
-            #     # that the original first column is preserved.
-            #     tmp_vacc_cum = np.minimum(tmp_vacc_cum,tmp_vacc_cum.shift(axis=1).fillna(np.inf))
-            #     tmp_vacc = tmp_vacc_cum.groupby(["region","age"]).apply(decumulative)
+            tmp_vacc = ExternalVacc(engine).fetch(region_id=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
+            # county_ids = self.region_defs[region]['counties_fips']
+            # tmp_vacc = ExternalVacc(engine)\
+            #     .fetch(county_ids=county_ids)\
+            #     .assign(region=region)\
+            #     .set_index('region',append=True)\
+            #     .reorder_levels(['measure_date', 'region', 'age'])
+            if tuple(tmp_vacc.groupby(["region","age"]).cumsum().idxmax(axis=1).unique()) != ("shot1",):
+                #TODO: If we ever change it so that shots can happen out of sequence, we will need to remove this.
+                logger.warning("Found at least one instance where a later sequence shot has a larger number of "
+                               "cumulative doses than an earlier shot (i.e. shot2 > shot1). This will break the "
+                               "compartmental flows! Adjusting vaccination data to compensate, but please fix the "
+                               "issue at the data source!")
+                # Transform the data to cumulative
+                tmp_vacc_cum = tmp_vacc.groupby(["region","age"]).cumsum()
+                # Take the element-wise minimum of the current cumulative data and the data shifted to the right
+                # by one column (i.e. the previous dose's cumulative #). Fill the first column with np.inf to ensure
+                # that the original first column is preserved.
+                tmp_vacc_cum = np.minimum(tmp_vacc_cum,tmp_vacc_cum.shift(axis=1).fillna(np.inf))
+                tmp_vacc = tmp_vacc_cum.groupby(["region","age"]).apply(decumulative)
 
             actual_vacc_df_list.append(tmp_vacc)
         self.actual_vacc_df = pd.concat(actual_vacc_df_list)
@@ -455,7 +455,7 @@ class RMWCovidModel:
             #date_level = hosps.index.get_level_values("date") - pd.Timedelta(days=6)
             date_level = hosps.index.get_level_values("date")
             #hosps = hosps.reset_index(level="date",drop=True).set_index(date_level,append=True)
-            hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(min(date_level), max(date_level), freq="D")],names=["region", "date"]))\
+            hosps = hosps.reindex(pd.MultiIndex.from_product([self.regions, pd.date_range(min(date_level), max(date_level), freq="D")],names=["region", "date"]),fill_value=0)\
                 .groupby("region")\
                 .rolling(7,min_periods=1)\
                 .mean()\

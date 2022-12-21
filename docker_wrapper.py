@@ -14,13 +14,12 @@ import json
 import base64
 import sys
 import logging
+import pickle
 from matplotlib import pyplot as plt
 from covid_model.rmw_model import RMWCovidModel
 from covid_model.runnable_functions import do_single_fit, do_create_report
 from covid_model.utils import setup, get_filepath_prefix
 from covid_model.analysis.charts import plot_transmission_control
-
-TESTING = True
 
 if __name__ == "__main__":
     # ENVIRONMENT VARIABLE SETUP
@@ -45,21 +44,21 @@ if __name__ == "__main__":
     #   "report_start_date": <report_start_date>,
     #   "report_variants": [...]
     # }
-
-    if TESTING:
-        with open("sample_config.json","r") as f:
-            args = json.load(f)
-    else:
-        # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
-        if len(sys.argv) < 2:
-            print("Error: Missing input arguments.")
-            sys.exit(1)
-        # Retrieve B64-encoded string.
-        b64_json_str = sys.argv[1]
-        # Decode the string
-        json_str = base64.b64decode(b64_json_str, validate=True)
-        # Load the JSON string
-        args = json.loads(json_str)
+    # TESTING = True
+    # if TESTING:
+    #     with open("sample_config_nmn.json","r") as f:
+    #         args = json.load(f)
+    #else:
+    # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
+    if len(sys.argv) < 2:
+        print("Error: Missing input arguments.")
+        sys.exit(1)
+    # Retrieve B64-encoded string.
+    b64_json_str = sys.argv[1]
+    # Decode the string
+    json_str = base64.b64decode(b64_json_str, validate=True)
+    # Load the JSON string
+    args = json.loads(json_str)
 
     # OUTPUT SETUP
     # The region handled by this Task/instance is just the BATCH_TASK_INDEX-th element of the args["regions"] list.
@@ -76,7 +75,8 @@ if __name__ == "__main__":
         'vacc_proj_params': 'covid_model/input/rmw_vacc_proj_params.json',
         'start_date': args["start_date"],
         'end_date': args["end_date"],
-        'regions': [instance_region]
+        'regions': [instance_region],
+        'tags': {"region": instance_region}
     }
 
     fit_args = {'outdir': outdir,
@@ -87,17 +87,17 @@ if __name__ == "__main__":
     # This code is mostly just copied from the Jupyter notebooks we use, but in the future we can make this
     # a more general wrapper for doing model fitting and generating plots.
     model = do_single_fit(**model_args,**fit_args)
-    #model = RMWCovidModel(base_spec_id=4578)
-    #model.update_tc({model.date_to_t(args["fit_end_date"]): {instance_region: 0.5}}, replace = False)
+    with open(get_filepath_prefix(outdir, tags=model.tags) + "model_solutionydf.pkl","wb") as f:
+        pickle.dump(model.solution_ydf,f)
     model.solve_seir()
     # MODEL OUTPUTS
     logging.info('Projecting')
     do_create_report(model, outdir=outdir, prep_model=False, solve_model=False, immun_variants=args["report_variants"],
                      from_date=args["report_start_date"])
     model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(
-        get_filepath_prefix(outdir, tags=model.tags) + 'reg_seir_variant_immun_total_all_at_once_projection.csv')
+        get_filepath_prefix(outdir, tags=model.tags) + 'seir_variant_immun_total_all_at_once_projection.csv')
     model.solution_sum_df().unstack().to_csv(
-        get_filepath_prefix(outdir, tags=model.tags) + 'reg_full_projection.csv')
+        get_filepath_prefix(outdir, tags=model.tags) + 'full_projection.csv')
 
     logging.info(f'{str(model.tags)}: Running forward sim')
 
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     ax = fig.add_subplot(212)
     plot_transmission_control(model, ax=ax)
     ax.set_xlim(xmin, xmax)
-    plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast.png')
+    plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.png')
     plt.close()
     hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
     json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
