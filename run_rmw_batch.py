@@ -209,7 +209,12 @@ if __name__ == "__main__":
                                   task_count_per_node=1,
                                   parallelism=6)
     # Display the output status for each task in the job.
-
+    # TODO: Get task status for each region and print a nice output that shows which regions are running and completed.
+    #       This should block until the Batch job has completed.
 
     # Combine files when job is complete
     combine_files(project=args.project_id,bucket=args.bucket_name,subdir=args.job_id)
+
+    # TODO: Create BigQuery tables for outputs based on the combined files from google cloud storage.
+
+    print("Done!")
