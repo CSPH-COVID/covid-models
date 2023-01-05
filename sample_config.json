@@ -1,0 +1,13 @@
+{
+    "regions": [
+        "con"
+    ],
+    "start_date": "2020-01-24",
+    "end_date": "2023-02-01",
+    "fit_end_date": "2022-09-30",
+    "report_start_date": "2022-01-01",
+    "report_variants": [
+        "ba45",
+        "emv"
+    ]
+}
