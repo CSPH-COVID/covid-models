@@ -22,7 +22,7 @@ from sortedcontainers import SortedDict
 from matplotlib import pyplot as plt
 """ Local Imports """
 from covid_model.ode_flow_terms import ConstantODEFlowTerm, ODEFlowTerm
-from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, get_region_mobility_from_db
+from covid_model.data_imports import ExternalVacc, ExternalHospsEMR, ExternalHospsCOPHS, ExternalPopulation, ExternalRegionDefs, get_region_mobility_from_db
 from covid_model.utils import IndentLogger, get_filepath_prefix, get_sqa_table, db_engine
 
 logger = IndentLogger(logging.getLogger(''), {})
@@ -83,7 +83,8 @@ class RMWCovidModel:
 
         # data related params
         self.__params_defs = json.load(open('covid_model/input/rmw_params.json'))  # default params
-        self.__region_defs = json.load(open('covid_model/input/rmw_region_definitions.json'))  # default value
+        #self.__region_defs = json.load(open('covid_model/input/rmw_region_definitions.json'))  # default value
+        self.__region_defs = None
         # hrf_finder
         #self.__hosp_reporting_frac = None
         self.__vacc_proj_params = None
@@ -155,6 +156,10 @@ class RMWCovidModel:
         if engine is None:
             engine = db_engine()
 
+        # Always update region defs and parameters.
+        self.get_region_defs()
+        self.get_population_data()
+
         if any([p in self.recently_updated_properties for p in ['start_date', 'end_date', 'regions', 'region_defs']]):
             logger.debug(f"{str(self.tags)} Updating actual vaccines")
             self.set_actual_vacc(engine)
@@ -212,12 +217,31 @@ class RMWCovidModel:
         actual_vacc_df_list = []
         for region in self.regions:
             tmp_vacc = ExternalVacc(engine).fetch(region_id=region).set_index('region', append=True).reorder_levels(['measure_date', 'region', 'age'])
-            # county_ids = self.region_defs[region]['counties_fips']
-            # tmp_vacc = ExternalVacc(engine)\
-            #     .fetch(county_ids=county_ids)\
-            #     .assign(region=region)\
-            #     .set_index('region',append=True)\
-            #     .reorder_levels(['measure_date', 'region', 'age'])
+            # Check that vaccinations don't exceed population for any regions.
+            vacc_data_sum = tmp_vacc.groupby(["region","age"]).sum()
+            # Get the population values for each region/age group combination.
+            pop_raw_vals = pd.DataFrame.from_dict({(p["attrs"]["region"],p["attrs"]["age"]):p["vals"]["2020-01-01"]
+                                                   for p in self.params_defs if p["param"] == "region_age_pop"},
+                                                  orient="index").squeeze()
+            pop_raw_vals.index = pd.MultiIndex.from_tuples(pop_raw_vals.index,names=["region","age"])
+            # Maximum percentages of population age groups which should have received vaccine.
+            vacc_thresh_pct = pd.DataFrame.from_dict(self.vacc_proj_params["max_cumu"])
+            vacc_thresh_pct.index.name = "age"
+            # Calculate the maximum number of people within each region/age_group combination who should have received
+            # the vaccine.
+            vacc_thresh_abs = vacc_thresh_pct.multiply(pop_raw_vals,axis="index",level="age")
+            # Check that these threshold numbers are above what we see in the vaccination data.
+            vacc_over_thresh = vacc_data_sum.gt(vacc_thresh_abs,axis="index")
+            idx_gt,col_gt = np.where(vacc_over_thresh)
+            # If we found issues, stop here and raise error
+            if len(idx_gt) != 0:
+                bad_idcs = list(zip(vacc_over_thresh.index[idx_gt],vacc_over_thresh.columns[col_gt]))
+                bad_idcs_str = "\n".join([str(x) for x in bad_idcs])
+                self.log_and_raise(f"Found {len(bad_idcs)} instances where vaccination exceeds"
+                                   f" population*max_cumu thresholds:\n{bad_idcs_str}\n"
+                                   f"Cannot continue, please fix these vaccination data issues and re-run the model.",
+                                   RuntimeError)
+            # Check that vaccination data is consistent
             if tuple(tmp_vacc.groupby(["region","age"]).cumsum().idxmax(axis=1).unique()) != ("shot1",):
                 #TODO: If we ever change it so that shots can happen out of sequence, we will need to remove this.
                 logger.warning("Found at least one instance where a later sequence shot has a larger number of "
@@ -1486,6 +1510,49 @@ class RMWCovidModel:
                 to_cmpts = self.update_cmpt_tuple_with_attrs(from_cmpt, to_attrs, is_param_cmpt=True)
             for to_cmpt in to_cmpts:
                 self.set_param_by_t(param, from_cmpt=from_cmpt, to_cmpt=to_cmpt, vals=vals, mults=mults)
+
+    def get_region_defs(self):
+        """Fetch the region definitions from BigQuery and update self.region_defs
+        :return:
+        """
+        logger.info(f"{str(self.tags)} Retrieving regional definitions")
+        engine = db_engine()
+        region_defs_df = ExternalRegionDefs(engine).fetch()
+        region_defs_dict = region_defs_df\
+            .groupby("region_id")\
+            .agg({"name":"first","counties":list,"counties_fips":list})\
+            .to_dict(orient="index")
+        self.region_defs = region_defs_dict
+
+
+    def get_population_data(self):
+        """Fetch the population parameters from BigQuery, and
+        :return:
+        """
+        logger.info(f"{str(self.tags)} Retrieving population data")
+        engine = db_engine()
+        # Get the DataFrame of populations
+        external_pop_df = ExternalPopulation(engine).fetch()
+        # Convert to a list of records so we can iterate
+        external_pop_records = external_pop_df.melt(ignore_index=False).to_records()
+        # Create a new dictionary and update param_defs.
+        pop_params = []
+        for region,age,pop in external_pop_records:
+            is_reg_age_pop = (age != "region_pop")
+            tmp_d = {"param":"region_age_pop" if is_reg_age_pop else "region_pop",
+                     "attrs":{"region": region},
+                     "vals":{"2020-01-01": pop}}
+            if is_reg_age_pop:
+                tmp_d["attrs"]["age"] = age
+            pop_params.append(tmp_d)
+        # Because param_defs is a list instead of a dictionary, we cannot easily update just the population parameters.
+        # We first need to scan through the entire list, and return a list the non-population parameters. Then we can
+        # append the updated pop_params list to this list and set a new value for param_defs.
+        non_pop_params = [p for p in self.params_defs if p["param"] not in {"region_pop","region_age_pop"}]
+        # After having dropped all current population params, we will add the new population params.
+        # This assumes that we update all population parameters each time.
+        self.params_defs = non_pop_params + pop_params
+        self.recently_updated_properties.append("params_defs")
 
     def build_param_lookups(self, apply_vaccines=True, vacc_delay=14):
         """ combine param_defs list and vaccination_data into a time indexed parameters dictionary

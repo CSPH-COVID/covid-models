@@ -75,6 +75,40 @@ class ExternalData:
         return pd.read_sql(con=self.engine, **args)
 
 
+class ExternalRegionDefs(ExternalData):
+    """Class for retrieving vaccination projection parameters from the database.
+
+    """
+    def fetch_from_db(self, **args) -> pd.DataFrame:
+        """Retrieve vaccination projection parameters from the database."""
+        with open("covid_model/sql/region_defs.sql","r") as sql:
+            df = pd.read_sql(sql.read(),
+                             self.engine,
+                             index_col="region_id")
+        return df
+
+
+class ExternalPopulation(ExternalData):
+    """Class for retrieving population data from the database.
+
+    """
+    def fetch_from_db(self) -> pd.DataFrame:
+        """Retrieve population data from database using query in """
+        with open("covid_model/sql/cste_population.sql","r") as sql:
+            df = pd.read_sql(sql.read(),
+                             self.engine,
+                             index_col="region_id")\
+                .rename(columns={"n1":"0-17","n2":"18-64","n3":"65+"})
+
+        # Verify that population values match by up across each row (region) and then check that the sum is 2x the
+        # value of the region_pop column. Since the other age group columns should add up to region_pop, any
+        # discrepancies mean there is a data issue.
+        bad_regions = list(df.index[df.sum(axis=1) != 2*df["region_pop"]])
+        if len(bad_regions) != 0:
+            raise RuntimeError(f"Regional population does not match population total for regions {bad_regions}.")
+        return df
+
+
 class ExternalHospsEMR(ExternalData):
     """Class for Retrieving EMResource hospitalization data from database
 
