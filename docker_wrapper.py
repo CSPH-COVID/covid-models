@@ -44,21 +44,17 @@ if __name__ == "__main__":
     #   "report_start_date": <report_start_date>,
     #   "report_variants": [...]
     # }
-    TESTING = True
-    if TESTING:
-        with open("sample_config_nmn.json","r") as f:
-            args = json.load(f)
-    else:
-        # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
-        if len(sys.argv) < 2:
-            print("Error: Missing input arguments.")
-            sys.exit(1)
-        # Retrieve B64-encoded string.
-        b64_json_str = sys.argv[1]
-        # Decode the string
-        json_str = base64.b64decode(b64_json_str, validate=True)
-        # Load the JSON string
-        args = json.loads(json_str)
+
+    # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
+    if len(sys.argv) < 2:
+        print("Error: Missing input arguments.")
+        sys.exit(1)
+    # Retrieve B64-encoded string.
+    b64_json_str = sys.argv[1]
+    # Decode the string
+    json_str = base64.b64decode(b64_json_str, validate=True)
+    # Load the JSON string
+    args = json.loads(json_str)
 
     # OUTPUT SETUP
     # The region handled by this Task/instance is just the BATCH_TASK_INDEX-th element of the args["regions"] list.
