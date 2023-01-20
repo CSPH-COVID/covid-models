@@ -82,7 +82,7 @@ class RMWCovidModel:
         self.solution_y = None
 
         # data related params
-        self.__params_defs = json.load(open('covid_model/input/rmw_params.json'))  # default params
+        self.__params_defs = None # default params
         #self.__region_defs = json.load(open('covid_model/input/rmw_region_definitions.json'))  # default value
         self.__region_defs = None
         # hrf_finder
@@ -159,6 +159,8 @@ class RMWCovidModel:
         # Always update region defs and parameters.
         self.get_region_defs()
         self.get_population_data()
+        # Always update vaccination parameters
+
 
         if any([p in self.recently_updated_properties for p in ['start_date', 'end_date', 'regions', 'region_defs']]):
             logger.debug(f"{str(self.tags)} Updating actual vaccines")
@@ -466,9 +468,7 @@ class RMWCovidModel:
 
         if self.regions != ['co']:
             region_name_to_shorthand = {v["name"]:k for k,v in self.region_defs.items()}
-            hosps = ExternalHospsCOPHS(engine).fetch(region_ids=region_names['region'].to_list()) \
-                                            .drop(["NA"],errors="ignore") \
-                                            .replace({"Region": region_name_to_shorthand})
+            hosps = ExternalHospsCOPHS(engine).fetch(region_ids=self.regions).drop(["NA"],errors="ignore")
             hosps.index = pd.to_datetime(hosps.index)
             hosps.index.name = "date"
             hosps.set_index("Region",inplace=True,append=True)
