@@ -131,6 +131,7 @@ dmypy.json
 # manually added ignores
 covid_model/output/
 .idea/
+old/
 co-covid-models-*.json
 *.png
 *.pkl

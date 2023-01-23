@@ -1,6 +1,6 @@
 # CSTE Rocky Mountain West Regional COVID Model Docker Image
 # Written by: Andrew Hill
-# Last Modified: 2022-12-07
+# Last Modified: 2023-01-20
 # Description: This image wraps the CSTE RMW Regional Model, and can be used to run multiple instances of the model
 #              in parallel (for example using Google Workflows and Google Batch).
 
@@ -14,7 +14,7 @@ COPY covid_model ./covid_model/
 # Make a empty output directory. We need this so we can mount the GCS bucket here.
 RUN mkdir covid_model/output
 # Copy the wrapper and requirements file to the image.
-COPY docker_wrapper.py requirements.txt ./
+COPY scripts/docker_wrapper.py requirements.txt ./
 # Install required packages
 RUN pip install --no-cache-dir -r requirements.txt
 # Set the entrypoint for the image.

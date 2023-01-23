@@ -1,12 +1,12 @@
 #=======================================================================================================================
 # docker_wrapper.py
 # Written by: Andrew Hill
-# Last Modified: 11/16/2022
+# Last Modified: 1/23/2023
 # Description:
 #   This file serves as an entry point for a Docker container to process a single region of the CSTE Rocky Mountain West
 #   model.
-#   This file assumes that the region to run is defined as the environment variable "RMW_REGION".
-#   In the future this file may also support passing in separate parameter files for each region.
+#   This file is intended to be run using Google Batch, the region used for model run is chosen based on the value of
+#   BATCH_TASK_INDEX, an environment variable defined by the Google Batch system.
 #=======================================================================================================================
 import datetime
 import os
@@ -21,41 +21,14 @@ from covid_model.runnable_functions import do_single_fit, do_create_report
 from covid_model.utils import setup, get_filepath_prefix
 from covid_model.analysis.charts import plot_transmission_control
 
-if __name__ == "__main__":
+
+def wrapper_run(args: dict):
     # ENVIRONMENT VARIABLE SETUP
-    # The BATCH_TASK_INDEX variable is passed in by Batch, and is the unique index of the Task within the group.
-    # We can use this to index into the list of regions, to determine which region we should fit.
+    # The BATCH_TASK_INDEX variable is passed in by Google Batch, and is the unique index of the Task within the group.
+    # We can use this to index into the list of regions and determine which region we should fit.
     BATCH_TASK_INDEX = int(os.environ["BATCH_TASK_INDEX"])
     # The model references the 'gcp_project' environment variable later, so we hard-code it here.
     os.environ["gcp_project"] = "co-covid-models"
-
-    # INPUT PARAMETERS
-    # The input parameters to the container are passed in as a base64 encoded JSON string. To retrieve them in a usable
-    # format, we first need to decode the base64 string into a UTF-8 JSON string, then parse the JSON string to retrieve
-    # a Python dictionary which we can use the arguments to the model.
-    # NOTE: All batch instances receive the same input arguments. The BATCH_TASK_INDEX variable can be used to index
-    # into instance-specific arguments (like region).
-    # The minimum viable JSON parameter object is:
-    # {
-    #   "regions" : [...],
-    #   "start_date": <start_date>,
-    #   "end_date": <end_date>,
-    #   "fit_end_date": <fit_end_date>,
-    #   "report_start_date": <report_start_date>,
-    #   "report_variants": [...]
-    # }
-
-    # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
-    if len(sys.argv) < 2:
-        print("Error: Missing input arguments.")
-        sys.exit(1)
-    # Retrieve B64-encoded string.
-    b64_json_str = sys.argv[1]
-    # Decode the string
-    json_str = base64.b64decode(b64_json_str, validate=True)
-    # Load the JSON string
-    args = json.loads(json_str)
-
     # OUTPUT SETUP
     # The region handled by this Task/instance is just the BATCH_TASK_INDEX-th element of the args["regions"] list.
     instance_region = args["regions"][BATCH_TASK_INDEX]
@@ -77,7 +50,9 @@ if __name__ == "__main__":
 
     fit_args = {'outdir': outdir,
                 'fit_end_date': args["fit_end_date"],
-                'model_class': RMWCovidModel}
+                'model_class': RMWCovidModel,
+                'write_results': False,
+                'pickle_matrices': False}
 
     # MODEL FITTING
     # This code is mostly just copied from the Jupyter notebooks we use, but in the future we can make this
@@ -114,3 +89,34 @@ if __name__ == "__main__":
     json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
 
     logging.info("Task finished.")
+
+
+if __name__ == "__main__":
+    # INPUT PARAMETERS
+    # The input parameters to the container are passed in as a base64 encoded JSON string. To retrieve them in a usable
+    # format, we first need to decode the base64 string into a UTF-8 JSON string, then parse the JSON string to retrieve
+    # a Python dictionary which we can use the arguments to the model.
+    # NOTE: All batch instances receive the same input arguments. The BATCH_TASK_INDEX variable can be used to index
+    # into instance-specific arguments (like region).
+    # The minimum viable JSON parameter object is:
+    # {
+    #   "regions" : [...],
+    #   "start_date": <start_date>,
+    #   "end_date": <end_date>,
+    #   "fit_end_date": <fit_end_date>,
+    #   "report_start_date": <report_start_date>,
+    #   "report_variants": [...]
+    # }
+
+    # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
+    if len(sys.argv) < 2:
+        print("Error: Missing input arguments.")
+        sys.exit(1)
+    # Retrieve B64-encoded string.
+    b64_json_str = sys.argv[1]
+    # Decode the string
+    json_str = base64.b64decode(b64_json_str, validate=True)
+    # Load the JSON string
+    args = json.loads(json_str)
+    # Run the wrapper function with these input arguments.
+    wrapper_run(args)

@@ -1,18 +1,19 @@
 # =======================================================================================================================
 # run_rmw_batch.py
 # Written by: Andrew Hill
-# Last Modified: 1/4/2023
+# Last Modified: 1/20/2023
 # Description:
 #   This script will start a Google Batch job to run a set of RMW models in parallel, monitor their execution, and
 #   collect the results when they finish executing.
 # =======================================================================================================================
+import time
 import json
 import base64
 import argparse
 import subprocess
-import curses  # If you are running on Windows curses is not included by default. Try 'pip install windows-curses'.
+from typing import List
 from os.path import join
-from datetime import datetime
+from datetime import datetime, timezone
 from collect_files import combine_files
 from google.cloud.storage import Blob, Client as GCS_Client
 from google.cloud import batch_v1 as batch  # If you get error here, try 'pip install google-cloud-batch'
@@ -25,6 +26,50 @@ BUCKET_NAME = "covid-rmw-model-results"
 # Default parameters, these should not be changed.
 BUCKET_MOUNT_PATH = "/covid_rmw_model/covid_model/output"
 DOCKER_BUILD_SCRIPT = "docker_build_and_deploy.sh"
+LINE_UP = "\033[F"
+LINE_CLEAR = "\033[K"
+LINE_UP_CLEAR = LINE_CLEAR + LINE_UP
+RED = "\033[31m"
+GREEN = "\033[32m"
+OFF = "\033[0m"
+
+def make_status_table(tasks, regions) -> List[str]:
+    headers = ["   ","TASK ID","REGION","STATE"]
+    progress = ["|","/","—","\\"]
+    col = " | "
+    lbar = "| "
+    rbar = " |"
+
+    task_ids = [t.name.rsplit("/",maxsplit=1)[-1] for t in tasks]
+    tid_col_width = max(max(len(tid) for tid in task_ids),len(headers[1]))
+
+    reg_col_width = max(max(len(reg) for reg in regions),len(headers[2]))
+
+    all_states = tasks[0].status.State
+    status_col_width = max(max(len(str(x)) for x in all_states),len(headers[3]))
+    task_status = [str(task.status.state) for task in tasks]
+
+    widths = [3,tid_col_width,reg_col_width,status_col_width]
+
+    pad_header = [header.center(width) for header,width in zip(headers,widths)]
+    header_bar = lbar+col.join(pad_header)+rbar
+
+    rows = []
+    for tid,region,status in zip(task_ids,regions,task_status):
+        p = (progress[int(time.perf_counter()*3)%4] if status == "State.RUNNING" else " ").center(3)
+        tid_c = tid.ljust(tid_col_width)
+        region_c = region.ljust(reg_col_width)
+
+        status_c = status.center(status_col_width)
+        if status in ["State.FAILED","State.STATE_UNSPECIFIED"]:
+            status_c = RED + status_c + OFF
+        elif status in ["State.SUCCEEDED","State.RUNNING"]:
+            status_c = GREEN + status_c + OFF
+        rows.append(lbar+col.join([p,tid_c,region_c,status_c])+rbar)
+
+    status_table_str = [header_bar] + rows
+
+    return status_table_str
 
 
 def create_bucket_subdir(bucket: str, subdir: str):
@@ -66,7 +111,8 @@ def batch_run_rmw_model(params: str,
                         memory_mib: int,
                         max_run_duration: str,
                         task_count_per_node: int,
-                        parallelism: int):
+                        parallelism: int,
+                        client: batch.BatchServiceClient = None):
     """
     :param params: The dictionary of parameters to pass to each Batch job.
     :param project_id: The Google Cloud Project ID for the job.
@@ -82,16 +128,17 @@ def batch_run_rmw_model(params: str,
     :param max_run_duration: Maximum duration that a single task can run before it is killed.
     :param task_count_per_node: Number of tasks which should run simultaneously on an instance.
     :param parallelism: Maximum number of instances which will be run simultaneously.
+    :param client: The BatchServiceClient which will be used to run this job.
     :return:
     """
 
     # Create Batch Client
-    client = batch.BatchServiceClient()
+    client = client if client is not None else batch.BatchServiceClient()
 
     # Create Runnable
     runnable = batch.Runnable()
     runnable.container = batch.Runnable.Container()
-    runnable.container.image_uri = "us-central1-docker.pkg.dev/co-covid-models/cste/rmw_model:latest"
+    runnable.container.image_uri = "gcr.io/co-covid-models/github.com/csph-covid/covid-rmw-model:latest"
     runnable.container.commands = [params]
     runnable.container.volumes = [f"/mnt/disks/output:{bucket_mount_path}:rw"]
 
@@ -142,7 +189,7 @@ def batch_run_rmw_model(params: str,
     request.job_id = job_id
     request.parent = f"projects/{project_id}/locations/{region}"
 
-    return client.create_job(request=request),
+    return client.create_job(request=request)
 
 
 if __name__ == "__main__":
@@ -155,11 +202,6 @@ if __name__ == "__main__":
                         type=str,
                         help="Name of a JSON file containing job parameters to read in.",
                         default="sample_config.json")
-    parser.add_argument("--regions",
-                        type=str,
-                        nargs="+",
-                        help="Which regions to run the model for.",
-                        default=[])
     parser.add_argument("--project_id",
                         type=str,
                         help="The project id for the Google Cloud Project",
@@ -187,33 +229,61 @@ if __name__ == "__main__":
     # Encode job parameters.
     # TODO: Make this a little less silly. We parse the JSON here, then convert it back to string inside
     #       the encode_arguments function.
-    with open(args.job_params,"r") as f:
+    with open(args.job_params, "r") as f:
         job_params = json.load(f)
     enc_job_params = encode_arguments(obj=job_params)
 
     # Create output path in GCS. Path will be BUCKET/JOB_ID
     bucket_output_path = create_bucket_subdir(bucket=args.bucket_name, subdir=args.job_id)
 
-    # Run Batch Job
-    request = batch_run_rmw_model(params=enc_job_params,
-                                  project_id=args.project_id,
-                                  region=args.region,
-                                  bucket_path=bucket_output_path,
-                                  task_count=len(job_params["regions"]),
-                                  job_id=args.job_id,
-                                  bucket_mount_path=BUCKET_MOUNT_PATH,
-                                  machine_type="e2-standard-4",
-                                  cpu_milli=4000,
-                                  memory_mib=16384,
-                                  max_run_duration="18000s",
-                                  task_count_per_node=1,
-                                  parallelism=6)
+    # Create batch client and run batch job
+    batch_client = batch.BatchServiceClient()
+    # job = batch_client.get_job(name="projects/co-covid-models/locations/us-central1/jobs/rmw-model-run-20230110-114102")
+    job = batch_run_rmw_model(params=enc_job_params,
+                              project_id=args.project_id,
+                              region=args.region,
+                              bucket_path=bucket_output_path,
+                              task_count=len(job_params["regions"]),
+                              job_id=args.job_id,
+                              bucket_mount_path=BUCKET_MOUNT_PATH,
+                              machine_type="e2-standard-4",
+                              cpu_milli=4000,
+                              memory_mib=16384,
+                              max_run_duration="18000s",
+                              task_count_per_node=1,
+                              parallelism=12,
+                              client=batch_client)
+    job_name = job.name
+    # Wait for job to move out of QUEUED state
+    stime = time.perf_counter()
+    while job.status.state == job.status.State.QUEUED:
+        # Get updated job status.
+        job = batch_client.get_job(name=job_name)
+        ctime = int(time.perf_counter() - stime)
+        print(f"Waiting for job to be queued [{ctime:03d}s]",end="\r")
+        time.sleep(1)
+    print("Job exited QUEUED state...")
     # Display the output status for each task in the job.
-    # TODO: Get task status for each region and print a nice output that shows which regions are running and completed.
-    #       This should block until the Batch job has completed.
-
+    job_status = job.status.state
+    tasks_status = list(batch_client.list_tasks(parent=job.name+"/taskGroups/group0"))
+    last_update = job.update_time
+    status_output = make_status_table(tasks=tasks_status,regions=job_params["regions"])
+    print("\n".join(status_output))
+    update_every = 10
+    # While job is running
+    while job.status not in [job.status.State.SUCCEEDED, job.status.State.FAILED]:
+        if (datetime.now(timezone.utc) - last_update).seconds > update_every:
+            job = batch_client.get_job(name=job.name)
+            last_update = datetime.now(timezone.utc)
+            tasks_status = list(batch_client.list_tasks(parent=job.name+"/taskGroups/group0"))
+        status_output = make_status_table(tasks=tasks_status,regions=job_params["regions"])
+        print(LINE_UP_CLEAR * (len(status_output)+1),end="")
+        print("\n".join(status_output))
+        print(f"Last Updated: {last_update}")
+        time.sleep(0.25)
+    print("Batch job complete, collecting files...")
     # Combine files when job is complete
-    combine_files(project=args.project_id,bucket=args.bucket_name,subdir=args.job_id)
+    combine_files(project=args.project_id, bucket=args.bucket_name, subdir=args.job_id)
 
     # TODO: Create BigQuery tables for outputs based on the combined files from google cloud storage.
 
