@@ -44,7 +44,7 @@ def main():
         'end_date': dt.datetime.strptime('2022-10-01', "%Y-%m-%d").date()
     }
     model_args = {
-        'params_defs': 'covid_model/analysis/20220620_much_simpler_regional_model/params.json',
+        'params_defs': 'covid_model/analysis/20220620_much_simpler_regional_model/co_local_model_params.json',
         'region_defs': 'covid_model/input/region_definitions.json',
         'vacc_proj_params': 'covid_model/input/20220718_vacc_proj_params.json',
         'mobility_mode': 'population_attached',
