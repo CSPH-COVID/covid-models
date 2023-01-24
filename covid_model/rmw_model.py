@@ -72,6 +72,12 @@ class RMWCovidModel:
         self.__tc = {}
         self.tc_t_prev_lookup = []
 
+        # Variant Seeds
+        self.susceptible_cmpt_idcs = {}
+        self.exposed_region_lookup = {}
+        self.__seeds = {}
+        self.seed_t_prev_lookup = {}
+
         # Model compartments, lookups, and ODE solution
         self.compartments_as_index = None
         self.Ih_compartments = None
@@ -113,7 +119,7 @@ class RMWCovidModel:
 
         self.linear_matrix = None
         self.nonlinear_matrices = None
-        self.constant_vector = None
+        #self.constant_vector = None
         self.region_picker_matrix = None
         self.max_step_size = 1.0
 
@@ -925,6 +931,13 @@ class RMWCovidModel:
         return self.__tc
 
     @property
+    def seeds(self):
+        """ Get the dictionary of variant seeds for the model.
+        :return: Parameter seed dictionary
+        """
+        return self.__seeds
+
+    @property
     def params_as_dict(self):
         """Return model parameters as a nested dictionary
 
@@ -1301,20 +1314,20 @@ class RMWCovidModel:
         """
         if compact:
             cm = ", ".join([f'[{i},{c}]' for i, c in enumerate(self.compartments)])
-            cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
-            cv = {t: ' ,'.join([f'({idx},{val:.2e})' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())]) for t, m in cv}
+            #cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
+            #cv = {t: ' ,'.join([f'({idx},{val:.2e})' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())]) for t, m in cv}
             lm = {t: ' ,'.join([f'({idx1},{idx2},{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[0].tolist(), m.nonzero()[1].tolist(), m[m.nonzero()].A[0].tolist())]) for t, m in self.linear_matrix.items() if len(m.nonzero()[0]) > 0}
             nl = {t: {f'({",".join([f"{k}" for k in keys])})': ', '.join([f'({idx1},{idx2},{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[0].tolist(), m.nonzero()[1].tolist(), m[m.nonzero()].A[0].tolist()) if val != 0]) for keys, m in mat_dict.items()} for t, mat_dict in self.nonlinear_matrices.items() if len(mat_dict) > 0}
-            return json.dumps({"compartments": cm, "constant_vector": cv, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
+            return json.dumps({"compartments": cm, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
         else:
             def fcm(i):
                 return f'{",".join(self.compartments[i])}'
 
-            cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
-            cv = {t: {fcm(idx): f'{val:.2e}' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())} for t, m in cv}
+            #cv = [[t, spsp.csr_array(vec)] for t, vec in self.constant_vector.items() if any(vec != 0)]
+            #cv = {t: {fcm(idx): f'{val:.2e}' for idx, val in zip(m.nonzero()[1].tolist(), m[m.nonzero()].tolist())} for t, m in cv}
             lm = {t: {f'({fcm(idx1)};{fcm(idx2)}': f'{val:.2e}' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[0].tolist())} for t, m in self.linear_matrix.items() if len(m.nonzero()[0]) > 0}
             nl = {t: {f'({";".join([f"{fcm(k)}" for k in keys])})': {f'({fcm(idx1)};{fcm(idx2)})': f'{val:.2e})' for idx1, idx2, val in zip(m.nonzero()[1].tolist(), m.nonzero()[0].tolist(), m[m.nonzero()].A[0].tolist()) if val != 0} for keys, m in mat_dict.items()} for t, mat_dict in self.nonlinear_matrices.items() if len(mat_dict) > 0}
-            return json.dumps({"constant_vector": cv, "linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
+            return json.dumps({"linear_matrix": lm, "nonlinear_matrices": nl}, indent=2)
 
     ####################################################################################################################
     ### ODE related functions
@@ -1606,6 +1619,8 @@ class RMWCovidModel:
         # Testing changing the vaccination to every week
         self.params_trange = sorted(list(set.union(*[set(param.keys()) for param_key in self.params_by_t.values() for param in param_key.values()])))
         self.t_prev_lookup = {t_int: max(t for t in self.params_trange if t <= t_int) for t_int in self.trange}
+        # Build lookup for variant seeds
+
 
     def update_tc(self, tc, replace=True, update_lookup=True):
         """set TC at different points in time, and update the lookup dictionary that quickly determines which TC is relevant for a given time
@@ -1647,7 +1662,7 @@ class RMWCovidModel:
         self.terms = []
         self.linear_matrix = {t: spsp.lil_matrix((self.n_compartments, self.n_compartments)) for t in self.params_trange}
         self.nonlinear_matrices = {t: defaultdict(self._default_nonlinear_matrix) for t in self.params_trange}
-        self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
+        #self.constant_vector = {t: np.zeros(self.n_compartments) for t in self.params_trange}
 
     def get_param_key_for_param_and_cmpts(self, param, cmpt=None, from_cmpt=None, to_cmpt=None, nomatch_okay=False, is_param_cmpt=False):
         """given a parameter, find its definition in params_by_t for the desired compartment(s).
@@ -1802,7 +1817,7 @@ class RMWCovidModel:
             for t in self.params_trange:
                 term.add_to_linear_matrix(self.linear_matrix[t], t)
                 term.add_to_nonlinear_matrices(self.nonlinear_matrices[t], t)
-                term.add_to_constant_vector(self.constant_vector[t], t)
+                #term.add_to_constant_vector(self.constant_vector[t], t)
 
 
     def add_flows_from_attrs_to_attrs(self, from_attrs, to_attrs, from_coef=None, to_coef=None, from_to_coef=None, scale_by_attrs=None, scale_by_coef=None, constant=None):
@@ -1882,15 +1897,15 @@ class RMWCovidModel:
                                                            {'vacc': f'{to_shot}', 'immun': f'strong'},
                                                            from_coef=f'{to_shot}_per_available')
 
-        # seed variants (only seed the ones in our attrs)
-        logger.debug(f"{str(self.tags)} Building seed flows")
-        for variant in self.attrs['variant']:
-            if variant == 'none':
-                continue
-            seed_param = f'{variant}_seed'
-            from_variant = self.attrs['variant'][0]  # first variant
-            # agecat_finder
-            self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '18-64', 'vacc': 'none', 'variant': from_variant, 'immun': 'none'}, {'seir': 'E', 'variant': variant}, constant=seed_param)
+        # # seed variants (only seed the ones in our attrs)
+        # logger.debug(f"{str(self.tags)} Building seed flows")
+        # for variant in self.attrs['variant']:
+        #     if variant == 'none':
+        #         continue
+        #     seed_param = f'{variant}_seed'
+        #     from_variant = self.attrs['variant'][0]  # first variant
+        #     # agecat_finder
+        #     self.add_flows_from_attrs_to_attrs({'seir': 'S', 'age': '18-64', 'vacc': 'none', 'variant': from_variant, 'immun': 'none'}, {'seir': 'E', 'variant': variant}, constant=seed_param)
 
         # exposure
         logger.debug(f"{str(self.tags)} Building transmission flows")
@@ -1982,6 +1997,7 @@ class RMWCovidModel:
                 self.nonlinear_matrices[t][k] = v.tocsr()
         self.region_picker_matrix = self.region_picker_matrix.tocsr()
 
+
     def ode(self, t: float, y: list):
         """Compute the derivative WRT time of the model at a time t and state vector y. Used to solve the system of ODE's
 
@@ -2005,9 +2021,29 @@ class RMWCovidModel:
         for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
             dy += nlm_vec * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * matrix.dot(y)
 
-        # apply constant terms
-        dy += self.constant_vector[t_int]
 
+        # TODO: Constant terms are ONLY used for the seeding, so we just need to replace this constant vector.
+        # apply constant terms
+        #dy += self.constant_vector[t_int]
+
+        # For each variant
+        for region in self.regions:
+            #susceptible_cmpt_for_region = self.susceptible_cmpt_idcs[region] # The name of the compartment
+            #susceptible_cmpt_index = self.cmpt_idx_lookup[susceptible_cmpt_for_region] # Index of comparment
+            from_cmpt_index = y[self.susceptible_cmpt_idcs[region]].argmax()
+            from_cmpt = self.compartments[from_cmpt_index]
+            for variant in self.attrs["variant"]:
+                if variant == "none":
+                    continue
+                # TODO: Check if this is too slow.
+                to_cmpt = tuple("E" if n == "seir" else variant if n == "variant" else v for n, v in zip(self.attrs, from_cmpt))
+                to_cmpt_idx = self.cmpt_idx_lookup[to_cmpt]
+                # Find a time key less than or equal to the current T value.
+                param_dict = self.params_by_t[from_cmpt[1:]][f"{variant}_seed"]
+                leq_key = max([key for key in param_dict.keys() if key <= t_int])
+                seed_val = param_dict[leq_key]
+                dy[from_cmpt_index] -= seed_val
+                dy[to_cmpt_idx] += seed_val
         return dy
 
     def solve_seir(self, y0=None, tstart=None, tend=None):
@@ -2030,6 +2066,7 @@ class RMWCovidModel:
         trange = range(tstart, tend + 1)  # simulate up to and including tend
         if y0 is None:
             y0 = self.y0_from_dict(self.y0_dict)
+
         solution = spi.solve_ivp(
             fun=self.ode,
             t_span=[min(trange), max(trange)],
@@ -2064,6 +2101,8 @@ class RMWCovidModel:
         self.compile()
         # initialize solution dataframe with all NA values
         self.solution_y = np.zeros(shape=(len(self.trange), len(self.compartments_as_index))) * np.nan
+        # Set the indices of the susceptible compartments
+        self.susceptible_cmpt_idcs = {region: [self.cmpt_idx_lookup[x] for x in self.get_cmpts_matching_attrs({"seir":"S","region":region})] for region in self.regions}
         if pickle_matrices:
             self.pickle_ode_matrices(outdir)
 
@@ -2396,7 +2435,7 @@ class RMWCovidModel:
         """
         logger.debug("Pickling ODE matrices")
         with open(get_filepath_prefix(outdir, self.tags) + "ode_matrices.pkl", 'wb') as f:
-            pickle.dump(self.constant_vector, f)
+            #pickle.dump(self.constant_vector, f)
             pickle.dump(self.linear_matrix, f)
             pickle.dump(self.nonlinear_matrices, f)
             pickle.dump(self.region_picker_matrix, f)
@@ -2410,7 +2449,7 @@ class RMWCovidModel:
         """
         logger.debug("Unpickling ODE matrices")
         with open(filepath, "rb") as f:
-            self.constant_vector = pickle.load(f)
+            #self.constant_vector = pickle.load(f)
             self.linear_matrix = pickle.load(f)
             self.nonlinear_matrices = pickle.load(f)
             self.region_picker_matrix = pickle.load(f)
