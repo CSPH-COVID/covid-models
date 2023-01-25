@@ -2326,10 +2326,12 @@ class RMWCovidModel:
         # returns all the data you would need to write to the database but doesn't actually write to the database
 
         with Session(engine) as session:
-            # generate a spec_id, so we can assign it to ourselves
-            specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
-            max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
-            self.spec_id = max_spec_id + 1
+            # Only generate a spec_id if we have not already been provided with one earlier.
+            if self.spec_id is None:
+                # generate a spec_id, so we can assign it to ourselves
+                specs_table = get_sqa_table(engine, schema='covid_model', table='specifications')
+                max_spec_id = session.query(func.max(specs_table.c.spec_id)).scalar()
+                self.spec_id = max_spec_id + 1
 
             stmt = specs_table.insert().values(OrderedDict([
                 ("base_spec_id", int(self.base_spec_id) if self.base_spec_id is not None else None),
