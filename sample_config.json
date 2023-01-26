@@ -4,7 +4,8 @@
     ],
     "start_date": "2020-01-24",
     "end_date": "2023-04-01",
-    "fit_end_date": "2023-01-01",
+    "base_model_fit_end_date": "2022-11-15",
+    "scenarios_fit_end_date": "2023-01-01",
     "report_start_date": "2022-07-01",
     "report_variants": [
         "ba45",
