@@ -1,7 +1,7 @@
 #=======================================================================================================================
 # docker_wrapper.py
 # Written by: Andrew Hill
-# Last Modified: 1/23/2023
+# Last Modified: 1/27/2023
 # Description:
 #   This file serves as an entry point for a Docker container to process a single region of the CSTE Rocky Mountain West
 #   model.
@@ -120,24 +120,25 @@ def wrapper_run(args: dict):
     # a more general wrapper for doing model fitting and generating plots.
     # base_model = RMWCovidModel(base_spec_id=4692)
     # base_model.prep()
-    # # base_model = do_single_fit(**base_model_args)
-    # # with open(get_filepath_prefix(outdir, tags=base_model.tags) + "model_solutionydf.pkl", "wb") as f:
-    # #     pickle.dump(base_model.solution_ydf, f)
-    # base_model.solve_seir()
-    # # MODEL OUTPUTS
-    # logging.info('Projecting')
-    # do_create_report(base_model, outdir=outdir, prep_model=False, solve_model=False,
-    #                  immun_variants=args["report_variants"],
-    #                  from_date=args["report_start_date"])
-    # base_model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(
-    #     get_filepath_prefix(outdir, tags=base_model.tags) + 'seir_variant_immun_total_all_at_once_projection.csv')
-    # base_model.solution_sum_df().unstack().to_csv(
-    #     get_filepath_prefix(outdir, tags=base_model.tags) + 'full_projection.csv')
+    base_model = do_single_fit(**base_model_args)
+    # with open(get_filepath_prefix(outdir, tags=base_model.tags) + "model_solutionydf.pkl", "wb") as f:
+    #     pickle.dump(base_model.solution_ydf, f)
+    base_model.solve_seir()
 
-    # logging.info(f"{str(model.tags)}: Running scenarios")
+    # MODEL OUTPUTS
+    logging.info('Projecting')
+    do_create_report(base_model, outdir=outdir, prep_model=False, solve_model=False,
+                     immun_variants=args["report_variants"],
+                     from_date=args["report_start_date"])
+    base_model.solution_sum_df(['seir', 'variant', 'immun']).unstack().to_csv(
+        get_filepath_prefix(outdir, tags=base_model.tags) + 'seir_variant_immun_total_all_at_once_projection.csv')
+    base_model.solution_sum_df().unstack().to_csv(
+        get_filepath_prefix(outdir, tags=base_model.tags) + 'full_projection.csv')
 
+    # SCENARIO FITTING
+    logging.info(f"{str(base_model.tags)}: Running scenarios")
     models = do_fit_scenarios(base_model_args=base_model_args, scenario_args_list=scenario_model_args,
-                              fit_args=scenario_fit_args, multiprocess=None)
+                              fit_args=scenario_fit_args, multiprocess=2)
     for model in models:
         xmin = datetime.datetime.strptime(args["report_start_date"], "%Y-%m-%d").date()
         xmax = datetime.datetime.strptime(args["end_date"], "%Y-%m-%d").date()
@@ -156,32 +157,32 @@ def wrapper_run(args: dict):
 
     logging.info("Task finished.")
 
-# if __name__ == "__main__":
-#     # INPUT PARAMETERS
-#     # The input parameters to the container are passed in as a base64 encoded JSON string. To retrieve them in a usable
-#     # format, we first need to decode the base64 string into a UTF-8 JSON string, then parse the JSON string to retrieve
-#     # a Python dictionary which we can use the arguments to the model.
-#     # NOTE: All batch instances receive the same input arguments. The BATCH_TASK_INDEX variable can be used to index
-#     # into instance-specific arguments (like region).
-#     # The minimum viable JSON parameter object is:
-#     # {
-#     #   "regions" : [...],
-#     #   "start_date": <start_date>,
-#     #   "end_date": <end_date>,
-#     #   "fit_end_date": <fit_end_date>,
-#     #   "report_start_date": <report_start_date>,
-#     #   "report_variants": [...]
-#     # }
-#
-#     # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
-#     if len(sys.argv) < 2:
-#         print("Error: Missing input arguments.")
-#         sys.exit(1)
-#     # Retrieve B64-encoded string.
-#     b64_json_str = sys.argv[1]
-#     # Decode the string
-#     json_str = base64.b64decode(b64_json_str, validate=True)
-#     # Load the JSON string
-#     args = json.loads(json_str)
-#     # Run the wrapper function with these input arguments.
-#     wrapper_run(args)
+if __name__ == "__main__":
+    # INPUT PARAMETERS
+    # The input parameters to the container are passed in as a base64 encoded JSON string. To retrieve them in a usable
+    # format, we first need to decode the base64 string into a UTF-8 JSON string, then parse the JSON string to retrieve
+    # a Python dictionary which we can use the arguments to the model.
+    # NOTE: All batch instances receive the same input arguments. The BATCH_TASK_INDEX variable can be used to index
+    # into instance-specific arguments (like region).
+    # The minimum viable JSON parameter object is:
+    # {
+    #   "regions" : [...],
+    #   "start_date": <start_date>,
+    #   "end_date": <end_date>,
+    #   "fit_end_date": <fit_end_date>,
+    #   "report_start_date": <report_start_date>,
+    #   "report_variants": [...]
+    # }
+
+    # If any of these fields are not defined in the input JSON, the program will fail as it expects them to exist.
+    if len(sys.argv) < 2:
+        print("Error: Missing input arguments.")
+        sys.exit(1)
+    # Retrieve B64-encoded string.
+    b64_json_str = sys.argv[1]
+    # Decode the string
+    json_str = base64.b64decode(b64_json_str, validate=True)
+    # Load the JSON string
+    args = json.loads(json_str)
+    # Run the wrapper function with these input arguments.
+    wrapper_run(args)

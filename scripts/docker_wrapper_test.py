@@ -14,10 +14,11 @@ from google.cloud import bigquery
 
 if __name__ == "__main__":
     # Get max spec_id
-    #bq_client = bigquery.Client()
-    #first_new_id = list(bq_client.query("SELECT MAX(spec_id)+1 FROM co-covid-models.covid_model.specifications").result())[0][0]
-    #os.environ["SPEC_ID"] = str(int(first_new_id))
-    os.environ["SPEC_ID"] = "4692"
+    bq_client = bigquery.Client()
+    first_new_id = list(bq_client.query("SELECT MAX(spec_id)+1 FROM co-covid-models.covid_model.specifications").result())[0][0]
+    os.environ["SPEC_ID"] = str(int(first_new_id))
+    print(f"Using spec_id {first_new_id} as base model spec_id")
+    #os.environ["SPEC_ID"] = "4692"
     # Load a parameter JSON file.
     with open("sample_config.json","r") as f:
         args = json.load(f)
