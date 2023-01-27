@@ -54,7 +54,7 @@ class RMWCovidModel:
                                     # agecat_finder
                                     'age': ['0-17', '18-64', '65+'],
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
-                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'emv'],
+                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'emv', 'XBB'],
                                     'immun': ['none', 'weak', 'strong'],
                                     # region_finder
                                     'region': ['coe','con','cow','ide','idn','ids','idw','mte','mtn','mtw','nme','nmn','nms','nmw','ute','utn','uts','utw','wye','wyn','wyw']})
