@@ -2469,16 +2469,6 @@
   {
     "param": "betta",
     "attrs": {
-      "variant": "XBB"
-    },
-    "mults": {
-      "2020-01-01": 8.581
-    },
-    "desc": "Alpha is 1.5x more infectious than wildtype"
-  },
-  {
-    "param": "betta",
-    "attrs": {
       "variant": "alpha"
     },
     "mults": {
@@ -2566,9 +2556,7 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45",
-        "emv",
-        "XBB"
+        "ba45"
       ]
     },
     "mults": {
@@ -2583,10 +2571,7 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45",
-        "emv",
-        "XBB"
-
+        "ba45"
       ],
       "vacc": [
         "none",
@@ -2605,9 +2590,7 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45",
-        "emv",
-        "XBB"
+        "ba45"
       ],
       "vacc": [
         "shot2",
@@ -2697,9 +2680,7 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45",
-        "emv",
-        "XBB"
+        "ba45"
       ]
     },
     "mults": {
@@ -2734,9 +2715,7 @@
         "omicron",
         "ba2",
         "ba2121",
-        "ba45",
-        "emv",
-        "XBB"
+        "ba45"
       ]
     },
     "mults": {
@@ -2804,12 +2783,8 @@
     "desc": "monoclonal antibodies reduce hospital length of stay by 28%"
   },
     {"param": "emv_seed", "attrs":  null, "vals":  {"2020-01-01": 0, "2022-09-20": 5, "2022-10-30": 0}, "desc": "baseline Variant X seeding value for scenarios"},
-    {"param": "XBB_seed", "attrs":  null, "vals":  {"2020-01-01": 0, "2022-11-25": 5, "2022-12-25": 0}, "desc": "baseline Variant X seeding value for scenarios"},
-    {"param": "XBB_seed", "attrs": {"region": "con"}, "mults": {"2020-01-01": 1.0}, "desc": ""},
     {"param": "betta", "attrs": {"variant": "emv"}, "mults": {"2020-01-01": 8.581}, "desc": "Variant X is equally as infectious as BA.5"},
     {"param": "hosp", "attrs": {"variant": "emv"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for Variant X hospitalization rate"},
     {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["emv"]}, "vals": {"2020-01-01": 0.095}, "desc": "given prior infection with any variant (or no variant), 9.5% of strongly immune individuals can get reinfected with Variant X"},
-    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["emv"]}, "vals": {"2020-01-01": 0.6}, "desc": "given prior infection with any variant (or no variant), 60% of individuals can get reinfected with Variant X"},
-    {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45","emv"]}, "to_attrs": {"variant": ["XBB"]}, "vals": {"2020-01-01": 0.095}, "desc": "given prior infection with any variant (or no variant), 9.5% of strongly immune individuals can get reinfected with Variant X"},
-    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45","emv"]}, "to_attrs": {"variant": ["XBB"]}, "vals": {"2020-01-01": 0.6}, "desc": "given prior infection with any variant (or no variant), 60% of individuals can get reinfected with Variant X"}
+    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["emv"]}, "vals": {"2020-01-01": 0.6}, "desc": "given prior infection with any variant (or no variant), 60% of individuals can get reinfected with Variant X"}
 ]

@@ -54,7 +54,7 @@ class RMWCovidModel:
                                     # agecat_finder
                                     'age': ['0-17', '18-64', '65+'],
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
-                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'emv', 'XBB'],
+                                    'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'emv'],
                                     'immun': ['none', 'weak', 'strong'],
                                     # region_finder
                                     'region': ['coe','con','cow','ide','idn','ids','idw','mte','mtn','mtw','nme','nmn','nms','nmw','ute','utn','uts','utw','wye','wyn','wyw']})
@@ -74,6 +74,7 @@ class RMWCovidModel:
 
         # Variant Seeds
         self.susceptible_cmpt_idcs = {}
+        self.exposed_cmpt_idcs = {}
         self.exposed_region_lookup = {}
         self.__seeds = {}
         self.seed_t_prev_lookup = {}
@@ -983,6 +984,23 @@ class RMWCovidModel:
         combined = self.solution_sum_df()[['E']].stack(self.param_attr_names).join(param_df)
         combined['Enew'] = (combined['E'] / combined['alpha'])
         combined = combined.groupby(['date', 'region']).sum().drop(columns=['E', 'alpha'])
+        return combined
+
+    @property
+    def new_infections_symptomatic(self):
+        """ Compute the estimated number of new symptomatic infections each day
+
+            Estimation is done by multiplying the number of current infected symptomatic individuals by the recovery
+            rate from the symptomatic state 'gamma'.
+
+        :return: Pandas DataFrame where the row index is the date/region and the column is the estimated new symptomatic
+                infections 'Inew'
+        """
+
+        param_df = self.get_param_for_attrs_by_t('gamma', attrs={}, convert_to_dates=True)
+        combined = self.solution_sum_df()[['I']].stack(self.param_attr_names).join(param_df)
+        combined['Inew'] = (combined['I'] / combined['gamm'])
+        combined = combined.groupby(['date', 'region']).sum().drop(columns=['I', 'gamm'])
         return combined
 
     @property
@@ -1897,7 +1915,9 @@ class RMWCovidModel:
                                                            {'vacc': f'{to_shot}', 'immun': f'strong'},
                                                            from_coef=f'{to_shot}_per_available')
 
-        # # seed variants (only seed the ones in our attrs)
+        # This is now implemented directly in the ode() function, since we need to handle which compartment to seed from
+        # dynamically.
+        # seed variants (only seed the ones in our attrs)
         # logger.debug(f"{str(self.tags)} Building seed flows")
         # for variant in self.attrs['variant']:
         #     if variant == 'none':
@@ -2021,28 +2041,43 @@ class RMWCovidModel:
         for scale_by_cmpt_idxs, matrix in self.nonlinear_matrices[t_int].items():
             dy += nlm_vec * sum(itemgetter(*scale_by_cmpt_idxs)(y)) * matrix.dot(y)
 
-
         # TODO: Constant terms are ONLY used for the seeding, so we just need to replace this constant vector.
         # apply constant terms
         #dy += self.constant_vector[t_int]
 
-        # For each variant
+        # This section implements a "dynamic" flow for variant seeding, which allows us to pull from the largest
+        # susceptible compartment at the current `t` whenever we need to seed a new variant. This is necessary because
+        # in the later stages of the pandemic, most of the population has some form of immunity, vaccination, and/or
+        # prior infection. The old method of pulling from the (S, 18-64, none, none, none) compartment starts to fail
+        # since this compartment approaches zero over time.
         for region in self.regions:
-            #susceptible_cmpt_for_region = self.susceptible_cmpt_idcs[region] # The name of the compartment
-            #susceptible_cmpt_index = self.cmpt_idx_lookup[susceptible_cmpt_for_region] # Index of comparment
+            # Find the index of the largest of the susceptible compartments at the previous timestep.
             from_cmpt_index = y[self.susceptible_cmpt_idcs[region]].argmax()
+            # Find the name of the compartment
             from_cmpt = self.compartments[from_cmpt_index]
+            # For each variant
             for variant in self.attrs["variant"]:
                 if variant == "none":
                     continue
                 # TODO: Check if this is too slow.
+                # Build a tuple for the name of the exposed compartment. To do this, copy all parameters except
+                # the 'seir' (which should be E instead of S) and 'variant' (which should be the current variant).
+                # We could hardcode the values of the tuple, but this would break if we add different attributes in the
+                # future. It doesn't seem like this adds significant computational overhead.
                 to_cmpt = tuple("E" if n == "seir" else variant if n == "variant" else v for n, v in zip(self.attrs, from_cmpt))
+                # Look up the index of the exposed compartment.
                 to_cmpt_idx = self.cmpt_idx_lookup[to_cmpt]
                 # Find a time key less than or equal to the current T value.
                 param_dict = self.params_by_t[from_cmpt[1:]][f"{variant}_seed"]
+                # Get the key for the current time step.
                 leq_key = max([key for key in param_dict.keys() if key <= t_int])
+                # Get the seed value from the parameters.
                 seed_val = param_dict[leq_key]
+                if y[from_cmpt_index] - seed_val < 0:
+                    raise ValueError(f"Seeding would cause compartment to become negative!\n{from_cmpt} Value: {y[from_cmpt_index]}\n{variant} Seed Value: {seed_val}")
+                # Subtract the seed value from the susceptible compartment.
                 dy[from_cmpt_index] -= seed_val
+                # Add the seed value to the exposed compartment.
                 dy[to_cmpt_idx] += seed_val
         return dy
 
@@ -2102,7 +2137,8 @@ class RMWCovidModel:
         # initialize solution dataframe with all NA values
         self.solution_y = np.zeros(shape=(len(self.trange), len(self.compartments_as_index))) * np.nan
         # Set the indices of the susceptible compartments
-        self.susceptible_cmpt_idcs = {region: [self.cmpt_idx_lookup[x] for x in self.get_cmpts_matching_attrs({"seir":"S","region":region})] for region in self.regions}
+        self.susceptible_cmpt_idcs = {region: [self.cmpt_idx_lookup[x] for x in self.get_cmpts_matching_attrs({"seir": "S", "region": region, "age": "18-64"})] for region in self.regions}
+        self.exposed_cmpt_idcs = {region: {variant: [self.cmpt_idx_lookup[x] for x in self.get_cmpts_matching_attrs({"seir": "E", "region": region, "variant": variant, "age": "18-64"})] for variant in self.attrs["variant"]} for region in self.regions}
         if pickle_matrices:
             self.pickle_ode_matrices(outdir)
 
