@@ -997,11 +997,11 @@ class RMWCovidModel:
                 infections 'Inew'
         """
 
-        param_df = self.get_param_for_attrs_by_t('gamma', attrs={}, convert_to_dates=True)
+        param_df = self.get_param_for_attrs_by_t('gamm', attrs={}, convert_to_dates=True)
         combined = self.solution_sum_df()[['I']].stack(self.param_attr_names).join(param_df)
-        combined['Inew'] = (combined['I'] / combined['gamm'])
+        combined['Inew'] = (combined['I'] * combined['gamm'])
         combined = combined.groupby(['date', 'region']).sum().drop(columns=['I', 'gamm'])
-        return combined
+        return combined["Inew"]
 
     @property
     def re_estimates(self):
