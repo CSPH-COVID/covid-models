@@ -2247,7 +2247,7 @@
     "desc": ""
   },
 {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
@@ -2257,7 +2257,7 @@
     "desc": "scaled emerging variant seed for reference region (CO North)"
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "coe"
     },
@@ -2267,7 +2267,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "con"
     },
@@ -2277,7 +2277,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "cow"
     },
@@ -2287,7 +2287,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "ide"
     },
@@ -2297,7 +2297,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "idn"
     },
@@ -2307,7 +2307,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "ids"
     },
@@ -2317,7 +2317,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "idw"
     },
@@ -2327,7 +2327,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "mte"
     },
@@ -2337,7 +2337,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "mtn"
     },
@@ -2347,7 +2347,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "mtw"
     },
@@ -2357,7 +2357,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "nme"
     },
@@ -2367,7 +2367,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "nmn"
     },
@@ -2377,7 +2377,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "nms"
     },
@@ -2387,7 +2387,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "nmw"
     },
@@ -2397,7 +2397,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "ute"
     },
@@ -2407,7 +2407,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "utn"
     },
@@ -2417,7 +2417,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "uts"
     },
@@ -2427,7 +2427,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "utw"
     },
@@ -2437,7 +2437,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "wye"
     },
@@ -2447,7 +2447,7 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
     "attrs": {
       "region": "wyn"
     },
@@ -2457,7 +2457,227 @@
     "desc": ""
   },
   {
-    "param": "emv_seed",
+    "param": "bq_seed",
+    "attrs": {
+      "region": "wyw"
+    },
+    "mults": {
+      "2020-01-01": 0.03353407
+    },
+    "desc": ""
+  },
+{
+    "param": "xbb_seed",
+    "attrs": null,
+    "vals": {
+      "2020-01-01": 0,
+      "2022-09-15": 4.4,
+      "2022-10-15": 0
+    },
+    "desc": "scaled emerging variant seed for reference region (CO North)"
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "coe"
+    },
+    "mults": {
+      "2020-01-01": 0.05086667
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "con"
+    },
+    "mults": {
+      "2020-01-01": 1.0
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "cow"
+    },
+    "mults": {
+      "2020-01-01": 0.09635088
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "ide"
+    },
+    "mults": {
+      "2020-01-01": 0.06310716
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "idn"
+    },
+    "mults": {
+      "2020-01-01": 0.04514256
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "ids"
+    },
+    "mults": {
+      "2020-01-01": 0.03402168
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "idw"
+    },
+    "mults": {
+      "2020-01-01": 0.10367545
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "mte"
+    },
+    "mults": {
+      "2020-01-01": 0.03227685
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "mtn"
+    },
+    "mults": {
+      "2020-01-01": 0.01146730
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "mtw"
+    },
+    "mults": {
+      "2020-01-01": 0.07473832
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "nme"
+    },
+    "mults": {
+      "2020-01-01": 0.02859627
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "nmn"
+    },
+    "mults": {
+      "2020-01-01": 0.03208236
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "nms"
+    },
+    "mults": {
+      "2020-01-01": 0.07708969
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "nmw"
+    },
+    "mults": {
+      "2020-01-01": 0.13332212
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "ute"
+    },
+    "mults": {
+      "2020-01-01": 0.02190727
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "utn"
+    },
+    "mults": {
+      "2020-01-01": 0.11366519
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "uts"
+    },
+    "mults": {
+      "2020-01-01": 0.04462114
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "utw"
+    },
+    "mults": {
+      "2020-01-01": 0.26188184
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "wye"
+    },
+    "mults": {
+      "2020-01-01": 0.04265239
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
+    "attrs": {
+      "region": "wyn"
+    },
+    "mults": {
+      "2020-01-01": 0.01135673
+    },
+    "desc": ""
+  },
+  {
+    "param": "xbb_seed",
     "attrs": {
       "region": "wyw"
     },
@@ -2782,9 +3002,12 @@
     },
     "desc": "monoclonal antibodies reduce hospital length of stay by 28%"
   },
-    {"param": "emv_seed", "attrs":  null, "vals":  {"2020-01-01": 0, "2022-09-20": 5, "2022-10-30": 0}, "desc": "baseline Variant X seeding value for scenarios"},
-    {"param": "betta", "attrs": {"variant": "emv"}, "mults": {"2020-01-01": 8.581}, "desc": "Variant X is equally as infectious as BA.5"},
-    {"param": "hosp", "attrs": {"variant": "emv"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for Variant X hospitalization rate"},
-    {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["emv"]}, "vals": {"2020-01-01": 0.095}, "desc": "given prior infection with any variant (or no variant), 9.5% of strongly immune individuals can get reinfected with Variant X"},
-    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["emv"]}, "vals": {"2020-01-01": 0.6}, "desc": "given prior infection with any variant (or no variant), 60% of individuals can get reinfected with Variant X"}
+    {"param": "betta", "attrs": {"variant": "bq"}, "mults": {"2020-01-01": 8.581}, "desc": "bq is equally as infectious as BA.5"},
+    {"param": "betta", "attrs": {"variant": "xbb"}, "mults": {"2020-01-01": 8.581}, "desc": "xbb is equally as infectious as BA.5"},
+    {"param": "hosp", "attrs": {"variant": "bq"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for bq hospitalization rate"},
+    {"param": "hosp", "attrs": {"variant": "xbb"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for xbb hospitalization rate"},
+    {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.075}, "desc": "given prior infection with any variant (or no variant), 7.5% of strongly immune individuals can get reinfected with bq"},
+    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.4}, "desc": "given prior infection with any variant (or no variant), 40% of individuals can get reinfected with bq"},
+    {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45", "bq"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.085}, "desc": "given prior infection with any variant (or no variant), 8.5% of strongly immune individuals can get reinfected with xbb"},
+    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45", "bq"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.5}, "desc": "given prior infection with any variant (or no variant), 50% of individuals can get reinfected with xbb"}
 ]
