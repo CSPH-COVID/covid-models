@@ -504,7 +504,7 @@ def do_build_legacy_output_df(model: RMWCovidModel):
     age_df['Ih_age2'] = age_totals['Ih']['18-64']
     age_df['Ih_age3'] = age_totals['Ih']['65+']
 
-    df = totals.join(model.new_infections).join(model.re_estimates).join(age_df)
+    df = totals.join(model.new_infections).join(model.new_infections_symptomatic).join(model.re_estimates).join(age_df)
 
     df['prev'] = 100000.0 * df['Itotal'] / df['region_pop']
     df['oneinX'] = df['region_pop'] / df['Itotal']

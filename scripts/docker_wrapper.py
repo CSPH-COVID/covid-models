@@ -118,11 +118,9 @@ def wrapper_run(args: dict):
     # MODEL FITTING
     # This code is mostly just copied from the Jupyter notebooks we use, but in the future we can make this
     # a more general wrapper for doing model fitting and generating plots.
-    # base_model = RMWCovidModel(base_spec_id=4692)
-    # base_model.prep()
     base_model = do_single_fit(**base_model_args)
-    # with open(get_filepath_prefix(outdir, tags=base_model.tags) + "model_solutionydf.pkl", "wb") as f:
-    #     pickle.dump(base_model.solution_ydf, f)
+    with open(get_filepath_prefix(outdir, tags=base_model.tags) + f"model_solutionydf.pkl", "wb") as f:
+        pickle.dump(base_model.solution_ydf, f)
     base_model.solve_seir()
 
     # MODEL OUTPUTS
@@ -136,26 +134,27 @@ def wrapper_run(args: dict):
         get_filepath_prefix(outdir, tags=base_model.tags) + 'full_projection.csv')
 
     # SCENARIO FITTING
-    logging.info(f"{str(base_model.tags)}: Running scenarios")
-    models = do_fit_scenarios(base_model_args=base_model_args, scenario_args_list=scenario_model_args,
-                              fit_args=scenario_fit_args, multiprocess=2)
-    for model in models:
-        xmin = datetime.datetime.strptime(args["report_start_date"], "%Y-%m-%d").date()
-        xmax = datetime.datetime.strptime(args["end_date"], "%Y-%m-%d").date()
-        fig = plt.figure(figsize=(10, 10), dpi=300)
-        ax = fig.add_subplot(211)
-        hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
-        hosps_df.plot(ax=ax)
-        ax.set_xlim(xmin, xmax)
-        ax = fig.add_subplot(212)
-        plot_transmission_control(model, ax=ax)
-        ax.set_xlim(xmin, xmax)
-        plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.png')
-        plt.close()
-        hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
-        json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
+    # logging.info(f"{str(base_model.tags)}: Running scenarios")
+    # models = do_fit_scenarios(base_model_args=base_model_args, scenario_args_list=scenario_model_args,
+    #                           fit_args=scenario_fit_args)
+    # for model in models:
+    #     xmin = datetime.datetime.strptime(args["report_start_date"], "%Y-%m-%d").date()
+    #     xmax = datetime.datetime.strptime(args["end_date"], "%Y-%m-%d").date()
+    #     fig = plt.figure(figsize=(10, 10), dpi=300)
+    #     ax = fig.add_subplot(211)
+    #     hosps_df = model.modeled_vs_observed_hosps().reset_index('region').drop(columns='region')
+    #     hosps_df.plot(ax=ax)
+    #     ax.set_xlim(xmin, xmax)
+    #     ax = fig.add_subplot(212)
+    #     plot_transmission_control(model, ax=ax)
+    #     ax.set_xlim(xmin, xmax)
+    #     plt.savefig(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.png')
+    #     plt.close()
+    #     hosps_df.to_csv(get_filepath_prefix(outdir, tags=model.tags) + '_model_forecast.csv')
+    #     json.dump(model.tc, open(get_filepath_prefix(outdir, tags=model.tags) + 'model_forecast_tc.json', 'w'))
 
     logging.info("Task finished.")
+
 
 if __name__ == "__main__":
     # INPUT PARAMETERS
