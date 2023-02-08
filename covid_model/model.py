@@ -49,10 +49,12 @@ class CovidModel:
 
         # basic model data
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
+                                    # agecat_finder
                                     'age': ['0-19', '20-39', '40-64', '65+'],
                                     'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
                                     'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'vx'],
                                     'immun': ['none', 'weak', 'strong'],
+                                    # region_finder
                                     'region': ['co']})
         # labels used when logging and writing to db.
         self.tags = {}
@@ -70,6 +72,7 @@ class CovidModel:
 
         # Model compartments, lookups, and ODE solution
         self.compartments_as_index = None
+        # hrf_finder (?)
         self.Ih_compartments = None
         self.compartments = None
         self.cmpt_idx_lookup = None
@@ -80,6 +83,7 @@ class CovidModel:
         # data related params
         self.__params_defs = json.load(open('covid_model/input/params.json'))  # default params
         self.__region_defs = json.load(open('covid_model/input/region_definitions.json'))  # default value
+        # hrf_finder
         self.__hosp_reporting_frac = None
         self.__vacc_proj_params = None
         self.__mobility_mode = None
@@ -176,6 +180,7 @@ class CovidModel:
                 self.params_defs.extend(self.get_mobility_as_params())
 
         if any([p in self.recently_updated_properties for p in
+            # hrf_finder
                 ['start_date', 'end_date', 'regions', 'region_defs', 'hosp_reporting_frac']]):
             logger.debug(f"{str(self.tags)} Setting Hospitalizations")
             self.set_hosp(engine)
@@ -353,7 +358,7 @@ class CovidModel:
                     params.extend([{'param': f'mob_{to_region}_frac_from_{from_region}', 'attrs': {}, 'vals': mobility.loc[(from_region, to_region)]['frac_of_to'].to_dict()}])
 
         return params
-
+    # hrf_finder
     def hosp_reporting_frac_by_t(self):
         """Construct a pandas DataFrame of the hospital reporting fraction over time
 
