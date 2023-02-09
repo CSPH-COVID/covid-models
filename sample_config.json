@@ -1,14 +1,13 @@
 {
     "regions": [
-        "mtn"
+        "utw"
     ],
     "start_date": "2020-01-24",
-    "end_date": "2023-04-01",
-    "base_model_fit_end_date": "2022-11-15",
+    "end_date": "2023-06-01",
+    "base_model_fit_end_date": "2023-01-31",
     "scenarios_fit_end_date": "2023-01-01",
-    "report_start_date": "2022-07-01",
+    "report_start_date": "2022-11-01",
     "report_variants": [
-        "ba45",
-        "emv"
+        "xbb"
     ]
 }

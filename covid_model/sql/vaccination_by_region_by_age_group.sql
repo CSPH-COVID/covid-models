@@ -6,6 +6,6 @@ SELECT
        dose2 AS shot2,
        booster1,
        booster2
-FROM `cste_testing.cdc_doses_by_region_by_age_group`
+FROM `cste_testing.cdc_state_doses_by_region_by_age_group`
 WHERE region_id = %(region_id)s
 ORDER BY measure_date,region_id,age_group
