@@ -374,6 +374,36 @@
     },
     "desc": "4% of second boosters among 65+ whose first, second, and first booster shots failed fail to confer immunity"
   },
+    {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "0-17"
+    },
+    "vals": {
+      "2020-01-01": 0.01
+    },
+    "desc": "1% of second boosters among 0-17 whose first, second, and first booster shots failed fail to confer immunity"
+  },
+  {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "18-64"
+    },
+    "vals": {
+      "2020-01-01": 0.01
+    },
+    "desc": "1% of second boosters among 18-64 whose first, second, and first booster shots failed fail to confer immunity"
+  },
+  {
+    "param": "booster3_fail_rate",
+    "attrs": {
+      "age": "65+"
+    },
+    "vals": {
+      "2020-01-01": 0.04
+    },
+    "desc": "4% of second boosters among 65+ whose first, second, and first booster shots failed fail to confer immunity"
+  },
   {
     "param": "immunity",
     "attrs": null,
@@ -480,8 +510,7 @@
     "param": "severe_immunity",
     "attrs": {
       "vacc": [
-        "booster1",
-        "booster2"
+        "booster1"
       ],
       "variant": [
         "omicron",
@@ -492,6 +521,67 @@
     },
     "mults": {
       "2020-01-01": 0.9
+    },
+    "desc": "90% of people who have been boosted are protected against severe Omicron"
+  },
+  {
+    "param": "severe_immunity",
+    "attrs": {
+      "vacc": [
+        "booster2"
+      ],
+      "age": [
+        "18-64",
+        "65+"
+      ],
+      "variant": [
+        "omicron",
+        "ba2",
+        "ba2121",
+        "ba45"
+      ]
+    },
+    "mults": {
+      "2020-01-01": 0.9
+    },
+    "desc": "90% of people who have been boosted are protected against severe Omicron"
+  },
+  {
+    "param": "severe_immunity",
+    "attrs": {
+      "vacc": [
+        "booster2"
+      ],
+      "age": [
+        "0-17"
+      ],
+      "variant": [
+        "omicron",
+        "ba2",
+        "ba2121",
+        "ba45"
+      ]
+    },
+    "mults": {
+      "2020-01-01": 0.95
+    },
+    "desc": "90% of people who have been boosted are protected against severe Omicron"
+  },
+    {
+    "param": "severe_immunity",
+    "attrs": {
+      "vacc": [
+        "booster3"
+      ],
+      "variant": [
+        "omicron",
+        "ba2",
+        "ba2121",
+        "ba45"
+      ]
+    },
+    "mults": {
+      "2020-01-01": 0.95
     },
     "desc": "90% of people who have been boosted are protected against severe Omicron"
   },
@@ -697,7 +787,8 @@
     "attrs": {
       "vacc": [
         "booster1",
-        "booster2"
+        "booster2",
+        "booster3"
       ]
     },
     "mults": {
@@ -2815,7 +2906,8 @@
       "vacc": [
         "shot2",
         "booster1",
-        "booster2"
+        "booster2",
+        "booster3"
       ]
     },
     "mults": {

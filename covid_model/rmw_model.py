@@ -53,7 +53,7 @@ class RMWCovidModel:
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                                     # agecat_finder
                                     'age': ['0-17', '18-64', '65+'],
-                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
+                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'],
                                     'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'bq', 'xbb'],
                                     'immun': ['none', 'weak', 'strong'],
                                     # region_finder
@@ -2349,6 +2349,8 @@ class RMWCovidModel:
 
         # triggers updating of tend, trange, etc.
         self.end_date = self.end_date
+        # triggers update of regions and compartments
+        self.regions = self.regions
 
     def write_specs_to_db(self, engine=None):
         """Function which assigns this model a spec_id and writes a serialized version of this model to the database
