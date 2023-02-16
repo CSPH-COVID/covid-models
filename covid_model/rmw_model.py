@@ -320,8 +320,10 @@ class RMWCovidModel:
                     for i in range(len(groups)):
                         group = groups[i]
                         key = tuple([d] + list(group))
-                        current_rate = projections.loc[key]
                         max_rate = max_rate_per_remaining * (max_cumu_df.loc[group] - cumu_vacc.loc[group])
+                        # Limit the rates so that later shot cumulative values never exceed earlier shot cumulative
+                        # values.
+                        max_rate = max_rate.clip(upper=(-cumu_vacc.loc[group].diff(periods=1)).fillna(np.inf))
                         excess_rate = (projections.loc[key] - max_rate).clip(lower=0)
                         projections.loc[key] -= excess_rate
                         # if a reallocate_order is provided, reallocate excess rate to other groups
@@ -1437,7 +1439,7 @@ class RMWCovidModel:
         # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
         cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2', 'booster3'])
         # compute what fraction of the eligible population got each shot on a given day.
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
         vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'date', 'region', 'age']).sort_index()
@@ -1892,7 +1894,6 @@ class RMWCovidModel:
         logger.debug(f"{str(self.tags)} Building ode flows")
         self.flows_string = self.flows_string = '(' + ','.join(self.attr_names) + ')'
         self.reset_ode()
-
         # vaccination
         logger.debug(f"{str(self.tags)} Building vaccination flows")
         for seir in ['S', 'E', 'A']:
