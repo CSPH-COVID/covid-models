@@ -20,13 +20,16 @@ from covid_model.utils import db_engine
 from covid_model.data_imports import ExternalHospsEMR, ExternalHospsCOPHS
 
 
-def plot_observed_hosps(engine, county_ids=None, **plot_params):
-    # TODO: pass in model and use its hosps instead of getting from db
-    if county_ids is None:
-        hosps = ExternalHospsEMR(engine).fetch()['currently_hospitalized']
-    else:
-        hosps = ExternalHospsCOPHS(engine).fetch(county_ids=county_ids)['currently_hospitalized']
-    hosps.plot(**{'color': 'red', 'label': 'Actual Hosps.', **plot_params})
+def plot_observed_hosps(model, ax, **plot_params):
+    """ Plots actual/observed (from data source) hospitalizations vs model's estimated hospitalizations (modeled) over
+        time.
+    :param model: The instance of the model to retrieve actual hospitalizations from.
+    :param ax: The axes to draw the hospitalizations onto.
+    :param plot_params: Any additional plotting parameters, passed directly to Axes.plot().
+    :return: None
+    """
+    for name, group in model.hosps.groupby("region"):
+        ax.plot(group.reset_index("region", drop=True), label=f"Actual Hosps. ({name})", **plot_params)
 
 
 def plot_modeled_vs_actual_hosps():
