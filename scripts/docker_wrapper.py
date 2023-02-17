@@ -76,7 +76,7 @@ def wrapper_run(args: dict):
     vacc_eff_lt5 = 0.5
     scenario_model_args = []
     scenario_params = json.load(open(base_model_args["params_defs"]))
-    for (weak_escape, strong_escape) in [(0.6, 0.15), (0.66, 0.165), (0.72, 0.18), (0.54, 0.135)]:
+    for (weak_escape, strong_escape) in [(0.6, 0.095), (0.7, 0.1), (0.5, 0.09)]:
         weak_param = [{"param": "immune_escape",
                        "from_attrs": {"immun": "weak",
                                       "variant": ["none", "wildtype", "alpha", "delta",

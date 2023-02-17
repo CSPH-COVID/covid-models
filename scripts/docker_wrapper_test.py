@@ -20,7 +20,7 @@ if __name__ == "__main__":
     print(f"Using spec_id {first_new_id} as base model spec_id")
     #os.environ["SPEC_ID"] = "4692"
     # Load a parameter JSON file.
-    with open("sample_config.json","r") as f:
+    with open("docker_test/sample_config.json","r") as f:
         args = json.load(f)
     # Run the wrapper with this input file.
     wrapper_run(args)

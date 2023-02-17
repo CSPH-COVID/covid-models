@@ -345,7 +345,7 @@
     "desc": "4% of first boosters among 65+ whose first and second shots failed fail to confer immunity"
   },
   {
-    "param": "booster2_fail_rate",
+    "param": "booster23_fail_rate",
     "attrs": {
       "age": "0-17"
     },
@@ -355,7 +355,7 @@
     "desc": "1% of second boosters among 0-17 whose first, second, and first booster shots failed fail to confer immunity"
   },
   {
-    "param": "booster2_fail_rate",
+    "param": "booster23_fail_rate",
     "attrs": {
       "age": "18-64"
     },
@@ -365,7 +365,7 @@
     "desc": "1% of second boosters among 18-64 whose first, second, and first booster shots failed fail to confer immunity"
   },
   {
-    "param": "booster2_fail_rate",
+    "param": "booster23_fail_rate",
     "attrs": {
       "age": "65+"
     },
@@ -528,42 +528,20 @@
     "param": "severe_immunity",
     "attrs": {
       "vacc": [
-        "booster2"
-      ],
-      "age": [
-        "18-64",
-        "65+"
+        "booster23"
       ],
       "variant": [
         "omicron",
         "ba2",
         "ba2121",
-        "ba45"
+        "ba45",
+        "bq",
+        "xbb"
       ]
     },
     "mults": {
-      "2020-01-01": 0.9
-    },
-    "desc": "90% of people who have been boosted are protected against severe Omicron"
-  },
-  {
-    "param": "severe_immunity",
-    "attrs": {
-      "vacc": [
-        "booster2"
-      ],
-      "age": [
-        "0-17"
-      ],
-      "variant": [
-        "omicron",
-        "ba2",
-        "ba2121",
-        "ba45"
-      ]
-    },
-    "mults": {
-      "2020-01-01": 0.95
+      "2020-01-01": 0.9,
+      "2022-08-31": 0.95
     },
     "desc": "90% of people who have been boosted are protected against severe Omicron"
   },
@@ -787,8 +765,7 @@
     "attrs": {
       "vacc": [
         "booster1",
-        "booster2",
-        "booster3"
+        "booster23"
       ]
     },
     "mults": {
@@ -2905,13 +2882,32 @@
       ],
       "vacc": [
         "shot2",
-        "booster1",
-        "booster2",
-        "booster3"
+        "booster1"
       ]
     },
     "mults": {
       "2020-01-01": 0.594
+    },
+    "desc": "Omicrons have a 40.6% lower proportion of symptomatic infections for those who are vaccinated compared to Delta"
+  },
+  {
+    "param": "pS",
+    "attrs": {
+      "variant": [
+        "omicron",
+        "ba2",
+        "ba2121",
+        "ba45",
+        "bq",
+        "xbb"
+      ],
+      "vacc": [
+        "booster23"
+      ]
+    },
+    "mults": {
+      "2020-01-01": 0.594,
+      "2022-08-31": 0.5
     },
     "desc": "Omicrons have a 40.6% lower proportion of symptomatic infections for those who are vaccinated compared to Delta"
   },
