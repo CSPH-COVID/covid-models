@@ -376,7 +376,7 @@ def do_create_report(model, outdir, immun_variants=('ba2121',), from_date=None, 
     #TODO: update to be the back_adjusted hosps
     fig, ax = plt.subplots(**subplots_args)
     ax.set_ylabel('Hospitalized with COVID-19')
-    plot_observed_hosps(db_engine(), ax=ax, color='black')
+    plot_observed_hosps(model, ax=ax, color='black')
     plot_modeled(model, 'Ih', ax=ax, label='modeled')
     format_date_axis(ax)
     ax.set_xlim(from_date, to_date)

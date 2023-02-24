@@ -53,7 +53,7 @@ class RMWCovidModel:
         self.__attrs = OrderedDict({'seir': ['S', 'E', 'I', 'A', 'Ih', 'D'],
                                     # agecat_finder
                                     'age': ['0-17', '18-64', '65+'],
-                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster2'],
+                                    'vacc': ['none', 'shot1', 'shot2', 'booster1', 'booster23'],
                                     'variant': ['none', 'wildtype', 'alpha', 'delta', 'omicron', 'ba2', 'ba2121', 'ba45', 'bq', 'xbb'],
                                     'immun': ['none', 'weak', 'strong'],
                                     # region_finder
@@ -320,8 +320,10 @@ class RMWCovidModel:
                     for i in range(len(groups)):
                         group = groups[i]
                         key = tuple([d] + list(group))
-                        current_rate = projections.loc[key]
                         max_rate = max_rate_per_remaining * (max_cumu_df.loc[group] - cumu_vacc.loc[group])
+                        # Limit the rates so that later shot cumulative values never exceed earlier shot cumulative
+                        # values.
+                        max_rate = max_rate.clip(upper=(-cumu_vacc.loc[group].diff(periods=1)).fillna(np.inf))
                         excess_rate = (projections.loc[key] - max_rate).clip(lower=0)
                         projections.loc[key] -= excess_rate
                         # if a reallocate_order is provided, reallocate excess rate to other groups
@@ -1437,7 +1439,7 @@ class RMWCovidModel:
         # vaccinations eventually overtake population (data issue) which would make 'none' < 0 so clip at 0
         cumu_vacc_final_shot['none'] = (cumu_vacc_final_shot['population'] * 2 - cumu_vacc_final_shot.sum(axis=1)).clip(lower=0)
         cumu_vacc_final_shot = cumu_vacc_final_shot.drop(columns='population')
-        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster2'])
+        cumu_vacc_final_shot = cumu_vacc_final_shot.reindex(columns=['none', 'shot1', 'shot2', 'booster1', 'booster23'])
         # compute what fraction of the eligible population got each shot on a given day.
         available_for_vacc = cumu_vacc_final_shot.shift(1, axis=1).drop(columns='none')
         vacc_per_available = (vacc_rates / available_for_vacc).fillna(0).replace(np.inf, 0).reorder_levels(['t', 'date', 'region', 'age']).sort_index()
@@ -1892,7 +1894,6 @@ class RMWCovidModel:
         logger.debug(f"{str(self.tags)} Building ode flows")
         self.flows_string = self.flows_string = '(' + ','.join(self.attr_names) + ')'
         self.reset_ode()
-
         # vaccination
         logger.debug(f"{str(self.tags)} Building vaccination flows")
         for seir in ['S', 'E', 'A']:
@@ -1900,7 +1901,7 @@ class RMWCovidModel:
                                                from_coef=f'shot1_per_available * (1 - shot1_fail_rate)')
             self.add_flows_from_attrs_to_attrs({'seir': seir, 'vacc': f'none'}, {'vacc': f'shot1', 'immun': f'none'},
                                                from_coef=f'shot1_per_available * shot1_fail_rate')
-            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster2')]:
+            for (from_shot, to_shot) in [('shot1', 'shot2'), ('shot2', 'booster1'), ('booster1', 'booster23')]:
                 for immun in self.attrs['immun']:
                     if immun == 'none':
                         # if immun is none, that means that the first vacc shot failed, which means that future shots may fail as well
@@ -1915,9 +1916,10 @@ class RMWCovidModel:
                                                            {'vacc': f'{to_shot}', 'immun': f'strong'},
                                                            from_coef=f'{to_shot}_per_available')
 
+
+        # seed variants (only seed the ones in our attrs)
         # This is now implemented directly in the ode() function, since we need to handle which compartment to seed from
         # dynamically.
-        # seed variants (only seed the ones in our attrs)
         # logger.debug(f"{str(self.tags)} Building seed flows")
         # for variant in self.attrs['variant']:
         #     if variant == 'none':
@@ -2349,6 +2351,8 @@ class RMWCovidModel:
 
         # triggers updating of tend, trange, etc.
         self.end_date = self.end_date
+        # triggers update of regions and compartments
+        self.regions = self.regions
 
     def write_specs_to_db(self, engine=None):
         """Function which assigns this model a spec_id and writes a serialized version of this model to the database

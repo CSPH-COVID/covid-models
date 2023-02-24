@@ -14,7 +14,7 @@ COPY covid_model ./covid_model/
 # Make a empty output directory. We need this so we can mount the GCS bucket here.
 RUN mkdir covid_model/output
 # Copy the wrapper and requirements file to the image.
-COPY scripts/docker_wrapper.py requirements.txt ./
+COPY scripts/docker_wrapper.py scripts/docker_wrapper_test.py docker_test/sample_config.json requirements.txt ./
 # Install required packages
 RUN pip install --no-cache-dir -r requirements.txt
 # Set the entrypoint for the image.
