@@ -579,7 +579,7 @@
       ]
     },
     "vals": {
-      "2020-01-01": 0.03
+      "2020-01-01": 0.015
     },
     "desc": "given prior infection with BA.1 or BA.2, 3% of strongly immune individuals can get reinfected with BA.2.12.1"
   },
@@ -598,7 +598,7 @@
       ]
     },
     "vals": {
-      "2020-01-01": 0.25
+      "2020-01-01": 0.15
     },
     "desc": "given prior infection with BA.1 or BA.2, 25% of weakly immune individuals can get reinfected with BA.2.12.1"
   },
@@ -619,7 +619,7 @@
       ]
     },
     "vals": {
-      "2020-01-01": 0.15
+      "2020-01-01": 0.08
     },
     "desc": "given prior infection with a pre-Omicron variant, 15% of strongly immune individuals can get reinfected with BA.4/5"
   },
@@ -640,7 +640,7 @@
       ]
     },
     "vals": {
-      "2020-01-01": 0.80
+      "2020-01-01": 0.60
     },
     "desc": "given prior infection with a pre-Omicron variant, 80% of weakly immune individuals can get reinfected with BA.4/5"
   },
@@ -680,7 +680,7 @@
       ]
     },
     "vals": {
-      "2020-01-01": 0.40
+      "2020-01-01": 0.30
     },
     "desc": "given prior infection with an Omicron variant, 40% of weakly immune individuals can get reinfected with BA.4/5"
   },
@@ -2031,8 +2031,8 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-03-15": 4.4,
-      "2022-03-25": 0
+      "2022-02-05": 1.9,
+      "2022-02-06": 0
     },
     "desc": "scaled BA.4/5 seed for reference region (CO North)"
   },
@@ -2251,8 +2251,8 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2022-09-15": 4.4,
-      "2022-10-15": 0
+      "2022-03-15": 1.9,
+      "2022-03-16": 0
     },
     "desc": "scaled emerging variant seed for reference region (CO North)"
   },
@@ -2471,8 +2471,8 @@
     "attrs": null,
     "vals": {
       "2020-01-01": 0,
-      "2023-01-15": 0.87,
-      "2023-02-15": 0
+      "2022-09-15": 5.2,
+      "2022-10-15": 0
     },
     "desc": "scaled emerging variant seed for reference region (CO North)"
   },
@@ -3002,12 +3002,16 @@
     },
     "desc": "monoclonal antibodies reduce hospital length of stay by 28%"
   },
-    {"param": "betta", "attrs": {"variant": "bq"}, "mults": {"2020-01-01": 8.581}, "desc": "bq is equally as infectious as BA.5"},
-    {"param": "betta", "attrs": {"variant": "xbb"}, "mults": {"2020-01-01": 8.581}, "desc": "xbb is equally as infectious as BA.5"},
-    {"param": "hosp", "attrs": {"variant": "bq"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for bq hospitalization rate"},
-    {"param": "hosp", "attrs": {"variant": "xbb"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for xbb hospitalization rate"},
-    {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.050}, "desc": "given prior infection with any variant (or no variant), 7.5% of strongly immune individuals can get reinfected with bq"},
-    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.15}, "desc": "given prior infection with any variant (or no variant), 40% of individuals can get reinfected with bq"},
-    {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45", "bq"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.095}, "desc": "given prior infection with any variant (or no variant), 8.5% of strongly immune individuals can get reinfected with xbb"},
-    {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta", "omicron", "ba2", "ba2121", "ba45", "bq"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.6}, "desc": "given prior infection with any variant (or no variant), 50% of individuals can get reinfected with xbb"}
+  {"param": "betta", "attrs": {"variant": "bq"}, "mults": {"2020-01-01": 8.581}, "desc": "bq is equally as infectious as BA.5"},
+  {"param": "betta", "attrs": {"variant": "xbb"}, "mults": {"2020-01-01": 8.581}, "desc": "xbb is equally as infectious as BA.5"},
+  {"param": "hosp", "attrs": {"variant": "bq"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for bq hospitalization rate"},
+  {"param": "hosp", "attrs": {"variant": "xbb"}, "mults": {"2020-01-01": 1}, "desc": "baseline multiplier for xbb hospitalization rate"},
+  {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.04}, "desc": "given prior infection with any variant (or no variant), 7.5% of strongly immune individuals can get reinfected with bq"},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.40}, "desc": "given prior infection with any variant (or no variant), 40% of individuals can get reinfected with bq"},
+  {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.02}, "desc": "given prior infection with any variant (or no variant), 7.5% of strongly immune individuals can get reinfected with bq"},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["omicron", "ba2", "ba2121", "ba45"]}, "to_attrs": {"variant": ["bq"]}, "vals": {"2020-01-01": 0.2}, "desc": "given prior infection with any variant (or no variant), 40% of individuals can get reinfected with bq"},
+  {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["omicron", "ba2", "ba2121", "ba45", "bq"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.02}, "desc": "given prior infection with any variant (or no variant), 8.5% of strongly immune individuals can get reinfected with xbb"},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["omicron", "ba2", "ba2121", "ba45", "bq"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.4}, "desc": "given prior infection with any variant (or no variant), 50% of individuals can get reinfected with xbb"},
+  {"param": "immune_escape", "from_attrs": {"immun": "strong" ,"variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.04}, "desc": "given prior infection with any variant (or no variant), 8.5% of strongly immune individuals can get reinfected with xbb"},
+  {"param": "immune_escape", "from_attrs": {"immun": "weak" ,"variant": ["none", "wildtype", "alpha", "delta"]}, "to_attrs": {"variant": ["xbb"]}, "vals": {"2020-01-01": 0.8}, "desc": "given prior infection with any variant (or no variant), 50% of individuals can get reinfected with xbb"}
 ]
