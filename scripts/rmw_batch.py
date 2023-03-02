@@ -276,7 +276,7 @@ if __name__ == "__main__":
     create_job_parser.add_argument("--job_params",
                                    type=str,
                                    help="Name of a JSON file containing job parameters to read in.",
-                                   default="sample_config.json")
+                                   default="docker_test/sample_config.json")
     create_job_parser.add_argument("--project_id",
                                    type=str,
                                    help="The project id for the Google Cloud Project",
@@ -295,6 +295,10 @@ if __name__ == "__main__":
                                    help="Defines the id of the Batch job, and the name of the output "
                                         "directory under BUCKET_NAME. ",
                                    default=DEFAULT_JOB_ID)
+    create_job_parser.add_argument("--parallelism",
+                                   type=str,
+                                   help="Defines the number of tasks which should be run concurrently.",
+                                   default=6)
 
     # Job Monitoring
     monitor_job_parser = subparsers.add_parser("monitor",
@@ -336,11 +340,12 @@ if __name__ == "__main__":
                                   task_count=len(job_params["regions"]),
                                   job_id=args.job_id,
                                   bucket_mount_path=BUCKET_MOUNT_PATH,
-                                  machine_type="e2-highcpu-4",
+                                  machine_type="e2-standard-4",
                                   cpu_milli=4000,
-                                  memory_mib=4096,
+                                  memory_mib=16384,
                                   max_run_duration="18000s",
-                                  client=batch_client)
+                                  client=batch_client,
+                                  parallelism=args.parallelism)
     else:
         # Monitor an existing Batch Job.
         job_name_str = f"projects/{PROJECT_ID}/locations/{GCP_REGION}/jobs/{args.job_id}"

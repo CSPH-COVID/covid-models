@@ -1,13 +1,35 @@
 {
     "regions": [
-        "con"
+        "coe",
+        "con",
+        "cow",
+        "ide",
+        "idn",
+        "ids",
+        "idw",
+        "mte",
+        "mtn",
+        "mtw",
+        "nme",
+        "nmn",
+        "nms",
+        "nmw",
+        "ute",
+        "utn",
+        "uts",
+        "utw",
+        "wye",
+        "wyn",
+        "wyw"
     ],
     "start_date": "2020-01-24",
     "end_date": "2023-06-01",
     "base_model_fit_end_date": "2022-10-31",
     "scenarios_fit_end_date": "2023-02-10",
-    "report_start_date": "2022-11-01",
+    "report_start_date": "2021-10-28",
     "report_variants": [
+        "ba45",
+        "bq",
         "xbb"
     ]
 }
