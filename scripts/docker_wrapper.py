@@ -52,7 +52,7 @@ def wrapper_run(args: dict):
     # For now we expect that all parameters for all regions exist in the same file.
     # TODO: Change this to support separate parameter files per-region.
     base_model_args = {
-        'params_defs': 'covid_model/input/rmw_temp_params.json',
+        'params_defs': 'covid_model/input/rmw_temp_params_binned_seeds.json',
         # 'region_defs': 'covid_model/input/rmw_region_definitions.json',
         'vacc_proj_params': 'covid_model/input/rmw_vacc_proj_params.json',
         'start_date': args["start_date"],
