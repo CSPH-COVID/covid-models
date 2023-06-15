@@ -8,6 +8,16 @@
     "desc": "transmission rate (product of transmission-relevant contact and probability of infection given that contact)"
   },
   {
+    "param": "beta1",
+    "attrs": null,
+    "vals": {
+        "01-01": 2,
+        "04-09": 0,
+        "10-18": 2
+    },
+    "desc": "seasonality test parameter"
+  },
+  {
     "param": "lamb",
     "attrs": null,
     "vals": {
